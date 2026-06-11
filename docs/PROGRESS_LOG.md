@@ -3,6 +3,18 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-11 — claude_runner.py 구현 (Headless subprocess wrapper, overnight 회차)
+- Status: 완료. Day 4–5 트랙 두 번째 항목 — run_headless + RunResult 파싱.
+- Changed: src/app/claude_runner.py(build_command: `claude -p --output-format json` 인자 리스트
+  shell 미사용, allowlist 비면 `--allowedTools` 생략=default deny; run_headless: SubprocessRunner
+  주입(테스트 mock/실 subprocess), TimeoutExpired→ClaudeTimeoutError; _parse_result: result JSON 의
+  result/usage 토큰합/total_cost_usd 파싱, 비-JSON 은 raw fallback, 실패는 exit_code 로 전달).
+  tests/test_claude_runner.py 14종(성공 JSON/raw fallback/부분 usage/비수치 cost/실패 stderr/
+  timeout/인자 전달/shell 미사용). 실 `claude` 호출 없음.
+- Verified: `python3 -m pytest tests/ -q` → 76 passed, 1 skipped(fastapi 미설치 로컬 한정).
+- Blockers: 없음.
+- Next: NEXT_PLAN 다음 [auto] — Tool Allowlist 정의 모듈(명령→허용 도구 매핑 + claude_runner 연결점).
+
 ## 2026-06-11 — sanitizer.py 구현 (주입 방어 1계층, overnight 회차)
 - Status: 완료. Day 4–5 트랙 첫 항목 — wrap_untrusted + build_prompt.
 - Changed: src/app/sanitizer.py(wrap_untrusted: 태그 위조 regex 무력화 — 대소문자/공백/속성 변형 포함,
