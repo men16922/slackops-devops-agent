@@ -3,6 +3,19 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-11 — allowlist.py 구현 (Tool Allowlist 주입 방어 2계층, overnight 회차)
+- Status: 완료. Day 4–5 트랙 세 번째 항목 — 명령별 Tool Allowlist 매핑 + claude_runner 연결점.
+- Changed: src/app/allowlist.py(_COMMAND_TOOLS: logs/diagnose/tf-review/pr → `--allowedTools`
+  패턴 매핑, ping 은 Claude 미경유라 의도적 제외; allowed_tools: default deny + 복사본 반환;
+  validate_mapping: FORBIDDEN_ACTIONS 키워드 단어 단위 regex 로 매핑 자체를 import 시 검증;
+  run_for_command: permissions.is_allowed 게이트 → allowlist → run_headless 단일 진입점,
+  거부 시 subprocess 미실행). tests/test_allowlist.py 17종(매핑/default deny/ping 제외/
+  복사본/금지 키워드 전수 스캔/validate 거부 케이스/runner 연결·거부 시 미호출).
+- Verified: `python3 -m pytest tests/ -q` → 93 passed, 1 skipped(fastapi 미설치 로컬 한정).
+- Blockers: 없음.
+- Next: NEXT_PLAN 다음 [auto] — commands/logs.py(CloudWatch 주입 mock + sanitizer 격리 +
+  run_for_command 조립).
+
 ## 2026-06-11 — claude_runner.py 구현 (Headless subprocess wrapper, overnight 회차)
 - Status: 완료. Day 4–5 트랙 두 번째 항목 — run_headless + RunResult 파싱.
 - Changed: src/app/claude_runner.py(build_command: `claude -p --output-format json` 인자 리스트

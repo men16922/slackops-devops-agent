@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- `python3 -m pytest tests/ -q` → **76 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
+- `python3 -m pytest tests/ -q` → **93 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
 - `/devops ping` e2e 는 미검증(EC2 + Slack App 필요).
 
@@ -17,12 +17,14 @@
 - 명령 라우팅(default deny + 금지 불변 거부), ping 핸들러, SQLite job queue(원자 클레임),
   permission engine(L0/1 활성·L2 비활성), health/metrics(127.0.0.1 전용),
   sanitizer(wrap_untrusted 태그 위조 무력화 + build_prompt template 강제),
-  claude_runner(run_headless — 실행기 주입, allowedTools 전달, JSON→RunResult 파싱, timeout).
-- stub 잔여: telemetry / commands(logs·diagnose·tf_review·pr) / Tool Allowlist 매핑 모듈.
+  claude_runner(run_headless — 실행기 주입, allowedTools 전달, JSON→RunResult 파싱, timeout),
+  allowlist(명령별 Tool Allowlist 매핑 + run_for_command 단일 진입점 — permissions 게이트 →
+  allowlist → run_headless, 금지 키워드 import-time 검증, default deny).
+- stub 잔여: telemetry / commands(logs·diagnose·tf_review·pr).
 
 ## Active Focus
 - 운영자 수동: deploy/README.md 1–4단계(Slack App → IAM → EC2 → EventBridge) → ping e2e.
-- 다음 코드 트랙: Day 4–5 잔여 — Tool Allowlist 매핑 모듈 + logs/diagnose.
+- 다음 코드 트랙: Day 4–5 잔여 — commands/logs.py + commands/diagnose.py + 라우팅 등록.
 
 ## Open Risks
 - untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

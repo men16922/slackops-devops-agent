@@ -11,8 +11,8 @@
 
 ## Current Handover
 1. Day 1–3 로컬분 완료(라우팅/ping/queue/permissions/deploy 산출물). 잔여 = AWS/Slack 수동 실행(deploy/README.md).
-2. Day 4–5 진행 중: sanitizer + claude_runner 완료(실행기 주입 + allowedTools + RunResult 파싱).
-   다음 = Tool Allowlist 매핑 모듈 + logs/diagnose.
+2. Day 4–5 진행 중: sanitizer + claude_runner + allowlist 완료(run_for_command 단일 진입점 —
+   permissions → allowlist → run_headless). 다음 = commands/logs.py → diagnose → 라우팅 등록.
 
 ## Open Risks
 - untrusted input(로그·diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.
