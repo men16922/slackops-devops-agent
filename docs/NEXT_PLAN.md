@@ -3,13 +3,12 @@
 
 > **열린 작업만** (≤120줄). 완료 시 제거(이력은 PROGRESS_LOG/COMPLETED_SUMMARY). 권위: 이 파일 > docs/plans/.
 
-## Day 1–3 — 기반 + ping
-- [ ] EC2(c7i.large) 프로비저닝 + IAM Instance Profile(읽기 전용 정책) — 근거: A2/A8, Access Key 금지.
-- [ ] EC2 에 Claude Code Headless + AWS CLI/kubectl/terraform/gh/helm/jq 설치 — 근거: A2 도구 체인.
-- [ ] Slack App 생성(Socket Mode, App/Bot 토큰) — 근거: 인바운드 포트 없음.
-- [ ] `slack_handler` Socket Mode client 연결 + 명령 라우팅 — 근거: src/app 레이어.
-- [ ] `/devops ping` 헬스체크 end-to-end 동작 — 근거: A6 첫 명령.
-- [ ] EventBridge 스케줄 stop/start 구성 — 근거: A4 비용/상시 금지.
+## Day 1–3 잔여 — AWS/Slack 실행분 (운영자 수동, deploy/README.md 순서)
+- [ ] Slack App 생성(Socket Mode) + SSM SecureString 토큰 저장 — 근거: 수동 UI 단계, 코드로 불가.
+- [ ] `deploy/iam/create-role.sh` 실행(IAM Role + Instance Profile) — 근거: 로컬 자격증명 무효로 미실행.
+- [ ] `deploy/ec2/launch-instance.sh` 실행 + user-data 의 REPO_URL `CHANGE_ME` 교체 — 근거: GitHub remote 미정.
+- [ ] `deploy/eventbridge/create-schedules.sh <instance-id>` 실행 — 근거: instance-id 필요.
+- [ ] `/devops ping` end-to-end 확인(Slack → EC2 → pong) — 근거: A6 첫 명령, 현재 미검증.
 
 ## Day 4–5 — logs + diagnose + Sanitizer
 - [ ] Context Sanitizer (`<untrusted_data>` 격리 주입) 구현 — 근거: 주입 방어 1계층.

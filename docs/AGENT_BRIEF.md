@@ -11,9 +11,9 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
 - **무엇:** Slack 자연어 명령 → EC2 의 Claude Code Headless 가 AWS/K8s/Terraform/GitHub 컨텍스트 분석 → 운영 자동화.
   MVP = Read-Only 분석 + PR 생성까지.
 - **차별화:** 단순 봇이 아니라 "에이전트를 안전하게 운영하는 법"의 레퍼런스 — 보안(권한 + 주입 방어) + 계측(OTel).
-- **동작:** (아직 없음 — repo 부트스트랩 직후, Day 1 빌드 착수 직전 스캐폴드 상태.)
-- **검증:** `python -m pytest tests/ -q` (현재 import smoke 만).
-- **현재 초점:** Day 1–3 — EC2 + IAM Role + Claude Code + Socket Mode + `/devops ping`.
+- **동작:** 명령 라우팅 + ping + job queue + permission gate(로컬 검증). AWS/Slack 실행분은 deploy/ 준비 완료.
+- **검증:** `python3 -m pytest tests/ -q` → 46 passed, 1 skipped.
+- **현재 초점:** Day 1–3 잔여(운영자 수동, deploy/README.md) + Day 4–5 코드(Sanitizer + logs/diagnose).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)
 - Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).

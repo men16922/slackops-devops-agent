@@ -1,0 +1,30 @@
+# ADOT Collector — OTLP 수신 → CloudWatch(EMF) + X-Ray 내보내기.
+# Day 8–9 계측 트랙에서 지표 세부(차원/네임스페이스) 확정. 자격증명은 Instance Profile.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  awsemf:
+    namespace: SlackOpsDevOpsAgent
+    log_group_name: /slackops-devops-agent/metrics
+  awsxray: {}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [awsemf]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [awsxray]

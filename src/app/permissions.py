@@ -26,14 +26,38 @@ class PermissionLevel(IntEnum):
 # MVP 에서 활성화된 최대 레벨(EXECUTE 비활성).
 MAX_ENABLED_LEVEL: PermissionLevel = PermissionLevel.PREPARE
 
+# subcommand → 요구 권한 레벨. 여기 없는 명령은 전부 거부(default deny).
+_COMMAND_LEVELS: dict[str, PermissionLevel] = {
+    "ping": PermissionLevel.OBSERVE,
+    "logs": PermissionLevel.OBSERVE,
+    "diagnose": PermissionLevel.OBSERVE,
+    "tf-review": PermissionLevel.PREPARE,
+    "pr": PermissionLevel.PREPARE,
+}
+
+# 금지 불변 — 레벨과 무관하게 항상 거부되는 행위 키워드(Production/배포/IAM/DB).
+FORBIDDEN_ACTIONS: frozenset[str] = frozenset(
+    {"apply", "deploy", "rollout", "iam", "db-change", "production"}
+)
+
+
+class PermissionDenied(Exception):
+    """권한 게이트 거부."""
+
 
 def required_level(command: str) -> PermissionLevel:
     """subcommand 가 요구하는 권한 레벨 반환.
 
     Args:
-        command: subcommand 이름(ping/logs/diagnose/tf_review/pr).
+        command: subcommand 이름(ping/logs/diagnose/tf-review/pr).
+
+    Raises:
+        PermissionDenied: 정의되지 않은 명령(default deny).
     """
-    raise NotImplementedError("Day 4–5: 명령→레벨 매핑 구현 예정")
+    try:
+        return _COMMAND_LEVELS[command]
+    except KeyError:
+        raise PermissionDenied(f"unknown command (default deny): {command!r}") from None
 
 
 def is_allowed(command: str) -> bool:
@@ -41,4 +65,9 @@ def is_allowed(command: str) -> bool:
 
     EXECUTE(2) 및 금지 불변(Production/배포/IAM/DB)은 항상 거부.
     """
-    raise NotImplementedError("Day 4–5: 권한 게이트 구현 예정")
+    if command in FORBIDDEN_ACTIONS:
+        return False
+    try:
+        return required_level(command) <= MAX_ENABLED_LEVEL
+    except PermissionDenied:
+        return False

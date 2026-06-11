@@ -10,9 +10,11 @@ import importlib
 
 import pytest
 
-# import-time 서드파티 의존이 없는 stub 모듈만 (fastapi/slack-bolt/otel 미설치 환경 통과 목적).
+# lazy import 설계로 전 모듈이 서드파티 미설치 환경에서도 import-safe.
 STUB_MODULES = [
     "app",
+    "app.main",
+    "app.slack_handler",
     "app.job_queue",
     "app.permissions",
     "app.sanitizer",

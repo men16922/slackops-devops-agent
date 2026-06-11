@@ -4,19 +4,23 @@
 > 현재 상태/검증/risks (≤120줄). source of truth. 갱신은 /checkpoint.
 
 ## 현재 요약
-- repo 부트스트랩 완료. 빌드 Day 1 착수 직전.
-- 문서 하네스(harness/ + docs/ + skill 3종) + src/app stub 골격 + pyproject/.env.example/.gitignore 생성됨.
+- Day 1–3 **로컬 구현 완료**: Socket Mode 라우팅 + `/devops ping` + job queue + permission gate
+  + FastAPI health/metrics. deploy/ 산출물(IAM/EC2/EventBridge/ADOT) ready-to-run.
+- AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- `python -m pytest tests/ -q` → import smoke test 만 존재 (의존성 미설치 환경에서도 통과 설계).
-- 실 기능 테스트 없음(코드 stub 단계).
+- `python3 -m pytest tests/ -q` → **46 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
+- lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
+- `/devops ping` e2e 는 미검증(EC2 + Slack App 필요).
 
 ## 동작하는 것
-- (없음 — 스캐폴드 단계.) 모든 src/app 모듈은 타입힌트·docstring 포함 stub, 로직 미구현.
+- 명령 라우팅(default deny + 금지 불변 거부), ping 핸들러, SQLite job queue(원자 클레임),
+  permission engine(L0/1 활성·L2 비활성), health/metrics(127.0.0.1 전용).
+- stub 잔여: sanitizer / claude_runner / telemetry / commands(logs·diagnose·tf_review·pr).
 
 ## Active Focus
-- Day 1–3 트랙: EC2 + IAM Role + Claude Code + Socket Mode + `/devops ping`.
-- 다음: logs/diagnose + Context Sanitizer.
+- 운영자 수동: deploy/README.md 1–4단계(Slack App → IAM → EC2 → EventBridge) → ping e2e.
+- 다음 코드 트랙: Day 4–5 — Context Sanitizer + logs/diagnose + Tool Allowlist.
 
 ## Open Risks
 - untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.
