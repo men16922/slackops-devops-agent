@@ -3,6 +3,23 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-11 — commands/diagnose.py 구현 (다중 소스 종합 진단 조립, overnight 회차)
+- Status: 완료. Day 4–5 트랙 다섯 번째 항목 — diagnose 핸들러(다중 소스 수집기 주입 + 격리 결합).
+- Changed: src/app/commands/diagnose.py(handle_diagnose: fetchers 매핑 주입(SourceFetcher) →
+  collect_sources(소스별 실패 격리 — fetcher 예외도 untrusted 데이터로 격리 블록에 기록) →
+  combine_sources(`=== source: ... ===` 섹션 마커, 빈 소스 `(no data)` 표기) → build_prompt
+  단일 격리 블록 → run_for_command("diagnose"); 기본 수집기 3종 — fetch_cloudwatch_logs 재사용
+  + fetch_kubectl_describe + fetch_git_diff(log -10 + diff HEAD~1), 전부 호출 시점에만 외부
+  도구 사용; 전 소스 빈 데이터 시 Claude 미호출). src/app/commands/logs.py(_validated_service
+  → validated_service 공개 승격 — diagnose 와 service 검증 공유, 동작 동일).
+  tests/test_diagnose_command.py 15종(다중 소스 조립/단일 격리 블록/태그 위조 무력화/섹션
+  라벨/service 주입 거부/fetcher 실패 격리/(no data)·전체 빈 데이터·exit≠0 경계/순서 보존/
+  import-safe). AWS/kubectl/git 실 호출 없음.
+- Verified: `python3 -m pytest tests/ -q` → 120 passed, 1 skipped(fastapi 미설치 로컬 한정).
+- Blockers: 없음.
+- Next: NEXT_PLAN 다음 [auto] — slack_handler 에 logs/diagnose 라우팅 등록
+  (register_default_commands).
+
 ## 2026-06-11 — commands/logs.py 구현 (CloudWatch 조회+분석 조립, overnight 회차)
 - Status: 완료. Day 4–5 트랙 네 번째 항목 — logs 핸들러(조회→격리→실행 조립).
 - Changed: src/app/commands/logs.py(handle_logs: fetcher 주입(LogFetcher) → sanitizer

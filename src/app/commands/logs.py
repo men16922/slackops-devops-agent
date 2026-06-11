@@ -46,7 +46,12 @@ class InvalidServiceName(Exception):
     """service 인자가 허용 문자 집합/길이를 벗어남."""
 
 
-def _validated_service(service: str) -> str:
+def validated_service(service: str) -> str:
+    """service 인자를 허용 문자 집합으로 강제 검증(diagnose 등 다른 명령과 공유).
+
+    Raises:
+        InvalidServiceName: 허용 문자 집합/길이를 벗어남.
+    """
     name = service.strip()
     if not _SERVICE_RE.fullmatch(name):
         raise InvalidServiceName(
@@ -86,7 +91,7 @@ def build_logs_prompt(service: str, raw_logs: str) -> str:
     Raises:
         InvalidServiceName: service 가 허용 문자 집합을 벗어남.
     """
-    template = LOGS_PROMPT_TEMPLATE.replace("__SERVICE__", _validated_service(service))
+    template = LOGS_PROMPT_TEMPLATE.replace("__SERVICE__", validated_service(service))
     return build_prompt(template, raw_logs)
 
 
@@ -111,7 +116,7 @@ def handle_logs(
         Slack 에 게시할 분석 요약(또는 입력/실행 오류 안내).
     """
     try:
-        validated = _validated_service(service)
+        validated = validated_service(service)
     except InvalidServiceName:
         return (
             ":no_entry: 서비스 이름이 올바르지 않습니다 — "

@@ -11,9 +11,9 @@
 
 ## Current Handover
 1. Day 1–3 로컬분 완료(라우팅/ping/queue/permissions/deploy 산출물). 잔여 = AWS/Slack 수동 실행(deploy/README.md).
-2. Day 4–5 진행 중: sanitizer + claude_runner + allowlist + commands/logs 완료
-   (logs = fetcher 주입→sanitizer 격리→run_for_command 조립, service 인자 regex 검증).
-   다음 = commands/diagnose.py → logs/diagnose 라우팅 등록.
+2. Day 4–5 진행 중: sanitizer + claude_runner + allowlist + commands/logs + commands/diagnose 완료
+   (diagnose = 다중 소스 fetchers 주입→소스별 실패 격리→섹션 마커 단일 격리 블록→run_for_command).
+   다음 = slack_handler 에 logs/diagnose 라우팅 등록(register_default_commands).
 
 ## Open Risks
 - untrusted input(로그·diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

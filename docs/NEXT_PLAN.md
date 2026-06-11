@@ -13,8 +13,6 @@
 - [ ] `[manual]` `/devops ping` end-to-end 확인(Slack → EC2 → pong).
 
 ## Day 4–5 — Sanitizer + logs/diagnose
-- [ ] `[auto]` `commands/diagnose.py` 구현 — 다중 소스(logs/kubectl/git diff) 수집기 주입 +
-      격리 결합. 완료: mock 기반 테스트 green.
 - [ ] `[auto]` slack_handler 에 logs/diagnose 등록(register_default_commands) — 완료: 라우팅 테스트 green.
 
 ## Day 6–7 — tf-review + pr
