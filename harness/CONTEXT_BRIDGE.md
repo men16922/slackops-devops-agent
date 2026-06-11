@@ -11,7 +11,7 @@
 
 ## Current Handover
 1. Day 1–3 로컬분 완료(라우팅/ping/queue/permissions/deploy 산출물). 잔여 = AWS/Slack 수동 실행(deploy/README.md).
-2. 다음 코드 트랙: Day 4–5 — Context Sanitizer + logs/diagnose + Tool Allowlist.
+2. Day 4–5 진행 중: sanitizer 완료(태그 위조 무력화 + template 강제). 다음 = claude_runner + Tool Allowlist + logs/diagnose.
 
 ## Open Risks
 - untrusted input(로그·diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

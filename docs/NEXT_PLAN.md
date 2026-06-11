@@ -13,8 +13,6 @@
 - [ ] `[manual]` `/devops ping` end-to-end 확인(Slack → EC2 → pong).
 
 ## Day 4–5 — Sanitizer + logs/diagnose
-- [ ] `[auto]` `sanitizer.py` 구현 — wrap_untrusted(태그 위조 무력화) + build_prompt(template 경유 강제).
-      완료: 태그 escape·결합 테스트 포함 pytest green.
 - [ ] `[auto]` `claude_runner.py` 구현 — subprocess 로 `claude -p` 호출, allowed_tools 전달,
       출력→RunResult 파싱. 완료: subprocess 주입(mock)으로 성공/실패/timeout 테스트 green. 실 호출 금지.
 - [ ] `[auto]` 명령별 Tool Allowlist 정의 모듈 — 명령→허용 도구 매핑(`logs`→`aws logs` 등) +
