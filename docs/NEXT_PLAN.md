@@ -6,13 +6,16 @@
 > 무인 회차는 위에서 아래로 `[auto]` 1개씩 수행. 각 항목의 "완료:" 기준을 충족해야 종료.
 
 ## ★ Active — H0 해커톤 피벗 (마감 2026-06-30, 상세 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5)
-- [ ] `[auto]` `store/` JobStore 프로토콜 + DynamoDB 단일테이블 구현 + SQLite 를 프로토콜 뒤로
-      — 완료: moto 로 enqueue/claim(경합)/approve/list 테스트 green, boto3 lazy import-safe.
-- [ ] `[auto]` AuditStore/TelemetryStore + telemetry.py 구현 + slack_handler route→job enqueue 전환
-      — 완료: 비동기 job 모델 테스트 green.
-- [ ] `[auto]` `worker.py` 폴링 루프(claim→run_for_command→diff/result/audit/metric write-back + 출력게이트)
-      — 완료: mock runner + moto 로 상태머신 e2e 테스트 green.
-- [ ] `[auto]` `commands/{tf_review,pr}.py` 구현(pr 출력게이트 = 대시보드 승인 백엔드).
+> store/ 레이어(JobStore + DynamoDB + SQLite)는 완료(52d7b98). 아래 [auto] 는 모두 그 store 를 재사용한다.
+- [ ] `[auto]` `store/audit_store.py` + `store/telemetry_store.py` — Audit/Metric 항목(DECISIONS/plans 의
+      단일테이블 키: `JOB#{id}`/`AUDIT#{ts}#{seq}`, `JOB#{id}`/`METRIC#{ts}`, GSI2 피드)을 DynamoDB+SQLite
+      양 구현 + moto 테스트. 완료: append/조회 동치 테스트 green, app.store 에서 export.
+- [ ] `[auto]` `telemetry.py` 구현 — record_run_metrics 가 TelemetryStore 에 metric 기록(+OTel 은 lazy stub).
+      완료: 주입된 store 에 기록되는 테스트 green.
+- [ ] `[auto]` `worker.py` 폴링 루프 — store.claim()→run_for_command 실행→diff 면 await_approval, 아니면
+      complete(DONE/FAILED)+audit/metric write-back. 주입 가능(store/runner). 완료: mock runner + SqliteJobStore
+      로 claim→실행→complete e2e + 출력게이트(pr) 분기 테스트 green.
+- [ ] `[auto]` `commands/{tf_review,pr}.py` 구현(pr 출력게이트 = 대시보드 승인 백엔드). 완료: mock 테스트 green.
 - [ ] `[manual]` v0 로 web/ Next.js 대시보드 스캐폴드 → server actions↔DynamoDB → Vercel 배포.
 - [ ] `[manual]` AWS/v0 크레딧 신청 + DynamoDB 테이블 provision + 실 EC2 e2e 1회 캡처.
 - [ ] `[manual]` 제출물: 아키텍처 다이어그램·DynamoDB 스크린샷·3분 데모영상·텍스트설명·Vercel 링크/Team ID·(보너스)아티클.
