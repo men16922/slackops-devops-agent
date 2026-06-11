@@ -3,6 +3,19 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — telemetry.py record_run_metrics → TelemetryStore (overnight 회차)
+- Status: 완료. H0 트랙 [auto] 2번 항목 — telemetry 가 store 레이어를 소비하는 첫 결합.
+- Changed: src/app/telemetry.py 재작성 — record_run_metrics(store, job_id, *, command/duration_ms/
+  tokens/cost_usd/tool_calls/success/error) 가 주입된 TelemetryStore.record 에 위임(MetricRecord 반환).
+  구 시그니처(step_latencies_ms/failed)는 store 스키마(duration_ms/success)로 정렬. setup_telemetry 는
+  lazy stub 로 전환 — opentelemetry lazy import, 미설치면 None(기존 NotImplementedError 제거).
+  tests/test_telemetry.py 신규 5종(주입 store 기록 roundtrip, 실패 error 보존, 기본값, 일자 피드 노출,
+  setup_telemetry import-safe).
+- Verified: `python3 -m pytest tests/ -q` → 183 passed, 1 skipped. `ruff check` 신규/변경 파일 clean.
+  `mypy src/app/telemetry.py` — telemetry 자체 오류 0(잔여는 기존 boto3 stub 부재 noise).
+- Blockers: 없음.
+- Next: [auto] worker.py 폴링 루프(claim→run_for_command→complete/await_approval+audit/metric write-back).
+
 ## 2026-06-12 — AuditStore + TelemetryStore (단일테이블 Audit/Metric 항목, overnight 회차)
 - Status: 완료. H0 트랙 [auto] 1번 항목 — store 레이어 확장.
 - Changed: src/app/store/audit_store.py(AuditEvent/AuditStore 프로토콜 + Sqlite/DynamoDb 구현 —

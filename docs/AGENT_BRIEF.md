@@ -14,10 +14,10 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
 - **동작:** 명령 라우팅(ping/logs/diagnose 등록 완료) + job queue + permission gate + sanitizer
   + claude_runner + allowlist(run_for_command 단일 진입점) + logs/diagnose 핸들러(fetcher
   주입→격리→조립, diagnose 는 다중 소스+소스별 실패 격리) + store/(H0 단일테이블 —
-  Job/Audit/Telemetry 각각 Sqlite+DynamoDb 양 구현) — 로컬 검증. AWS/Slack 실행분은
-  deploy/ 준비 완료.
-- **검증:** `python3 -m pytest tests/ -q` → 178 passed, 1 skipped.
-- **현재 초점:** H0 [auto] 트랙 — telemetry.py → worker.py → commands/{tf_review,pr} + [manual](크레딧/provision/대시보드).
+  Job/Audit/Telemetry 각각 Sqlite+DynamoDb 양 구현) + telemetry(record_run_metrics→
+  주입 store, OTel 은 lazy stub) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료.
+- **검증:** `python3 -m pytest tests/ -q` → 183 passed, 1 skipped.
+- **현재 초점:** H0 [auto] 트랙 — worker.py → commands/{tf_review,pr} + [manual](크레딧/provision/대시보드).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)
 - Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).

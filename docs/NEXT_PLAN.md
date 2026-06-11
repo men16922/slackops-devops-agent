@@ -8,8 +8,6 @@
 ## ★ Active — H0 해커톤 피벗 (마감 2026-06-30, 상세 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5)
 > store/ 레이어 완료: JobStore(52d7b98) + AuditStore/TelemetryStore(단일테이블 Audit/Metric,
 > Sqlite+DynamoDb 양 구현). 아래 [auto] 는 모두 그 store 를 재사용한다.
-- [ ] `[auto]` `telemetry.py` 구현 — record_run_metrics 가 TelemetryStore 에 metric 기록(+OTel 은 lazy stub).
-      완료: 주입된 store 에 기록되는 테스트 green.
 - [ ] `[auto]` `worker.py` 폴링 루프 — store.claim()→run_for_command 실행→diff 면 await_approval, 아니면
       complete(DONE/FAILED)+audit/metric write-back. 주입 가능(store/runner). 완료: mock runner + SqliteJobStore
       로 claim→실행→complete e2e + 출력게이트(pr) 분기 테스트 green.
@@ -33,8 +31,9 @@
 - [ ] `[manual]` GitHub App 최소 스코프 + branch protection(자동 머지 차단) 설정.
 
 ## Day 8–9 — Observability
-- [ ] `[auto]` `telemetry.py` 구현 — OTel SDK 셋업(lazy import) + record_run_metrics
-      (step latency/토큰/비용/tool call/실패). 완료: in-memory exporter 또는 mock 테스트 green.
+- [ ] `[auto]` `telemetry.py` OTel 파이프라인 — setup_telemetry 실 구현(TracerProvider+OTLP exporter,
+      lazy import 유지) + record_run_metrics 의 OTel 지표 emit(store 기록은 완료). 완료: in-memory
+      exporter 또는 mock 테스트 green.
 - [ ] `[auto]` claude_runner·commands 에 telemetry 계측 결합 — 완료: 호출 시 지표 기록 테스트 green.
 - [ ] `[manual]` EC2 에 ADOT Collector 구성 + diagnose 1회 수치 캡처(N초/$0.0X/tool call M회).
 

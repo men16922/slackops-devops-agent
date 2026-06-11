@@ -12,9 +12,9 @@
 ## Current Handover
 1. Day 1–5 로컬분 완결(라우팅/ping/permissions/sanitizer/claude_runner/allowlist/logs/diagnose).
    잔여 = AWS/Slack 수동 실행(deploy/README.md) + H0 [manual](크레딧/DynamoDB provision/v0 대시보드).
-2. H0 store/ 레이어 **완료**: JobStore + AuditStore + TelemetryStore(단일테이블, Sqlite+DynamoDb
-   양 구현, moto 동치 — pytest 178 passed). 다음 [auto] = telemetry.py(record_run_metrics→
-   TelemetryStore) → worker.py 폴링 루프 → commands/{tf_review,pr}.
+2. H0 store/ 레이어 + telemetry **완료**: JobStore/AuditStore/TelemetryStore(단일테이블,
+   Sqlite+DynamoDb 양 구현, moto 동치) + record_run_metrics→주입 store(OTel 은 lazy stub) —
+   pytest 183 passed. 다음 [auto] = worker.py 폴링 루프 → commands/{tf_review,pr}.
 
 ## Open Risks
 - untrusted input(로그·diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.
