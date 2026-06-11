@@ -3,6 +3,27 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — code-review 후속 수정 (밤샘 산출물 10 findings 일괄 수정)
+- Status: 완료. high-effort 멀티에이전트 리뷰가 찾은 버그 5 + 정리 5 를 우선순위대로 수정.
+- Changed:
+  - #1+#8 slack_handler.route: 핸들러 예외(ClaudeTimeout/Permission/Allowlist/일반)를 Slack
+    메시지로 매핑하는 최종 안전망(무응답 silent crash 제거) + commands/_replies.py 로 에러문구 일원화.
+  - #3 sanitizer._TAG_FORGERY: 닫는 '>' 없는 미완성 태그도 무력화(`[^>]*>?`) — 부분 close 위조 차단.
+  - #4 logs._SERVICE_RE: 선행 '-' 거부 + diagnose fetch_kubectl_describe argv 에 '--' 구분자.
+  - #5 logs.fetch_cloudwatch_logs: filter_log_events(가장 오래된 것)→describe_log_streams
+    +get_log_events(startFromHead=False)로 **최신** 이벤트 조회.
+  - #6 bin/overnight/run.sh: limit 감지를 --output-format json 의 is_error 우선 판정으로
+    교체(성공 회차의 'rate limit' 언급 오판 제거) — classify_outcome(python3).
+  - #7 permissions.COMMAND_SPECS 단일 레지스트리 + allowlist._cross_check_with_permissions
+    import-time 강제(4곳 드리프트→import 에러).
+  - #9 tests/_helpers.py 로 RecordingRunner/RecordingFetcher/result_json 일원화(4파일 중복 제거).
+  - #10 RunResult.tool_calls 죽은 필드(항상 0·무참조) 제거.
+- Verified: `python3 -m pytest tests/ -q` → 133 passed, 1 skipped(fastapi 로컬 미설치).
+  새 검증 9종(미완성 태그·선행 dash·kubectl '--'·route 예외매핑 4·allowlist↔permissions 불변).
+  run.sh classify_outcome 4케이스 수동 검증(성공/limit/failure/non-json).
+- Blockers: 없음.
+- Next: Day 6–7 [auto] — commands/tf_review.py, commands/pr.py(출력 게이트).
+
 ## 2026-06-12 — slack_handler 에 logs/diagnose 라우팅 등록 (Day 4–5 완결, overnight 회차)
 - Status: 완료. Day 4–5 트랙 마지막 항목 — register_default_commands 에 logs/diagnose 연결.
 - Changed: src/app/slack_handler.py(register_default_commands: `from app.commands import

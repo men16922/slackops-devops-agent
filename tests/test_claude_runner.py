@@ -15,6 +15,7 @@ from app.claude_runner import (
     build_command,
     run_headless,
 )
+from tests._helpers import RecordingRunner
 
 
 def _result_json(
@@ -32,20 +33,6 @@ def _result_json(
             "usage": {"input_tokens": tokens[0], "output_tokens": tokens[1]},
         }
     )
-
-
-class RecordingRunner:
-    """주입용 mock 실행기 — 호출 인자를 기록하고 고정 응답 반환."""
-
-    def __init__(self, exit_code: int = 0, stdout: str = "", stderr: str = "") -> None:
-        self.exit_code = exit_code
-        self.stdout = stdout
-        self.stderr = stderr
-        self.calls: list[tuple[list[str], int]] = []
-
-    def __call__(self, cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
-        self.calls.append((cmd, timeout_s))
-        return self.exit_code, self.stdout, self.stderr
 
 
 # ── build_command ────────────────────────────────────────────────

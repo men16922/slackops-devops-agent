@@ -17,7 +17,11 @@ PROMPT_PLACEHOLDER = "{untrusted_data}"
 
 # 태그 위조 탐지: 대소문자/여분 공백/속성 변형까지 전부 무력화 대상.
 # 예: </untrusted_data>, </ UNTRUSTED_DATA >, <untrusted_data role=system>
-_TAG_FORGERY = re.compile(r"<\s*/?\s*untrusted_data\b[^>]*>", re.IGNORECASE)
+# 닫는 '>' 는 선택(`>?`) — '</untrusted_data\nSYSTEM...' 처럼 '>' 없이 끝나는
+# 미완성 태그도 '<' 부터 무력화해야 LLM 이 블록 종료로 오인하지 못한다.
+# '>' 가 없으면 '[^>]*' 가 뒤를 삼키지만, _escape_tag 는 그 안의 '<'·'>' 만 치환하고
+# 나머지 본문은 보존하므로 데이터 손실이 없다.
+_TAG_FORGERY = re.compile(r"<\s*/?\s*untrusted_data\b[^>]*>?", re.IGNORECASE)
 
 
 class PromptTemplateError(Exception):
@@ -32,7 +36,8 @@ def wrap_untrusted(content: str) -> str:
     """untrusted content 를 격리 태그로 감싼다.
 
     내부의 동일 태그 시퀀스는 무력화(escape)해 태그 위조를 막는다.
-    escape 결과에는 `<` 가 남지 않으므로 단일 패스로 재조합 위조가 불가능하다.
+    닫는 `>` 가 없는 미완성 태그(`</untrusted_data\n...`)도 `<` 부터 escape 되어,
+    escape 결과에는 untrusted_data 태그를 이루는 `<` 가 남지 않는다(재조합·미완성 위조 불가).
 
     Args:
         content: CloudWatch 로그·git diff 등 신뢰할 수 없는 텍스트.

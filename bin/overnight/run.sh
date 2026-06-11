@@ -6,6 +6,9 @@
 #   touch bin/overnight/STOP                     # 중단 요청
 # 설계: 회차마다 fresh context 로 /sync → 작업 1묶음 → /checkpoint → commit.
 #       usage limit 도달 시 LIMIT_WAIT 대기 후 재시도(리셋 후 속행).
+# 결과 분류: claude -p --output-format json 의 마지막 JSON 객체 is_error 로 성공을 먼저
+#   판정한다. 성공(is_error=false)이면 result 텍스트에 'rate limit' 등이 언급돼도 무시한다
+#   (정상 회차 오판 방지). 성공이 아닐 때만 limit 텍스트를 검사해 wait/retry 로 분기한다.
 set -u
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -40,6 +43,42 @@ run_with_timeout() {
   fi
 }
 
+# 회차 로그 + rc 로부터 결과 분류: success / limit / failure.
+# 성공은 --output-format json 의 is_error=false 로 판정(가장 신뢰 가능한 신호).
+# 성공이 아닐 때만 limit 텍스트를 검사 → 정상 회차의 'rate limit' 언급 오판을 막는다.
+classify_outcome() {
+  python3 - "$1" "$2" <<'PY'
+import json, re, sys
+
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+rc = int(sys.argv[2])
+
+def payload(t):
+    t = t.strip()
+    if not t:
+        return None
+    for cand in (t.splitlines()[-1], t):
+        try:
+            obj = json.loads(cand)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
+
+obj = payload(text)
+if isinstance(obj, dict) and obj.get("is_error") is False:
+    print("success")
+elif re.search(
+    r"usage limit|session limit|rate.?limit|limit (reached|exceeded)|hit your.*limit|overloaded",
+    text, re.IGNORECASE,
+):
+    print("limit")
+else:
+    print("failure" if rc != 0 else "success")
+PY
+}
+
 note "runner start (max_iter=$MAX_ITER once=$once repo=$REPO_ROOT)"
 iter=0
 consec_fail=0
@@ -54,18 +93,21 @@ while [ "$iter" -lt "$MAX_ITER" ]; do
 
   run_with_timeout claude -p "$(cat "$DIR/PROMPT.md")" \
     --permission-mode acceptEdits \
+    --output-format json \
     >"$ITER_LOG" 2>&1
   rc=$?
 
-  if grep -qiE "usage limit|session limit|rate.?limit|limit (reached|exceeded)|hit your.*limit|overloaded" "$ITER_LOG"; then
-    note "iter $iter: usage/rate limit detected (rc=$rc) — sleeping ${LIMIT_WAIT}s"
+  outcome="$(classify_outcome "$ITER_LOG" "$rc")"
+
+  if [ "$outcome" = "limit" ]; then
+    note "iter $iter: usage/session limit detected (rc=$rc) — sleeping ${LIMIT_WAIT}s"
     consec_fail=0
     $once && { note "once mode — exiting after limit"; break; }
     sleep "$LIMIT_WAIT"
     continue
   fi
 
-  if [ "$rc" -ne 0 ]; then
+  if [ "$outcome" = "failure" ]; then
     consec_fail=$((consec_fail + 1))
     note "iter $iter: FAILED rc=$rc (consecutive=$consec_fail)"
     if [ "$consec_fail" -ge "$MAX_CONSEC_FAIL" ]; then

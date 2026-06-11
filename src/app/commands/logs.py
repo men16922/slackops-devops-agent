@@ -14,7 +14,14 @@ from typing import Callable
 
 from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
+from app.commands._replies import (
+    exec_failed_reply,
+    invalid_service_reply,
+    no_data_reply,
+)
 from app.sanitizer import build_prompt
+
+_USAGE_HINT = "사용법: `/devops logs <service>`"
 
 # 로그 fetcher 시그니처: (service) → raw 로그 텍스트. 비어 있으면 "" 반환.
 LogFetcher = Callable[[str], str]
@@ -24,7 +31,9 @@ DEFAULT_EVENT_LIMIT = 200
 
 # service 인자는 Slack 원문에서 온 untrusted 입력 — CloudWatch log group 문자 집합으로
 # 강제 검증한 뒤에만 template 에 삽입한다(주입 방어 4계층: Slack 입력 직접 전달 금지).
-_SERVICE_RE = re.compile(r"^[A-Za-z0-9_./#-]{1,512}$")
+# 맨 앞 '-' 금지 — 검증값은 kubectl/aws argv 에 위치 인자로 들어가므로, 선행 '-' 는
+# 플래그(예: '-A', '--all-namespaces')로 해석돼 옵션 주입이 된다(diagnose 의 kubectl 경로).
+_SERVICE_RE = re.compile(r"^[A-Za-z0-9_./#][A-Za-z0-9_./#-]{0,511}$")
 
 # 신뢰 template — untrusted 로그는 {untrusted_data} 자리에 격리 삽입된다.
 # __SERVICE__ 토큰은 _SERVICE_RE 검증을 통과한 값으로만 치환된다.
@@ -61,24 +70,42 @@ def validated_service(service: str) -> str:
 
 
 def fetch_cloudwatch_logs(service: str, limit: int = DEFAULT_EVENT_LIMIT) -> str:
-    """기본 fetcher — CloudWatch Logs 최근 이벤트를 boto3 로 조회(테스트에서는 mock 주입).
+    """기본 fetcher — CloudWatch Logs 의 **가장 최근** 이벤트를 boto3 로 조회(테스트에서는 mock 주입).
+
+    `filter_log_events` 는 startTime 없이 페이지네이션하면 보존 기간 시작점(가장 오래된)부터
+    반환하므로, 최근 이벤트가 있는 로그 스트림을 LastEventTime 내림차순으로 골라
+    `get_log_events(startFromHead=False)` 로 끝(최신)에서부터 가져온다.
 
     Args:
         service: log group 이름(검증된 값).
         limit: 가져올 최근 이벤트 수 상한.
 
     Returns:
-        이벤트 message 를 줄바꿈으로 이은 raw 로그 텍스트.
+        최신순으로 수집해 시간순(오래된→최신)으로 정렬한 이벤트 message 를
+        줄바꿈으로 이은 raw 로그 텍스트(최대 limit 개).
     """
     import boto3  # lazy: 미설치/자격증명 없는 환경 import-safe
 
     client = boto3.client("logs")
-    paginator = client.get_paginator("filter_log_events")
-    pages = paginator.paginate(
-        logGroupName=service, PaginationConfig={"MaxItems": limit}
-    )
-    messages = [str(m) for m in pages.search("events[].message")]
-    return "\n".join(messages)
+    streams = client.describe_log_streams(
+        logGroupName=service,
+        orderBy="LastEventTime",
+        descending=True,
+        limit=5,
+    ).get("logStreams", [])
+
+    messages: list[str] = []
+    for stream in streams:
+        events = client.get_log_events(
+            logGroupName=service,
+            logStreamName=stream["logStreamName"],
+            limit=limit,
+            startFromHead=False,  # 끝(최신)에서부터
+        ).get("events", [])
+        messages.extend(event["message"] for event in events)
+        if len(messages) >= limit:
+            break
+    return "\n".join(messages[-limit:])
 
 
 def build_logs_prompt(service: str, raw_logs: str) -> str:
@@ -118,19 +145,13 @@ def handle_logs(
     try:
         validated = validated_service(service)
     except InvalidServiceName:
-        return (
-            ":no_entry: 서비스 이름이 올바르지 않습니다 — "
-            "허용 문자: 영숫자와 `_ . / # -`. 사용법: `/devops logs <service>`"
-        )
+        return invalid_service_reply(_USAGE_HINT)
     active_fetcher: LogFetcher = fetcher if fetcher is not None else fetch_cloudwatch_logs
     raw_logs = active_fetcher(validated)
     if not raw_logs.strip():
-        return f":mag: `{validated}` 에서 최근 로그 이벤트를 찾지 못했습니다."
+        return no_data_reply(validated, "최근 로그 이벤트를")
     prompt = build_logs_prompt(validated, raw_logs)
     result = run_for_command("logs", prompt, timeout_s=timeout_s, runner=runner)
     if result.exit_code != 0:
-        return (
-            f":warning: `{validated}` 로그 분석 실행이 실패했습니다 "
-            f"(exit {result.exit_code}).\n{result.output}"
-        )
+        return exec_failed_reply(validated, "로그 분석", result.exit_code, result.output)
     return result.output

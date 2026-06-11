@@ -36,19 +36,21 @@ class ClaudeTimeoutError(ClaudeRunnerError):
 class RunResult:
     """Claude Code Headless 실행 결과.
 
+    tool call 횟수는 `--output-format json` 의 result 객체에 없어 여기서 제공하지 않는다.
+    계측이 필요하면 stream-json 파싱이 도입될 때 추가한다(telemetry.record_run_metrics 는
+    tool_calls 를 별도 인자로 받는다).
+
     Attributes:
         output: 결과 텍스트(JSON 출력이면 `result` 필드, 아니면 raw stdout/stderr).
         exit_code: subprocess 종료 코드.
         tokens: 사용 토큰 수(input+output, 계측용, 없으면 None).
         cost_usd: 호출 비용 USD(계측용, 없으면 None).
-        tool_calls: tool call 횟수(계측용 — result JSON 에는 없어 stream 계측 전까지 0).
     """
 
     output: str
     exit_code: int
     tokens: int | None = None
     cost_usd: float | None = None
-    tool_calls: int = 0
 
 
 def build_command(prompt: str, allowed_tools: list[str]) -> list[str]:

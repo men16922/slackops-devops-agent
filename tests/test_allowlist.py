@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 
 import pytest
@@ -16,18 +15,7 @@ from app.allowlist import (
 )
 from app.claude_runner import build_command
 from app.permissions import FORBIDDEN_ACTIONS, PermissionDenied
-
-
-class RecordingRunner:
-    """주입용 mock 실행기 — 호출 인자를 기록하고 고정 응답 반환."""
-
-    def __init__(self, stdout: str = "") -> None:
-        self.stdout = stdout
-        self.calls: list[tuple[list[str], int]] = []
-
-    def __call__(self, cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
-        self.calls.append((cmd, timeout_s))
-        return 0, self.stdout, ""
+from tests._helpers import RecordingRunner, result_json as _result_json
 
 
 # ── 명령별 매핑 ──────────────────────────────────────────────────
@@ -59,6 +47,16 @@ def test_pr_allowlist_covers_branch_to_pr_workflow() -> None:
 
 def test_known_commands_are_claude_backed_only() -> None:
     assert known_commands() == frozenset({"logs", "diagnose", "tf-review", "pr"})
+
+
+def test_allowlist_matches_permissions_registry() -> None:
+    """allowlist 명령 집합 == permissions 의 claude_backed 집합(finding #7 드리프트 차단).
+
+    import 시 _cross_check_with_permissions 가 이미 강제하지만, 회귀 가드로 명시한다.
+    """
+    from app import permissions
+
+    assert known_commands() == permissions.claude_backed_commands()
 
 
 # ── default deny ─────────────────────────────────────────────────
@@ -114,10 +112,6 @@ def test_validate_mapping_accepts_current_shape() -> None:
 
 
 # ── run_for_command — claude_runner 연결점 ───────────────────────
-
-
-def _result_json(result: str = "ok") -> str:
-    return json.dumps({"result": result, "total_cost_usd": 0.01})
 
 
 def test_run_for_command_passes_allowlist_to_runner() -> None:

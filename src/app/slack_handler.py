@@ -14,6 +14,8 @@ import os
 from typing import Any, Callable
 
 from app import permissions
+from app.allowlist import AllowlistDenied
+from app.claude_runner import ClaudeRunnerError, ClaudeTimeoutError
 
 # subcommand 핸들러 시그니처: (args_text) -> Slack 게시용 응답 텍스트.
 CommandHandler = Callable[[str], str]
@@ -79,7 +81,26 @@ class SlackHandler:
         handler = self._routes.get(subcommand)
         if handler is None:
             return f":construction: `{subcommand}` 는 아직 구현되지 않았습니다."
-        return handler(rest.strip())
+        # 핸들러 예외를 Slack 메시지로 매핑하는 최종 안전망 — ack() 후 respond() 가
+        # 반드시 불리도록, 어떤 예외도 무응답(silent crash)으로 새지 않게 한다.
+        try:
+            return handler(rest.strip())
+        except permissions.PermissionDenied:
+            return f":no_entry: `{subcommand}` 실행이 권한 정책에 의해 거부됐습니다."
+        except AllowlistDenied:
+            return f":no_entry: `{subcommand}` 에 허용된 도구가 없어 실행이 거부됐습니다."
+        except ClaudeTimeoutError:
+            return (
+                f":hourglass: `{subcommand}` 실행이 시간 초과로 중단됐습니다. "
+                "잠시 후 다시 시도해 주세요."
+            )
+        except ClaudeRunnerError:
+            return f":warning: `{subcommand}` 실행 중 오류가 발생했습니다."
+        except Exception as exc:  # noqa: BLE001 — 최종 안전망: 무응답 방지가 목적
+            return (
+                f":warning: `{subcommand}` 처리 중 예기치 못한 오류가 발생했습니다 "
+                f"({type(exc).__name__}). 서버 로그를 확인해 주세요."
+            )
 
     def _bind_slash_command(self) -> None:
         """Bolt App 에 `/devops` slash command 핸들러 바인딩."""

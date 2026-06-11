@@ -4,7 +4,21 @@ from __future__ import annotations
 
 import pytest
 
+from app.allowlist import AllowlistDenied
+from app.claude_runner import ClaudeTimeoutError
+from app.permissions import PermissionDenied
 from app.slack_handler import USAGE, SlackHandler, build_default_handler
+
+
+def _handler_raising(exc: Exception) -> SlackHandler:
+    """logs 핸들러가 주어진 예외를 던지도록 등록한 SlackHandler."""
+
+    def _boom(_args: str) -> str:
+        raise exc
+
+    handler = SlackHandler()
+    handler.register("logs", _boom)
+    return handler
 
 
 @pytest.fixture
@@ -90,3 +104,28 @@ def test_register_disallowed_command_rejected() -> None:
     handler = SlackHandler()
     with pytest.raises(ValueError):
         handler.register("apply", lambda _: "never")
+
+
+# ── route 예외 매핑 (finding #1: 핸들러 예외가 Slack 무응답으로 새지 않게) ──
+
+
+def test_route_maps_timeout_to_slack_message() -> None:
+    reply = _handler_raising(ClaudeTimeoutError("timed out")).route("logs svc")
+    assert "시간 초과" in reply
+
+
+def test_route_maps_permission_denied_to_slack_message() -> None:
+    reply = _handler_raising(PermissionDenied("nope")).route("logs svc")
+    assert "권한" in reply
+
+
+def test_route_maps_allowlist_denied_to_slack_message() -> None:
+    reply = _handler_raising(AllowlistDenied("no tools")).route("logs svc")
+    assert "거부" in reply
+
+
+def test_route_never_raises_on_unexpected_handler_error() -> None:
+    """boto3 등 예상 못한 예외도 메시지로 변환 — ack 후 respond 가 반드시 불린다."""
+    reply = _handler_raising(RuntimeError("boto3 ResourceNotFound")).route("logs svc")
+    assert "예기치 못한" in reply
+    assert "RuntimeError" in reply

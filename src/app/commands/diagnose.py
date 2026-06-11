@@ -15,12 +15,19 @@ from typing import Callable
 
 from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
+from app.commands._replies import (
+    exec_failed_reply,
+    invalid_service_reply,
+    no_data_reply,
+)
 from app.commands.logs import (
     InvalidServiceName,
     fetch_cloudwatch_logs,
     validated_service,
 )
 from app.sanitizer import build_prompt
+
+_USAGE_HINT = "사용법: `/devops diagnose <service>`"
 
 # 소스 fetcher 시그니처: (service) → raw 텍스트. 비어 있으면 "" 반환.
 SourceFetcher = Callable[[str], str]
@@ -64,8 +71,10 @@ def fetch_kubectl_describe(service: str) -> str:
         describe 출력. 실패 시 exit code 와 stderr 를 담은 한 줄(이 텍스트도
         격리 블록 안에서 데이터로만 취급된다).
     """
+    # '--' 로 플래그 파싱을 끊어 service 가 옵션으로 해석되는 것을 막는다(선행 '-' 는
+    # validated_service 가 이미 거부하지만, argv 구분자로 한 겹 더 방어한다).
     proc = subprocess.run(
-        ["kubectl", "describe", "deployment", service],
+        ["kubectl", "describe", "deployment", "--", service],
         capture_output=True,
         text=True,
         timeout=FETCH_TIMEOUT_S,
@@ -174,19 +183,13 @@ def handle_diagnose(
     try:
         validated = validated_service(service)
     except InvalidServiceName:
-        return (
-            ":no_entry: 서비스 이름이 올바르지 않습니다 — "
-            "허용 문자: 영숫자와 `_ . / # -`. 사용법: `/devops diagnose <service>`"
-        )
+        return invalid_service_reply(_USAGE_HINT)
     active_fetchers = fetchers if fetchers is not None else default_fetchers()
     sections = collect_sources(validated, active_fetchers)
     if all(not content.strip() for _, content in sections):
-        return f":mag: `{validated}` 에서 진단에 쓸 데이터를 찾지 못했습니다."
+        return no_data_reply(validated, "진단에 쓸 데이터를")
     prompt = build_diagnose_prompt(validated, sections)
     result = run_for_command("diagnose", prompt, timeout_s=timeout_s, runner=runner)
     if result.exit_code != 0:
-        return (
-            f":warning: `{validated}` 진단 실행이 실패했습니다 "
-            f"(exit {result.exit_code}).\n{result.output}"
-        )
+        return exec_failed_reply(validated, "진단", result.exit_code, result.output)
     return result.output

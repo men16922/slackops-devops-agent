@@ -89,6 +89,34 @@ def validate_mapping(mapping: Mapping[str, tuple[str, ...]]) -> None:
 validate_mapping(_COMMAND_TOOLS)
 
 
+def _cross_check_with_permissions() -> None:
+    """allowlist 와 permissions 레지스트리의 명령 집합이 정확히 일치하는지 검증.
+
+    Claude 경유(claude_backed) 명령은 allowlist 엔트리가 **반드시** 있어야 하고,
+    allowlist 엔트리는 모두 claude_backed 여야 한다. 한쪽에만 추가하는 드리프트를
+    런타임 거부가 아니라 **import 시점 에러**로 드러낸다(리뷰 finding #7).
+
+    Raises:
+        ValueError: 두 집합이 어긋나는 경우.
+    """
+    tools_commands = frozenset(_COMMAND_TOOLS)
+    backed = permissions.claude_backed_commands()
+    missing = backed - tools_commands
+    if missing:
+        raise ValueError(
+            f"claude-backed commands without an allowlist entry: {sorted(missing)}"
+        )
+    extra = tools_commands - backed
+    if extra:
+        raise ValueError(
+            "allowlist commands not marked claude_backed in permissions registry: "
+            f"{sorted(extra)}"
+        )
+
+
+_cross_check_with_permissions()
+
+
 def known_commands() -> frozenset[str]:
     """allowlist 에 정의된 명령 집합(Claude 경유 명령만 — ping 제외)."""
     return frozenset(_COMMAND_TOOLS)

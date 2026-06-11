@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from app.allowlist import allowed_tools
@@ -19,35 +17,7 @@ from app.commands.diagnose import (
 )
 from app.commands.logs import InvalidServiceName
 from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
-
-
-class RecordingRunner:
-    """주입용 mock 실행기 — 호출 인자를 기록하고 고정 응답 반환."""
-
-    def __init__(self, stdout: str = "", exit_code: int = 0) -> None:
-        self.stdout = stdout
-        self.exit_code = exit_code
-        self.calls: list[tuple[list[str], int]] = []
-
-    def __call__(self, cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
-        self.calls.append((cmd, timeout_s))
-        return self.exit_code, self.stdout, ""
-
-
-class RecordingFetcher:
-    """주입용 mock 소스 fetcher — 호출 service 를 기록하고 고정 내용 반환."""
-
-    def __init__(self, content: str) -> None:
-        self.content = content
-        self.calls: list[str] = []
-
-    def __call__(self, service: str) -> str:
-        self.calls.append(service)
-        return self.content
-
-
-def _result_json(result: str = "diagnosis done") -> str:
-    return json.dumps({"result": result, "total_cost_usd": 0.01})
+from tests._helpers import RecordingFetcher, RecordingRunner, result_json as _result_json
 
 
 def _fetchers(
@@ -135,6 +105,45 @@ def test_handle_diagnose_rejects_injection_in_service_name() -> None:
     for fetcher in fetchers.values():
         assert fetcher.calls == []
     assert runner.calls == []
+
+
+def test_handle_diagnose_rejects_leading_dash_service() -> None:
+    """선행 '-' (예: '-A')는 kubectl 플래그 주입이 되므로 거부(finding #4)."""
+    fetchers = _fetchers()
+    runner = RecordingRunner()
+    reply = handle_diagnose("-A", fetchers=fetchers, runner=runner)
+    assert ":no_entry:" in reply
+    for fetcher in fetchers.values():
+        assert fetcher.calls == []
+    assert runner.calls == []
+
+
+def test_kubectl_fetcher_uses_double_dash_separator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """기본 kubectl 수집기는 '--' 로 플래그 파싱을 끊는다(finding #4, defense-in-depth)."""
+    import app.commands.diagnose as diagnose_mod
+
+    captured: dict[str, list[str]] = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = "describe output"
+        stderr = ""
+
+    def fake_run(args: list[str], **kwargs: object) -> _Proc:
+        captured["args"] = args
+        return _Proc()
+
+    monkeypatch.setattr(diagnose_mod.subprocess, "run", fake_run)
+    diagnose_mod.fetch_kubectl_describe("payments")
+    assert captured["args"] == [
+        "kubectl",
+        "describe",
+        "deployment",
+        "--",
+        "payments",
+    ]
 
 
 def test_handle_diagnose_strips_whitespace_around_service() -> None:

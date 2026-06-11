@@ -9,8 +9,10 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- `python3 -m pytest tests/ -q` → **124 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
+- `python3 -m pytest tests/ -q` → **133 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
+- code-review(high) 후속 10 findings 수정 완료 — route 예외 안전망, sanitizer 미완성태그,
+  kubectl 플래그 주입, CloudWatch 최신 이벤트, run.sh limit 판정, 명령 레지스트리 단일화 등.
 - `/devops ping` e2e 는 미검증(EC2 + Slack App 필요).
 
 ## 동작하는 것
