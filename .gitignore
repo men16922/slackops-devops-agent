@@ -1,0 +1,20 @@
+# 작업 하네스 런타임
+.harness/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# 환경/자격증명 (절대 커밋 금지)
+.env
+.venv/
+venv/
+
+# SQLite job queue (MVP)
+*.db
