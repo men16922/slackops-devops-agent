@@ -23,5 +23,7 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
 
 ## 운영
 - 읽기 `/sync` · 기록 `/checkpoint` · 정리 `/tidy-docs`. 경계는 DOCS_POLICY.md.
+- 무인 자율 가동: `bin/overnight/run.sh` — NEXT_PLAN `[auto]` 백로그를 회차(작업 1묶음
+  → pytest → checkpoint → commit) 단위로 진행. 중단은 `touch bin/overnight/STOP`.
 - 불변 표준은 `harness/CORE_MANDATES.md`. 핸드오프는 `harness/CONTEXT_BRIDGE.md`.
 - 비대해진 원문/로그는 `bin/docs/archive/`(기본 컨텍스트 제외).

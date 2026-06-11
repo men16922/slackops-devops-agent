@@ -18,3 +18,8 @@ venv/
 
 # SQLite job queue (MVP)
 *.db
+
+# overnight runner 런타임 산출물
+bin/overnight/logs/
+bin/overnight/STOP
+bin/overnight/DONE
