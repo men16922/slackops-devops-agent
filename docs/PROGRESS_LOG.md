@@ -3,6 +3,18 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-11 — overnight 자율 가동 러너 구축
+- Status: 구축 완료. 실전 1회차(live) 검증은 사용자 직접 실행 대기.
+- Changed: bin/overnight/run.sh(STOP/DONE/limit 30분 대기/연속실패 3회 중단/--once, 회차 간 30초),
+  bin/overnight/PROMPT.md(회차 = sync → NEXT_PLAN [auto] 1개 → pytest green → checkpoint → commit),
+  .claude/settings.json(allowlist + aws/push/curl/sudo deny, acceptEdits),
+  NEXT_PLAN [auto]/[manual] 태깅 + 항목별 완료 기준, .gitignore(logs/STOP/DONE).
+- Verified: bash -n / settings.json JSON 파싱 / STOP 파일 조기 종료(iterations=0) 통과.
+  **live 1회차는 미검증** — 무인 에이전트 기동은 사용자 승인 필요로 차단됨.
+- Blockers: 없음(검증만 잔여).
+- Next: 사용자가 `bin/overnight/run.sh --once` 직접 실행 → 1회차 정상 확인 후
+  `caffeinate -dimsu bin/overnight/run.sh &` 로 야간 가동.
+
 ## 2026-06-11 — Day 1–3 로컬 구현 (Socket Mode + ping + deploy 산출물)
 - Status: 완료(로컬분). AWS/Slack 실행분은 ready-to-run 스크립트로 준비 — 자격증명 필요.
 - Changed: slack_handler(Socket Mode lazy + 라우팅 + default deny 게이트), commands/ping 구현,
