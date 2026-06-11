@@ -13,8 +13,6 @@
 - [ ] `[manual]` `/devops ping` end-to-end 확인(Slack → EC2 → pong).
 
 ## Day 4–5 — Sanitizer + logs/diagnose
-- [ ] `[auto]` `commands/logs.py` 구현 — CloudWatch 클라이언트는 주입 가능 의존성(mock),
-      조회→sanitizer 격리→claude_runner 호출 조립. 완료: mock 기반 조립 테스트 green, aws 실 호출 없음.
 - [ ] `[auto]` `commands/diagnose.py` 구현 — 다중 소스(logs/kubectl/git diff) 수집기 주입 +
       격리 결합. 완료: mock 기반 테스트 green.
 - [ ] `[auto]` slack_handler 에 logs/diagnose 등록(register_default_commands) — 완료: 라우팅 테스트 green.

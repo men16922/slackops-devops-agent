@@ -3,6 +3,20 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-11 — commands/logs.py 구현 (CloudWatch 조회+분석 조립, overnight 회차)
+- Status: 완료. Day 4–5 트랙 네 번째 항목 — logs 핸들러(조회→격리→실행 조립).
+- Changed: src/app/commands/logs.py(handle_logs: fetcher 주입(LogFetcher) → sanitizer
+  build_prompt 격리 → run_for_command 조립, 빈 로그/비정상 exit 는 안내 메시지;
+  _validated_service: Slack untrusted 인자를 log group 문자 집합 regex 로 강제 검증 후에만
+  template 삽입(주입 방어 4계층); LOGS_PROMPT_TEMPLATE: `{untrusted_data}` placeholder 신뢰
+  template; fetch_cloudwatch_logs: boto3 lazy import 기본 fetcher — filter_log_events
+  paginator, MaxItems 상한). tests/test_logs_command.py 12종(조립/태그 격리·위조 무력화/
+  service 인자 주입 거부/빈 로그·exit≠0 경계/이중 확장 방지/lazy import). AWS 실 호출 없음.
+- Verified: `python3 -m pytest tests/ -q` → 105 passed, 1 skipped(fastapi 미설치 로컬 한정).
+- Blockers: 없음. (참고: template 본문에 raw `<untrusted_data>` 태그 언급 시 build_prompt 가
+  거부 — 문구를 태그 없는 표현으로 작성해야 함.)
+- Next: NEXT_PLAN 다음 [auto] — commands/diagnose.py(다중 소스 수집기 주입 + 격리 결합).
+
 ## 2026-06-11 — allowlist.py 구현 (Tool Allowlist 주입 방어 2계층, overnight 회차)
 - Status: 완료. Day 4–5 트랙 세 번째 항목 — 명령별 Tool Allowlist 매핑 + claude_runner 연결점.
 - Changed: src/app/allowlist.py(_COMMAND_TOOLS: logs/diagnose/tf-review/pr → `--allowedTools`
