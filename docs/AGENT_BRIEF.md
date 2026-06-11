@@ -13,10 +13,11 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
 - **차별화:** 단순 봇이 아니라 "에이전트를 안전하게 운영하는 법"의 레퍼런스 — 보안(권한 + 주입 방어) + 계측(OTel).
 - **동작:** 명령 라우팅(ping/logs/diagnose 등록 완료) + job queue + permission gate + sanitizer
   + claude_runner + allowlist(run_for_command 단일 진입점) + logs/diagnose 핸들러(fetcher
-  주입→격리→조립, diagnose 는 다중 소스+소스별 실패 격리) — 로컬 검증. AWS/Slack 실행분은
-  deploy/ 준비 완료. Day 4–5 완결.
-- **검증:** `python3 -m pytest tests/ -q` → 124 passed, 1 skipped.
-- **현재 초점:** Day 1–3 잔여(운영자 수동, deploy/README.md) + Day 6–7(commands/tf_review.py 부터).
+  주입→격리→조립, diagnose 는 다중 소스+소스별 실패 격리) + store/(H0 단일테이블 —
+  Job/Audit/Telemetry 각각 Sqlite+DynamoDb 양 구현) — 로컬 검증. AWS/Slack 실행분은
+  deploy/ 준비 완료.
+- **검증:** `python3 -m pytest tests/ -q` → 178 passed, 1 skipped.
+- **현재 초점:** H0 [auto] 트랙 — telemetry.py → worker.py → commands/{tf_review,pr} + [manual](크레딧/provision/대시보드).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)
 - Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).

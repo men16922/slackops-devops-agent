@@ -7,6 +7,7 @@ claude_runner/allowlist/logs/diagnose 테스트가 동일한 mock 을 복붙하�
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 
 class RecordingRunner:
@@ -41,3 +42,66 @@ class RecordingFetcher:
 def result_json(result: str = "ok", cost: float = 0.01) -> str:
     """claude `--output-format json` 성공 출력의 최소 형태(result + 비용)."""
     return json.dumps({"result": result, "total_cost_usd": cost})
+
+
+# ── store 테스트 공용 (test_store / test_audit_telemetry_store) ──
+
+
+def counter_clock() -> Callable[[], str]:
+    """호출마다 1초씩 전진하는 결정적 clock(같은 날 안에서 단조 증가)."""
+    state = {"i": 0}
+
+    def clock() -> str:
+        state["i"] += 1
+        return f"2026-06-12T00:00:{state['i']:02d}.000000Z"
+
+    return clock
+
+
+def counter_id() -> Callable[[], str]:
+    """job-1, job-2, … 결정적 id factory."""
+    state = {"i": 0}
+
+    def idf() -> str:
+        state["i"] += 1
+        return f"job-{state['i']}"
+
+    return idf
+
+
+def create_single_table(dynamodb: object, table_name: str) -> None:
+    """제출 데이터모델대로 단일테이블 + GSI1/GSI2 생성(deploy provisioning 과 동일 스키마)."""
+    dynamodb.create_table(  # type: ignore[attr-defined]
+        TableName=table_name,
+        BillingMode="PAY_PER_REQUEST",
+        KeySchema=[
+            {"AttributeName": "PK", "KeyType": "HASH"},
+            {"AttributeName": "SK", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "PK", "AttributeType": "S"},
+            {"AttributeName": "SK", "AttributeType": "S"},
+            {"AttributeName": "GSI1PK", "AttributeType": "S"},
+            {"AttributeName": "GSI1SK", "AttributeType": "S"},
+            {"AttributeName": "GSI2PK", "AttributeType": "S"},
+            {"AttributeName": "GSI2SK", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "GSI1",
+                "KeySchema": [
+                    {"AttributeName": "GSI1PK", "KeyType": "HASH"},
+                    {"AttributeName": "GSI1SK", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+            {
+                "IndexName": "GSI2",
+                "KeySchema": [
+                    {"AttributeName": "GSI2PK", "KeyType": "HASH"},
+                    {"AttributeName": "GSI2SK", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
+    )

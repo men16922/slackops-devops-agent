@@ -10,10 +10,11 @@
 - 문서 진입점: docs/AGENT_BRIEF.md → STATUS.md → NEXT_PLAN.md.
 
 ## Current Handover
-1. Day 1–3 로컬분 완료(라우팅/ping/queue/permissions/deploy 산출물). 잔여 = AWS/Slack 수동 실행(deploy/README.md).
-2. Day 4–5 **완결**: sanitizer + claude_runner + allowlist + commands/logs + commands/diagnose
-   + 라우팅 등록(register_default_commands — ping/logs/diagnose, 호출 시점 모듈 속성 조회).
-   다음 = Day 6–7: commands/tf_review.py(plan 실행기 주입 mock + 출력 격리 + apply 부재 테스트).
+1. Day 1–5 로컬분 완결(라우팅/ping/permissions/sanitizer/claude_runner/allowlist/logs/diagnose).
+   잔여 = AWS/Slack 수동 실행(deploy/README.md) + H0 [manual](크레딧/DynamoDB provision/v0 대시보드).
+2. H0 store/ 레이어 **완료**: JobStore + AuditStore + TelemetryStore(단일테이블, Sqlite+DynamoDb
+   양 구현, moto 동치 — pytest 178 passed). 다음 [auto] = telemetry.py(record_run_metrics→
+   TelemetryStore) → worker.py 폴링 루프 → commands/{tf_review,pr}.
 
 ## Open Risks
 - untrusted input(로그·diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

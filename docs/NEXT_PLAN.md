@@ -6,10 +6,8 @@
 > 무인 회차는 위에서 아래로 `[auto]` 1개씩 수행. 각 항목의 "완료:" 기준을 충족해야 종료.
 
 ## ★ Active — H0 해커톤 피벗 (마감 2026-06-30, 상세 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5)
-> store/ 레이어(JobStore + DynamoDB + SQLite)는 완료(52d7b98). 아래 [auto] 는 모두 그 store 를 재사용한다.
-- [ ] `[auto]` `store/audit_store.py` + `store/telemetry_store.py` — Audit/Metric 항목(DECISIONS/plans 의
-      단일테이블 키: `JOB#{id}`/`AUDIT#{ts}#{seq}`, `JOB#{id}`/`METRIC#{ts}`, GSI2 피드)을 DynamoDB+SQLite
-      양 구현 + moto 테스트. 완료: append/조회 동치 테스트 green, app.store 에서 export.
+> store/ 레이어 완료: JobStore(52d7b98) + AuditStore/TelemetryStore(단일테이블 Audit/Metric,
+> Sqlite+DynamoDb 양 구현). 아래 [auto] 는 모두 그 store 를 재사용한다.
 - [ ] `[auto]` `telemetry.py` 구현 — record_run_metrics 가 TelemetryStore 에 metric 기록(+OTel 은 lazy stub).
       완료: 주입된 store 에 기록되는 테스트 green.
 - [ ] `[auto]` `worker.py` 폴링 루프 — store.claim()→run_for_command 실행→diff 면 await_approval, 아니면

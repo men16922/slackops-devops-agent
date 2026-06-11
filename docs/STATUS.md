@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- `python3 -m pytest tests/ -q` → **133 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
+- `python3 -m pytest tests/ -q` → **178 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
 - code-review(high) 후속 10 findings 수정 완료 — route 예외 안전망, sanitizer 미완성태그,
   kubectl 플래그 주입, CloudWatch 최신 이벤트, run.sh limit 판정, 명령 레지스트리 단일화 등.
@@ -26,12 +26,15 @@
   service 인자 regex 검증, boto3 lazy 기본 fetcher),
   commands/diagnose(handle_diagnose — 다중 소스 fetchers 주입(logs/kubectl/git diff),
   소스별 실패 격리, 섹션 마커 단일 격리 블록, 전 소스 빈 데이터 시 Claude 미호출),
-  라우팅 등록(register_default_commands — ping/logs/diagnose, 호출 시점 모듈 속성 조회).
-- stub 잔여: telemetry / commands(tf_review·pr).
+  라우팅 등록(register_default_commands — ping/logs/diagnose, 호출 시점 모듈 속성 조회),
+  store/(H0 단일테이블 — JobStore 상태머신+claim 원자성, AuditStore append/job·일자 피드,
+  TelemetryStore record/피드 — 각각 Sqlite+DynamoDb 양 구현, moto 동치 검증).
+- stub 잔여: telemetry / commands(tf_review·pr) / worker.py(미작성).
 
 ## Active Focus
-- 운영자 수동: deploy/README.md 1–4단계(Slack App → IAM → EC2 → EventBridge) → ping e2e.
-- 다음 코드 트랙: Day 6–7 — commands/tf_review.py(plan 실행기 주입 mock + 출력 격리 + apply 부재 테스트).
+- H0 [auto] 트랙: telemetry.py(record_run_metrics→TelemetryStore) → worker.py 폴링 루프
+  → commands/{tf_review,pr}.
+- 운영자 수동: AWS/v0 크레딧 + DynamoDB provision + deploy/README.md 1–4단계 → ping e2e.
 
 ## Open Risks
 - untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

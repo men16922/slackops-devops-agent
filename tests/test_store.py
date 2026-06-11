@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 
 import pytest
 
 from app.store import Job, JobSource, JobStatus, SqliteJobStore
 from app.store.dynamodb_store import DynamoDbJobStore
+from tests._helpers import counter_clock, counter_id, create_single_table
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
@@ -20,69 +21,11 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 TABLE_NAME = "slackops-agent-test"
 
 
-def _counter_clock() -> Callable[[], str]:
-    state = {"i": 0}
-
-    def clock() -> str:
-        state["i"] += 1
-        return f"2026-06-12T00:00:{state['i']:02d}.000000Z"
-
-    return clock
-
-
-def _counter_id() -> Callable[[], str]:
-    state = {"i": 0}
-
-    def idf() -> str:
-        state["i"] += 1
-        return f"job-{state['i']}"
-
-    return idf
-
-
-def _create_table(dynamodb: object) -> None:
-    """제출 데이터모델대로 단일테이블 + GSI1/GSI2 생성(deploy provisioning 과 동일 스키마)."""
-    dynamodb.create_table(  # type: ignore[attr-defined]
-        TableName=TABLE_NAME,
-        BillingMode="PAY_PER_REQUEST",
-        KeySchema=[
-            {"AttributeName": "PK", "KeyType": "HASH"},
-            {"AttributeName": "SK", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "PK", "AttributeType": "S"},
-            {"AttributeName": "SK", "AttributeType": "S"},
-            {"AttributeName": "GSI1PK", "AttributeType": "S"},
-            {"AttributeName": "GSI1SK", "AttributeType": "S"},
-            {"AttributeName": "GSI2PK", "AttributeType": "S"},
-            {"AttributeName": "GSI2SK", "AttributeType": "S"},
-        ],
-        GlobalSecondaryIndexes=[
-            {
-                "IndexName": "GSI1",
-                "KeySchema": [
-                    {"AttributeName": "GSI1PK", "KeyType": "HASH"},
-                    {"AttributeName": "GSI1SK", "KeyType": "RANGE"},
-                ],
-                "Projection": {"ProjectionType": "ALL"},
-            },
-            {
-                "IndexName": "GSI2",
-                "KeySchema": [
-                    {"AttributeName": "GSI2PK", "KeyType": "HASH"},
-                    {"AttributeName": "GSI2SK", "KeyType": "RANGE"},
-                ],
-                "Projection": {"ProjectionType": "ALL"},
-            },
-        ],
-    )
-
-
 @pytest.fixture
 def store(request: pytest.FixtureRequest) -> Iterator[object]:
     """두 구현을 같은 테스트로 돌리기 위한 parametrized 스토어 픽스처."""
     if request.param == "sqlite":
-        s = SqliteJobStore(":memory:", clock=_counter_clock(), id_factory=_counter_id())
+        s = SqliteJobStore(":memory:", clock=counter_clock(), id_factory=counter_id())
         yield s
         s.close()
     else:
@@ -92,9 +35,9 @@ def store(request: pytest.FixtureRequest) -> Iterator[object]:
             import boto3
 
             ddb = boto3.resource("dynamodb", region_name="us-east-1")
-            _create_table(ddb)
+            create_single_table(ddb, TABLE_NAME)
             yield DynamoDbJobStore(
-                TABLE_NAME, dynamodb=ddb, clock=_counter_clock(), id_factory=_counter_id()
+                TABLE_NAME, dynamodb=ddb, clock=counter_clock(), id_factory=counter_id()
             )
 
 

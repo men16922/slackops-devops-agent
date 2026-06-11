@@ -3,6 +3,19 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — AuditStore + TelemetryStore (단일테이블 Audit/Metric 항목, overnight 회차)
+- Status: 완료. H0 트랙 [auto] 1번 항목 — store 레이어 확장.
+- Changed: src/app/store/audit_store.py(AuditEvent/AuditStore 프로토콜 + Sqlite/DynamoDb 구현 —
+  PK=JOB#{id}, SK=AUDIT#{ts}#{seq:06d}, GSI2=AUDIT#{yyyymmdd}/{ts}, seq 는 같은 ts tie-breaker),
+  src/app/store/telemetry_store.py(MetricRecord/TelemetryStore + 양 구현 — SK=METRIC#{ts},
+  GSI2=METRIC#{yyyymmdd}/{ts}, float→Decimal 변환), app.store __init__ 에서 신규 + DynamoDbJobStore
+  export. tests/_helpers.py 로 counter_clock/counter_id/create_single_table 공용화(test_store 중복 제거).
+- Verified: `python3 -m pytest tests/ -q` → 178 passed, 1 skipped(+25: 동치 12종×2 — append/record
+  roundtrip, 시간순/limit, job 스코프, 일자 피드 최신순/필터, 같은 ts seq 정렬 + 단일테이블 공존 1종).
+  `ruff check` 변경 파일 clean.
+- Blockers: 없음.
+- Next: [auto] telemetry.py(record_run_metrics→TelemetryStore) → worker.py 폴링 루프.
+
 ## 2026-06-12 — H0 해커톤 피벗 D1–D2 (DynamoDB store 레이어)
 - Status: 진행 중. 브랜치 hackathon-h0. 데이터층 핵심(JobStore) 완료.
 - Changed: DECISIONS D5(피벗) + docs/plans/2026-06-12-h0-hackathon.md + NEXT_PLAN active 트랙.
