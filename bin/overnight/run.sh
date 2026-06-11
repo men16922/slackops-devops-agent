@@ -57,7 +57,7 @@ while [ "$iter" -lt "$MAX_ITER" ]; do
     >"$ITER_LOG" 2>&1
   rc=$?
 
-  if grep -qiE 'usage limit|rate.?limit|limit (reached|exceeded)|overloaded' "$ITER_LOG"; then
+  if grep -qiE "usage limit|session limit|rate.?limit|limit (reached|exceeded)|hit your.*limit|overloaded" "$ITER_LOG"; then
     note "iter $iter: usage/rate limit detected (rc=$rc) — sleeping ${LIMIT_WAIT}s"
     consec_fail=0
     $once && { note "once mode — exiting after limit"; break; }
