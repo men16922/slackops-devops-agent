@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-최종 갱신: 2026-06-11
+최종 갱신: 2026-06-12
 
 > 현재 상태/검증/risks (≤120줄). source of truth. 갱신은 /checkpoint.
 
@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- `python3 -m pytest tests/ -q` → **120 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
+- `python3 -m pytest tests/ -q` → **124 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
 - `/devops ping` e2e 는 미검증(EC2 + Slack App 필요).
 
@@ -23,12 +23,13 @@
   commands/logs(handle_logs — fetcher 주입→sanitizer 격리→run_for_command 조립,
   service 인자 regex 검증, boto3 lazy 기본 fetcher),
   commands/diagnose(handle_diagnose — 다중 소스 fetchers 주입(logs/kubectl/git diff),
-  소스별 실패 격리, 섹션 마커 단일 격리 블록, 전 소스 빈 데이터 시 Claude 미호출).
-- stub 잔여: telemetry / commands(tf_review·pr). logs/diagnose 라우팅 등록 미완.
+  소스별 실패 격리, 섹션 마커 단일 격리 블록, 전 소스 빈 데이터 시 Claude 미호출),
+  라우팅 등록(register_default_commands — ping/logs/diagnose, 호출 시점 모듈 속성 조회).
+- stub 잔여: telemetry / commands(tf_review·pr).
 
 ## Active Focus
 - 운영자 수동: deploy/README.md 1–4단계(Slack App → IAM → EC2 → EventBridge) → ping e2e.
-- 다음 코드 트랙: Day 4–5 잔여 — slack_handler 에 logs/diagnose 라우팅 등록.
+- 다음 코드 트랙: Day 6–7 — commands/tf_review.py(plan 실행기 주입 mock + 출력 격리 + apply 부재 테스트).
 
 ## Open Risks
 - untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

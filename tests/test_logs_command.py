@@ -155,10 +155,15 @@ def test_handle_logs_placeholder_literal_in_logs_not_double_expanded() -> None:
 
 
 def test_logs_module_import_safe_without_boto3_loaded() -> None:
-    """boto3 는 기본 fetcher 내부 lazy import — 모듈 import 시점에 로드되지 않는다."""
-    import importlib
+    """boto3 는 기본 fetcher 내부 lazy import — 모듈 import 시점에 로드되지 않는다.
 
-    import app.commands.logs as logs_module
+    reload 는 모듈 dict 를 제자리 갱신해 타 모듈이 들고 있는 클래스 정체성을
+    깨뜨리므로(예외 except 미스매치), sys.modules 를 건드리지 않는 fresh copy 로 검증한다.
+    """
+    import importlib.util
 
-    importlib.reload(logs_module)
-    assert callable(logs_module.fetch_cloudwatch_logs)
+    spec = importlib.util.find_spec("app.commands.logs")
+    assert spec is not None and spec.loader is not None
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)
+    assert callable(fresh.fetch_cloudwatch_logs)

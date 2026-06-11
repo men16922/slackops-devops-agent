@@ -1,9 +1,12 @@
 # COMPLETED_SUMMARY — slackops-devops-agent
-최종 갱신: 2026-06-11
+최종 갱신: 2026-06-12
 
 > 완료 milestone 압축 + 링크. 상세 이력은 PROGRESS_LOG / bin/docs/archive/. 갱신은 /checkpoint.
 
 ## Milestones
+- **2026-06-12 — Day 4–5 완결 (Sanitizer + logs/diagnose)**: sanitizer + claude_runner +
+  allowlist + commands/logs + commands/diagnose + 라우팅 등록까지 로컬 구현·검증
+  (124 passed, 1 skipped). 상세: docs/PROGRESS_LOG.md (2026-06-11~12 항목).
 - **2026-06-11 — Repo Bootstrap**: 작업 하네스 체계 + 프로젝트 스캐폴드 완료.
   상세: docs/PROGRESS_LOG.md (2026-06-11 항목).
 

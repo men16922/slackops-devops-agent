@@ -1,7 +1,24 @@
 # PROGRESS_LOG — slackops-devops-agent
-최종 갱신: 2026-06-11
+최종 갱신: 2026-06-12
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
+
+## 2026-06-12 — slack_handler 에 logs/diagnose 라우팅 등록 (Day 4–5 완결, overnight 회차)
+- Status: 완료. Day 4–5 트랙 마지막 항목 — register_default_commands 에 logs/diagnose 연결.
+- Changed: src/app/slack_handler.py(register_default_commands: `from app.commands import
+  diagnose, logs, ping` 후 호출 시점 모듈 속성 조회 lambda 로 ping/logs/diagnose 등록 —
+  monkeypatch 주입 가능). tests/test_slack_routing.py(+4: logs/diagnose 라우팅·인자 전달,
+  인자 없는 logs/diagnose 는 service 검증에서 fetcher/Claude 호출 전 거부; 기존
+  "미구현" 테스트는 tf-review 로 이전). 추가 수정 — 기존 테스트 오염 발견·해소:
+  test_logs/diagnose_command 의 importlib.reload 가 모듈 dict 를 제자리 갱신해
+  타 모듈이 든 InvalidServiceName 클래스 정체성을 깨뜨림(구 validated_service 가 런타임
+  전역 조회로 신 클래스를 raise → diagnose 의 except 미스매치). import-safety 테스트를
+  sys.modules 를 건드리지 않는 fresh copy(module_from_spec+exec_module) 방식으로 교체.
+- Verified: `python3 -m pytest tests/ -q` → 124 passed, 1 skipped(fastapi 미설치 로컬 한정).
+  2회 연속 실행으로 순서 의존 재발 없음 확인.
+- Blockers: 없음.
+- Next: NEXT_PLAN 다음 [auto] — commands/tf_review.py(terraform plan 실행기 주입 mock,
+  plan 출력 격리, apply 경로 부재 확인 테스트).
 
 ## 2026-06-11 — commands/diagnose.py 구현 (다중 소스 종합 진단 조립, overnight 회차)
 - Status: 완료. Day 4–5 트랙 다섯 번째 항목 — diagnose 핸들러(다중 소스 수집기 주입 + 격리 결합).

@@ -1,5 +1,5 @@
 # NEXT_PLAN — slackops-devops-agent
-최종 갱신: 2026-06-11
+최종 갱신: 2026-06-12
 
 > **열린 작업만** (≤120줄). 완료 시 제거(이력은 PROGRESS_LOG/COMPLETED_SUMMARY). 권위: 이 파일 > docs/plans/.
 > 태그: `[auto]` = overnight 무인 회차 수행 가능(로컬 코드+테스트). `[manual]` = 운영자 수동(AWS/Slack/UI).
@@ -11,9 +11,6 @@
 - [ ] `[manual]` `deploy/ec2/launch-instance.sh` 실행 + user-data REPO_URL `CHANGE_ME` 교체.
 - [ ] `[manual]` `deploy/eventbridge/create-schedules.sh <instance-id>` 실행.
 - [ ] `[manual]` `/devops ping` end-to-end 확인(Slack → EC2 → pong).
-
-## Day 4–5 — Sanitizer + logs/diagnose
-- [ ] `[auto]` slack_handler 에 logs/diagnose 등록(register_default_commands) — 완료: 라우팅 테스트 green.
 
 ## Day 6–7 — tf-review + pr
 - [ ] `[auto]` `commands/tf_review.py` 구현 — terraform plan 실행기 주입(mock), plan 출력 격리

@@ -224,10 +224,15 @@ def test_default_fetchers_cover_three_sources_without_external_calls() -> None:
 
 
 def test_diagnose_module_import_safe_without_boto3_loaded() -> None:
-    """boto3/kubectl/git 은 호출 시점 의존 — 모듈 import 는 외부 도구 없이 안전하다."""
-    import importlib
+    """boto3/kubectl/git 은 호출 시점 의존 — 모듈 import 는 외부 도구 없이 안전하다.
 
-    import app.commands.diagnose as diagnose_module
+    reload 는 모듈 dict 를 제자리 갱신해 타 모듈이 들고 있는 클래스 정체성을
+    깨뜨리므로(예외 except 미스매치), sys.modules 를 건드리지 않는 fresh copy 로 검증한다.
+    """
+    import importlib.util
 
-    importlib.reload(diagnose_module)
-    assert callable(diagnose_module.handle_diagnose)
+    spec = importlib.util.find_spec("app.commands.diagnose")
+    assert spec is not None and spec.loader is not None
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)
+    assert callable(fresh.handle_diagnose)
