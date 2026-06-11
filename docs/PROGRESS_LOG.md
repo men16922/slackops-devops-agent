@@ -3,6 +3,17 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — H0 해커톤 피벗 D1–D2 (DynamoDB store 레이어)
+- Status: 진행 중. 브랜치 hackathon-h0. 데이터층 핵심(JobStore) 완료.
+- Changed: DECISIONS D5(피벗) + docs/plans/2026-06-12-h0-hackathon.md + NEXT_PLAN active 트랙.
+  src/app/store/{base,sqlite_store,dynamodb_store}.py — JobStore 프로토콜 + 이중 구현(상태머신
+  PENDING→AWAITING_APPROVAL→APPROVED→RUNNING→DONE|FAILED, claim 원자성, 출력 게이트).
+  레거시 job_queue.py 대체. pyproject moto dev dep.
+- Verified: `python3 -m pytest tests/ -q` → 153 passed, 1 skipped. test_store.py 22종(SQLite +
+  moto DynamoDB 동치 — claim FIFO/우선순위/중복방지, 승인 플로우, reject).
+- Blockers: 없음. AWS 크레딧/v0 계정/실 테이블 provision 은 [manual] 선행 대기.
+- Next: AuditStore/TelemetryStore + slack_handler route→enqueue 전환 → worker.py(claim→run→write-back).
+
 ## 2026-06-12 — code-review 후속 수정 (밤샘 산출물 10 findings 일괄 수정)
 - Status: 완료. high-effort 멀티에이전트 리뷰가 찾은 버그 5 + 정리 5 를 우선순위대로 수정.
 - Changed:
