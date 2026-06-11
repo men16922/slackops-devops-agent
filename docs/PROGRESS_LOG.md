@@ -3,6 +3,23 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — worker.py 폴링 루프 (claim→실행→게이트/complete + write-back, overnight 회차)
+- Status: 완료. H0 트랙 [auto] 3번 항목 — 이중 컨트롤플레인 consumer 골격.
+- Changed: src/app/worker.py 신규 — Worker(job/audit/telemetry store 주입, process_one =
+  claim→executor 실행→outcome.diff 있고 미승인이면 await_approval(출력 게이트), 아니면
+  complete(DONE), 예외는 FAILED — 모두 audit append + record_run_metrics write-back),
+  run_forever(주입 sleep/max_iterations 폴링), CommandOutcome(result/diff/tokens/cost_usd/
+  tool_calls), default_executors(ping/logs/diagnose/tf-review/pr — 호출 시점 모듈 조회,
+  runner 전달; tf-review/pr 은 현 스텁이 NotImplementedError → FAILED 경로),
+  매핑 외 명령은 실행 없이 FAILED(default deny). tests/test_worker.py 9종(빈 큐/폴링 sleep,
+  logs e2e mock runner+fetcher → DONE+audit[claimed,done]+metric, ping default_executors,
+  주입 monotonic duration_ms, pr diff → AWAITING_APPROVAL 게이트, approve 후 재claim →
+  게이트 재진입 없이 DONE, executor 예외 → FAILED+metric success=False, 미정의 명령 거부).
+- Verified: `python3 -m pytest tests/ -q` → 192 passed, 1 skipped. `python3 -m ruff check`
+  신규 2파일 clean.
+- Blockers: 없음.
+- Next: [auto] commands/{tf_review,pr}.py 구현(pr 출력게이트 = CommandOutcome.diff 연결).
+
 ## 2026-06-12 — telemetry.py record_run_metrics → TelemetryStore (overnight 회차)
 - Status: 완료. H0 트랙 [auto] 2번 항목 — telemetry 가 store 레이어를 소비하는 첫 결합.
 - Changed: src/app/telemetry.py 재작성 — record_run_metrics(store, job_id, *, command/duration_ms/

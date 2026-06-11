@@ -6,12 +6,10 @@
 > 무인 회차는 위에서 아래로 `[auto]` 1개씩 수행. 각 항목의 "완료:" 기준을 충족해야 종료.
 
 ## ★ Active — H0 해커톤 피벗 (마감 2026-06-30, 상세 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5)
-> store/ 레이어 완료: JobStore(52d7b98) + AuditStore/TelemetryStore(단일테이블 Audit/Metric,
-> Sqlite+DynamoDb 양 구현). 아래 [auto] 는 모두 그 store 를 재사용한다.
-- [ ] `[auto]` `worker.py` 폴링 루프 — store.claim()→run_for_command 실행→diff 면 await_approval, 아니면
-      complete(DONE/FAILED)+audit/metric write-back. 주입 가능(store/runner). 완료: mock runner + SqliteJobStore
-      로 claim→실행→complete e2e + 출력게이트(pr) 분기 테스트 green.
-- [ ] `[auto]` `commands/{tf_review,pr}.py` 구현(pr 출력게이트 = 대시보드 승인 백엔드). 완료: mock 테스트 green.
+> store/ 레이어 + worker.py 완료: JobStore(52d7b98) + AuditStore/TelemetryStore(단일테이블) +
+> Worker 폴링 루프(claim→실행→출력게이트/complete + audit/metric write-back). 아래 [auto] 는 이를 재사용한다.
+- [ ] `[auto]` `commands/{tf_review,pr}.py` 구현(pr 출력게이트 = 대시보드 승인 백엔드 —
+      worker 의 CommandOutcome.diff 로 연결, default_executors 갱신 포함). 완료: mock 테스트 green.
 - [ ] `[manual]` v0 로 web/ Next.js 대시보드 스캐폴드 → server actions↔DynamoDB → Vercel 배포.
 - [ ] `[manual]` AWS/v0 크레딧 신청 + DynamoDB 테이블 provision + 실 EC2 e2e 1회 캡처.
 - [ ] `[manual]` 제출물: 아키텍처 다이어그램·DynamoDB 스크린샷·3분 데모영상·텍스트설명·Vercel 링크/Team ID·(보너스)아티클.
