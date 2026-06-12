@@ -58,13 +58,16 @@ limit 을 **자유 텍스트 grep 이 아니라** 구조화 신호로 판정한�
 ### 3.3 회차 지시문 — `bin/overnight/PROMPT.md`
 헤드리스 에이전트가 매 회차 수행하는 고정 절차:
 1. **상태 복원**: Skill `sync` (Read Path: CONTEXT_BRIDGE → AGENT_BRIEF → STATUS → NEXT_PLAN)
-2. **작업 선택**: `NEXT_PLAN.md` 의 `[auto]` **최상위 미완료 1개만**. (`[manual]` 은 건너뜀, 없으면 `DONE` 생성 후 종료)
-3. **구현**: 완료 기준대로 코드+테스트 → `pytest` **전체 통과까지**. 실패 시 `git restore` 후 Blocker 기록.
-4. **기록**: Skill `checkpoint` (PROGRESS_LOG append + STATUS/NEXT_PLAN 갱신)
-5. **커밋**: 먼저 `git status`로 파일 반영 확인(write 유실 방어) → `git add -A && git commit`(로컬만)
+2. **잔여물 복구**: `git status --porcelain` 검사. dirty = 이전 회차 중단 잔여물 → **복구가 곧
+   이번 회차의 작업 1묶음**. pytest green 이면 `[recovered]` 커밋으로 직행, red 면 건드리지 않고
+   Blocker 기록 + `STOP` 생성(사람 검수 필요 상태 — graceful 정지). 잔여물 위 새 작업·커밋 혼입 금지.
+3. **작업 선택**: `NEXT_PLAN.md` 의 `[auto]` **최상위 미완료 1개만**. (`[manual]` 은 건너뜀, 없으면 `DONE` 생성 후 종료)
+4. **구현**: 완료 기준대로 코드+테스트 → `pytest` **전체 통과까지**. 실패 시 `git restore` 후 Blocker 기록.
+5. **기록**: Skill `checkpoint` (PROGRESS_LOG append + STATUS/NEXT_PLAN 갱신)
+6. **커밋**: 먼저 `git status`로 파일 반영 확인(write 유실 방어) → `git add -A && git commit`(로컬만)
 
 불변: `aws` 실 호출 금지(연동 코드는 mock/주입), `git push` 금지, 외부 네트워크 금지, 작업 1묶음 초과 금지,
-한도 임박 시 4–5단계(checkpoint+commit) 우선.
+한도 임박 시 5–6단계(checkpoint+commit) 우선.
 
 ### 3.4 백로그 — `docs/NEXT_PLAN.md`
 러너가 소비하는 작업 큐. 각 항목에 태그 + **완료 기준 1줄**(scope 폭주 방지):
@@ -102,7 +105,8 @@ tail -f bin/overnight/logs/runner.log   # 관찰
 - **Mac 절전/덮개**: `caffeinate` 필수, 전원 연결 권장(배터리+덮개 닫힘은 잠듦).
 - **회차 단위 손실**: 한도가 회차 중간에 닥치면 진행 중이던 1회차는 미커밋 손실 가능(직전까지는 커밋됨,
   다음 회차가 `/sync`로 복원). 2026-06-12 tf_review/pr 회차가 commit 직전 session limit 으로 끊겨 미커밋으로
-  남았고, 다음 세션에서 pytest 검증 후 복구 커밋한 사례가 있다.
+  남았고, 다음 세션에서 pytest 검증 후 복구 커밋한 사례가 있다 → 이 복구를 PROMPT 2단계(잔여물 복구)로
+  자동화함(green=`[recovered]` 커밋, red=무수정+STOP). 단 red 잔여물은 여전히 사람 검수가 필요하다(의도).
 - **회차당 docs 재독해 비용**: Read Path 가 작아(≈130줄) 의도된 트레이드오프.
 - **limit "직전" 감지가 아니라 회차 단위 저장**: 정확한 잔여 쿼터 조회가 불가하므로, 매 회차 커밋으로
   손실을 1회차로 bound 하는 설계.

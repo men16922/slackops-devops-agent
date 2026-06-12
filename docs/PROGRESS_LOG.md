@@ -3,6 +3,22 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — 하네스 개선: overnight 회차 시작 시 잔여물(dirty tree) 자동 복구 단계
+- Status: 완료. 제품 코드 변경 없음 — LOOP 하네스 자체 개선 1건(예측가능성/복구가능성).
+- Changed: bin/overnight/PROMPT.md 절차에 2단계 "잔여물 복구" 추가(이하 6단계로 재번호) —
+  회차 시작 시 `git status --porcelain` 검사; dirty 면 복구가 그 회차의 작업 1묶음:
+  pytest green → `[recovered]` 커밋 직행, red → 무수정 + Blocker 기록 + STOP 생성(사람 검수,
+  graceful 정지). 근거: 2026-06-12 commit 직전 session limit 중단 → 수동 복구했던 사례의
+  자동화 + 다음 회차 `git add -A` 가 미검증 잔여물을 새 커밋에 섞는 오염 차단.
+  docs/LOOP_ENGINEERING.md §3.3(6단계 절차)/§5(한계 — 복구 자동화 반영) 동기 갱신.
+- Verified: `python3 -m pytest tests/ -q` → 216 passed, 1 skipped(baseline 불변).
+  현재 트리 clean + bin/overnight/{logs,STOP,DONE} gitignore 확인(dirty 신호 신뢰성 전제).
+- Blockers: settings.json 에 `git stash push` allowlist 추가는 auto mode 분류기가 거부
+  (self-modification 권한 확장) → red 잔여물은 stash 보존 대신 무수정+STOP 방식으로 적응
+  (더 보수적 — 파괴/권한확장 없음). 권한 확장이 필요해지면 사용자 승인으로만.
+- Next: 다음 하네스 개선 후보 = 동일 작업 반복 Blocker 감지(같은 [auto] 항목이 2회 이상
+  Blocker 면 건너뛰기/중단 판단). 제품 [auto] 잔여 = Day 8–9 telemetry OTel.
+
 ## 2026-06-12 — commands/{tf_review,pr} 구현 + pr 출력게이트 worker 연결 (overnight 회차)
 - Status: 완료. H0 트랙 [auto] 마지막 항목 — Day 6–7 [auto] 2건도 함께 충족(같은 작업의 상세 기준).
 - Changed: commands/tf_review.py(handle_tf_review — PlanFetcher 주입(기본 = TF_PLAN_ARGS 고정
