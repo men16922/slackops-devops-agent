@@ -14,7 +14,9 @@
    되돌리고 PROGRESS_LOG 에 Blocker 로 기록 후 4단계로 진행.
 4. **기록**: Skill `checkpoint` 호출 — PROGRESS_LOG append(Verified 는 실제 실행한 검증만),
    STATUS/NEXT_PLAN 갱신(완료 항목 제거), 비가역 결정 시 DECISIONS 기록.
-5. **커밋**: `git add -A && git commit` (로컬 커밋만, 메시지에 작업 한 줄 요약).
+5. **커밋**: 먼저 `git status`로 이번에 구현/수정한 파일이 실제로 변경 목록에 있는지 확인한다 —
+   비어 있으면 write 가 유실된 것이니 보고 후 재작성(false success 방지). 확인되면
+   `git add -A && git commit` (로컬 커밋만, 메시지에 작업 한 줄 요약).
 
 ## 불변 (위반 금지)
 - harness/CORE_MANDATES.md 전체 준수 (타입힌트, `print` 금지, lazy import 유지 등).

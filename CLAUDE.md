@@ -57,3 +57,12 @@ EC2 DevOps Agent (c7i.large, EventBridge 스케줄 가동)
 - 핵심: Python 3.11+, Bolt Socket Mode 전용, Claude Code Headless subprocess, IAM Instance Profile 만,
   타입 힌트 필수, `print` 금지, 멀티파일 변경 후 `python -m pytest tests/ -q` 전체 실행·보고.
 - 비-목표/범위 밖은 docs/STATUS.md Open Risks 및 BOOTSTRAP.md A8 참조.
+
+## 작업 방식 (운영 규칙 — /insights 반영)
+- **Status 질문:** "상태/진행" 요청엔 git/코드 탐색 전에 **Read Path(/sync)·docs 먼저** 읽는다.
+- **Overnight 회차:** 한 회차 = 상태복원(/sync) → `[auto]` **정확히 1개** → 전체 `pytest` → /checkpoint
+  → 로컬 commit. **commit 전략·scope 를 과분석하지 말고 그냥 커밋**한다. 규약은 bin/overnight/{run.sh,PROMPT.md}.
+- **Testing:** 멀티파일 변경 후 전체 `pytest` 실행 + **pass 카운트 보고**(예: "216 passed, 1 skipped").
+- **Shell & 검증:** 절대경로 사용·`cd` 후 상태 의존 금지. **복합 bash(`&&`/`;` 다단계)는 단계 분리**
+  (권한 거부·디버그난 회피). 커밋 전 `git status`로 기대 파일이 실제 반영됐는지 확인(write 유실/중단 방어).
+- **보고 간결:** 상태 보고는 짧게/불릿(과대 출력 회피).
