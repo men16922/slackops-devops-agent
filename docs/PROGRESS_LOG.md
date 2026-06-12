@@ -3,6 +3,27 @@
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 
+## 2026-06-12 — commands/{tf_review,pr} 구현 + pr 출력게이트 worker 연결 (overnight 회차)
+- Status: 완료. H0 트랙 [auto] 마지막 항목 — Day 6–7 [auto] 2건도 함께 충족(같은 작업의 상세 기준).
+- Changed: commands/tf_review.py(handle_tf_review — PlanFetcher 주입(기본 = TF_PLAN_ARGS 고정
+  `terraform plan -no-color -input=false -lock=false`, apply 불가), plan 격리 → 위험/비용/보안
+  리뷰 프롬프트 → run_for_command). commands/pr.py(handle_pr 2단계 — prepare: PR_GATED_TOOLS
+  (`git push`/`gh pr create`) 를 argv 에서 제거 + 마커(===DIFF_BEGIN/END===)로 diff 추출 →
+  PrResult.diff, execute(approved_diff 전달 시): 전체 allowlist 로 push+PR; 설명은 검증
+  (비어있지 않음/≤2000자) 후 격리 블록으로만 전달). allowlist.run_for_command 에
+  exclude_tools(좁히기 전용) 추가. worker.default_executors — pr_executor(approved_by 있으면
+  job.diff 를 approved_diff 로 전달, PrResult→CommandOutcome.diff 연결), tf-review 에 runner
+  전달. slack_handler.register_default_commands 에 tf-review 등록(pr 은 동기 경로 의도적
+  미등록 — 게이트가 store 상태 요구, worker 경유 전용). tests: test_tf_review_command.py 9종
+  (조립/allowlist argv/apply 부재(argv+기본 fetcher)/빈 plan/실행 실패/태그 위조 무력화),
+  test_pr_command.py 13종(prepare 게이트 도구 부재 = 게이트 없이 PR 생성 불가, 격리/위조,
+  마커 파서, execute 전체 allowlist, 입력 검증), test_worker.py +2(default_executors pr e2e —
+  prepare 게이트→approve→execute argv 검증, tf-review e2e), test_slack_routing.py 갱신.
+- Verified: `python3 -m pytest tests/ -q` → 216 passed, 1 skipped. `python3 -m ruff check`
+  변경 9파일 clean.
+- Blockers: 없음.
+- Next: [auto] 잔여 = Day 8–9 telemetry OTel 파이프라인 + 계측 결합. [manual] = v0 대시보드/크레딧/provision.
+
 ## 2026-06-12 — worker.py 폴링 루프 (claim→실행→게이트/complete + write-back, overnight 회차)
 - Status: 완료. H0 트랙 [auto] 3번 항목 — 이중 컨트롤플레인 consumer 골격.
 - Changed: src/app/worker.py 신규 — Worker(job/audit/telemetry store 주입, process_one =

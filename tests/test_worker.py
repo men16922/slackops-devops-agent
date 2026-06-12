@@ -195,6 +195,63 @@ def test_approved_pr_job_completes_without_regating(stores) -> None:
     ]
 
 
+def test_pr_default_executor_gates_then_creates_pr_after_approval(stores) -> None:
+    """default_executors 의 pr 경로 e2e — prepare 게이트 → 승인 → execute 완료.
+
+    1차(prepare) argv 에는 push/PR 도구가 없고(게이트 없이 PR 생성 불가),
+    승인 후 2차(execute) argv 에만 push/PR 도구가 들어간다.
+    """
+    from app.commands.pr import DIFF_BEGIN_MARKER, DIFF_END_MARKER
+
+    diff = "--- a/x.py\n+++ b/x.py\n-old\n+new"
+    runner = RecordingRunner(
+        stdout=result_json(f"준비 완료\n{DIFF_BEGIN_MARKER}\n{diff}\n{DIFF_END_MARKER}")
+    )
+    jobs, _, _ = stores
+    job = jobs.enqueue("pr", "fix typo", source=JobSource.SLACK, requested_by="U1")
+    worker = make_worker(stores, executors=default_executors(runner=runner))
+
+    gated = worker.process_one()
+
+    assert gated is not None
+    assert gated.status is JobStatus.AWAITING_APPROVAL
+    assert gated.diff == diff
+    first_cmd, _ = runner.calls[0]
+    assert "Bash(gh pr create:*)" not in first_cmd
+    assert "Bash(git push:*)" not in first_cmd
+
+    assert jobs.approve(job.id, "alice") is not None
+    done = worker.process_one()
+
+    assert done is not None
+    assert done.status is JobStatus.DONE
+    second_cmd, _ = runner.calls[1]
+    assert "Bash(gh pr create:*)" in second_cmd
+    assert "Bash(git push:*)" in second_cmd
+
+
+def test_tf_review_executor_e2e_done(stores) -> None:
+    jobs, _, _ = stores
+    from app.commands import tf_review
+
+    job = jobs.enqueue("tf-review", source=JobSource.WEB)
+    runner = RecordingRunner(stdout=result_json("plan 리뷰 결과"))
+
+    def tf_executor(_job: Job) -> CommandOutcome:
+        return CommandOutcome(
+            result=tf_review.handle_tf_review(
+                fetcher=lambda: "Plan: 1 to add", runner=runner
+            )
+        )
+
+    worker = make_worker(stores, executors={"tf-review": tf_executor})
+    done = worker.process_one()
+
+    assert done is not None and done.id == job.id
+    assert done.status is JobStatus.DONE
+    assert done.result == "plan 리뷰 결과"
+
+
 # ── 실패 경로 ─────────────────────────────────────────────────
 
 

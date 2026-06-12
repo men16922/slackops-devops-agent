@@ -16,9 +16,11 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   주입→격리→조립, diagnose 는 다중 소스+소스별 실패 격리) + store/(H0 단일테이블 —
   Job/Audit/Telemetry 각각 Sqlite+DynamoDb 양 구현) + telemetry(record_run_metrics→
   주입 store, OTel 은 lazy stub) + worker(폴링 consumer — claim→실행→출력게이트/
-  complete + audit/metric write-back) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료.
-- **검증:** `python3 -m pytest tests/ -q` → 192 passed, 1 skipped.
-- **현재 초점:** H0 [auto] 트랙 — commands/{tf_review,pr} + [manual](크레딧/provision/대시보드).
+  complete + audit/metric write-back) + tf-review(plan 격리 리뷰, apply 경로 부재)
+  + pr(2단계 출력게이트 — prepare 는 push/PR 도구 argv 제거 + diff 추출, execute 는
+  승인 후만) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료.
+- **검증:** `python3 -m pytest tests/ -q` → 216 passed, 1 skipped.
+- **현재 초점:** [auto] Day 8–9 Observability(OTel) + [manual](크레딧/provision/대시보드).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)
 - Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).

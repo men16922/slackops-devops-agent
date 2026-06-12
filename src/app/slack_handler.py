@@ -123,12 +123,15 @@ def register_default_commands(handler: SlackHandler) -> SlackHandler:
 
     구현된 명령만 등록 — 미등록 명령은 route 에서 "구현 예정" 응답.
     핸들러는 호출 시점에 모듈 속성으로 조회한다(테스트에서 monkeypatch 주입 가능).
+    pr 은 의도적으로 동기 경로에 등록하지 않는다 — 출력 게이트(AWAITING_APPROVAL)가
+    store 상태를 요구하므로 job queue(worker) 경유로만 실행한다.
     """
-    from app.commands import diagnose, logs, ping
+    from app.commands import diagnose, logs, ping, tf_review
 
     handler.register("ping", lambda _args: ping.handle_ping())
     handler.register("logs", lambda args: logs.handle_logs(args))
     handler.register("diagnose", lambda args: diagnose.handle_diagnose(args))
+    handler.register("tf-review", lambda _args: tf_review.handle_tf_review())
     return handler
 
 

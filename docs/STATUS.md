@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- `python3 -m pytest tests/ -q` → **192 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
+- `python3 -m pytest tests/ -q` → **216 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip).
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
 - code-review(high) 후속 10 findings 수정 완료 — route 예외 안전망, sanitizer 미완성태그,
   kubectl 플래그 주입, CloudWatch 최신 이벤트, run.sh limit 판정, 명령 레지스트리 단일화 등.
@@ -32,13 +32,18 @@
   telemetry(record_run_metrics — 주입된 TelemetryStore 에 기록, setup_telemetry 는 OTel lazy stub),
   worker(Worker.process_one — claim→executor→diff 미승인이면 await_approval 출력게이트,
   아니면 DONE/예외 FAILED + audit/metric write-back, run_forever 주입 sleep 폴링,
-  default_executors ping/logs/diagnose/tf-review/pr, 매핑 외 명령 default deny).
-- stub 잔여: telemetry OTel 파이프라인(setup_telemetry) / commands(tf_review·pr —
-  NotImplementedError → worker 가 FAILED 기록).
+  default_executors ping/logs/diagnose/tf-review/pr, 매핑 외 명령 default deny),
+  commands/tf_review(handle_tf_review — PlanFetcher 주입(기본 argv `terraform plan` 고정,
+  apply 경로 부재 테스트), plan 격리 → 위험/비용/보안 리뷰),
+  commands/pr(handle_pr 2단계 — prepare 는 push/PR 도구를 argv 에서 제거(exclude_tools,
+  좁히기 전용)하고 마커로 diff 추출 → PrResult.diff → worker 게이트, execute(승인 후)만
+  전체 allowlist 로 push+`gh pr create`; 설명은 길이 검증 후 격리 블록으로만 전달),
+  slack 동기 경로에 tf-review 등록(pr 은 게이트가 store 상태를 요구해 worker 경유 전용).
+- stub 잔여: telemetry OTel 파이프라인(setup_telemetry).
 
 ## Active Focus
-- H0 [auto] 트랙: commands/{tf_review,pr} — pr 출력게이트는 worker CommandOutcome.diff 로 연결.
-- 운영자 수동: AWS/v0 크레딧 + DynamoDB provision + deploy/README.md 1–4단계 → ping e2e.
+- [auto] 잔여: Day 8–9 Observability — setup_telemetry 실 구현 + claude_runner/commands 계측 결합.
+- 운영자 수동: v0 대시보드 + AWS/v0 크레딧 + DynamoDB provision + deploy/README.md 1–4단계 → ping e2e.
 
 ## Open Risks
 - untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

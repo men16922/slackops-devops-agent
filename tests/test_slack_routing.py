@@ -48,9 +48,19 @@ def test_forbidden_invariant_denied(handler: SlackHandler) -> None:
     assert "허용되지 않은" in handler.route("deploy prod")
 
 
-def test_allowed_but_unimplemented_command(handler: SlackHandler) -> None:
-    response = handler.route("tf-review")
+def test_allowed_but_unregistered_command(handler: SlackHandler) -> None:
+    """pr 은 동기 경로 미등록(출력 게이트는 job queue 경유) — '구현 예정' 응답."""
+    response = handler.route("pr fix typo")
     assert "구현되지 않았습니다" in response
+
+
+def test_tf_review_routes_to_handler(
+    handler: SlackHandler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "app.commands.tf_review.handle_tf_review", lambda: "tf-ok"
+    )
+    assert handler.route("tf-review") == "tf-ok"
 
 
 def test_logs_routes_to_logs_handler(

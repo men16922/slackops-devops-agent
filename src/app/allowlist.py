@@ -144,6 +144,8 @@ def run_for_command(
     prompt: str,
     timeout_s: int = DEFAULT_TIMEOUT_S,
     runner: SubprocessRunner | None = None,
+    *,
+    exclude_tools: frozenset[str] = frozenset(),
 ) -> RunResult:
     """명령의 allowlist 를 강제해 Claude Code Headless 를 실행하는 단일 진입점.
 
@@ -155,6 +157,9 @@ def run_for_command(
         prompt: sanitizer.build_prompt 로 생성된 검증된 프롬프트.
         timeout_s: 실행 타임아웃(초).
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
+        exclude_tools: allowlist 에서 추가로 **제거**할 도구(좁히기만 — 도구를
+            더할 수는 없다). pr 출력 게이트의 prepare 단계가 push/PR 도구를
+            argv 수준에서 제거할 때 쓴다.
 
     Raises:
         permissions.PermissionDenied: 권한 레벨 초과/미정의/금지 불변.
@@ -164,6 +169,5 @@ def run_for_command(
         raise permissions.PermissionDenied(
             f"command not allowed by permission engine: {command!r}"
         )
-    return run_headless(
-        prompt, allowed_tools(command), timeout_s=timeout_s, runner=runner
-    )
+    tools = [t for t in allowed_tools(command) if t not in exclude_tools]
+    return run_headless(prompt, tools, timeout_s=timeout_s, runner=runner)

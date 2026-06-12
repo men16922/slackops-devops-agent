@@ -6,10 +6,9 @@
 > 무인 회차는 위에서 아래로 `[auto]` 1개씩 수행. 각 항목의 "완료:" 기준을 충족해야 종료.
 
 ## ★ Active — H0 해커톤 피벗 (마감 2026-06-30, 상세 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5)
-> store/ 레이어 + worker.py 완료: JobStore(52d7b98) + AuditStore/TelemetryStore(단일테이블) +
-> Worker 폴링 루프(claim→실행→출력게이트/complete + audit/metric write-back). 아래 [auto] 는 이를 재사용한다.
-- [ ] `[auto]` `commands/{tf_review,pr}.py` 구현(pr 출력게이트 = 대시보드 승인 백엔드 —
-      worker 의 CommandOutcome.diff 로 연결, default_executors 갱신 포함). 완료: mock 테스트 green.
+> store/ + worker + commands 전부 완료: JobStore/AuditStore/TelemetryStore(단일테이블) +
+> Worker 폴링 루프 + commands/{tf_review,pr}(pr 출력게이트 = CommandOutcome.diff 연결).
+> 로컬 [auto] 잔여는 Day 8–9 Observability 뿐.
 - [ ] `[manual]` v0 로 web/ Next.js 대시보드 스캐폴드 → server actions↔DynamoDB → Vercel 배포.
 - [ ] `[manual]` AWS/v0 크레딧 신청 + DynamoDB 테이블 provision + 실 EC2 e2e 1회 캡처.
 - [ ] `[manual]` 제출물: 아키텍처 다이어그램·DynamoDB 스크린샷·3분 데모영상·텍스트설명·Vercel 링크/Team ID·(보너스)아티클.
@@ -21,11 +20,7 @@
 - [ ] `[manual]` `deploy/eventbridge/create-schedules.sh <instance-id>` 실행.
 - [ ] `[manual]` `/devops ping` end-to-end 확인(Slack → EC2 → pong).
 
-## Day 6–7 — tf-review + pr
-- [ ] `[auto]` `commands/tf_review.py` 구현 — terraform plan 실행기 주입(mock), plan 출력 격리
-      → 위험/비용/보안 리뷰 프롬프트. 완료: mock 테스트 green, apply 경로 부재 확인 테스트.
-- [ ] `[auto]` `commands/pr.py` 구현 — branch→수정→test→PR 단계 조립(gh 실행기 주입 mock) +
-      출력 게이트(diff 선게시 후 확인 토큰 필요 구조). 완료: 게이트 없이 PR 생성 불가 테스트 green.
+## Day 6–7 — tf-review + pr 잔여
 - [ ] `[manual]` GitHub App 최소 스코프 + branch protection(자동 머지 차단) 설정.
 
 ## Day 8–9 — Observability

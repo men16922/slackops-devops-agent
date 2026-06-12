@@ -67,14 +67,21 @@ def default_executors(
     """permissions 레지스트리의 MVP 명령에 대한 기본 실행기 매핑 생성.
 
     핸들러는 호출 시점에 모듈 속성으로 조회한다(slack_handler 와 동일 패턴 —
-    테스트에서 monkeypatch 주입 가능). tf-review/pr 은 핸들러가 아직
-    NotImplementedError 를 raise 하므로 worker 가 FAILED 로 기록한다.
-    pr 의 diff 분기는 commands/pr 구현 시 CommandOutcome.diff 로 연결한다.
+    테스트에서 monkeypatch 주입 가능). pr 은 PrResult.diff 를 CommandOutcome.diff
+    로 연결해 출력 게이트(AWAITING_APPROVAL)로 분기시킨다.
 
     Args:
         runner: claude-backed 핸들러에 전달할 subprocess 실행기(테스트 주입점).
     """
     from app.commands import diagnose, logs, ping, pr, tf_review
+
+    def pr_executor(job: Job) -> CommandOutcome:
+        # 승인된 job(approved_by 기록)만 execute 단계 — job.diff 가 승인된 diff 다.
+        approved_diff = job.diff if job.approved_by is not None else None
+        pr_result = pr.handle_pr(
+            job.args, approved_diff=approved_diff, runner=runner
+        )
+        return CommandOutcome(result=pr_result.summary, diff=pr_result.diff)
 
     return {
         "ping": lambda _job: CommandOutcome(result=ping.handle_ping()),
@@ -84,8 +91,10 @@ def default_executors(
         "diagnose": lambda job: CommandOutcome(
             result=diagnose.handle_diagnose(job.args, runner=runner)
         ),
-        "tf-review": lambda _job: CommandOutcome(result=tf_review.handle_tf_review()),
-        "pr": lambda job: CommandOutcome(result=pr.handle_pr(job.args)),
+        "tf-review": lambda _job: CommandOutcome(
+            result=tf_review.handle_tf_review(runner=runner)
+        ),
+        "pr": pr_executor,
     }
 
 
