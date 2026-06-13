@@ -4,6 +4,15 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — 하네스 개선 4/5: iter 로그 보존 정책 (KEEP_ITER_LOGS)
+- Status: 완료. 개선안 4번 — 장기 가동 시 iter-*.log 무한 증식 통제.
+- Changed: bin/overnight/run.sh — prune_iter_logs(회차 시작 시 `iter-*.log` 최근
+  `KEEP_ITER_LOGS`(기본 30)개만 유지, 파일명이 타임스탬프라 sort -r = 최신순; runner.log 는
+  항상 보존). LOOP_ENGINEERING §3.1 표 갱신.
+- Verified: `bash -n` clean. 더미 5개 + KEEP=3 실측 → 최신 3개만 잔존, runner.log 무영향.
+- Blockers: 없음.
+- Next: 개선 5 — NEXT_PLAN 품질 리뷰 회차 패턴.
+
 ## 2026-06-13 — 하네스 개선 3/5: 반복 Blocker 전략 적응 ([blocked] 태그)
 - Status: 완료. 개선안 3번 — 막힌 작업 1개가 백로그 전체를 잠그는 것 방지(러너 백스톱은 "멈춤"만,
   이건 "건너뛰고 계속").

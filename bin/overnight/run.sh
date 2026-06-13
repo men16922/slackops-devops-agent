@@ -24,6 +24,7 @@ LIMIT_WAIT="${LIMIT_WAIT:-1800}"      # limit 감지 시 대기 초
 PAUSE="${PAUSE:-30}"                  # 회차 간 간격 초
 MAX_CONSEC_FAIL="${MAX_CONSEC_FAIL:-3}"
 MAX_NO_PROGRESS="${MAX_NO_PROGRESS:-2}"  # success 인데 새 커밋 없음 연속 N회 시 중단 (Blocker 반복/빈 회차)
+KEEP_ITER_LOGS="${KEEP_ITER_LOGS:-30}"   # iter-*.log 최근 보존 개수 (runner.log 는 항상 보존)
 
 mkdir -p "$LOG_DIR"
 cd "$REPO_ROOT"
@@ -42,6 +43,12 @@ run_with_timeout() {
   else
     "$@"  # timeout 미가용 — 회차 자체에 의존
   fi
+}
+
+# iter-*.log 증식 통제 — 최근 KEEP_ITER_LOGS 개만 유지(이름이 타임스탬프라 사전순 = 시간순).
+prune_iter_logs() {
+  ls -1 "$LOG_DIR"/iter-*.log 2>/dev/null | sort -r | tail -n +$((KEEP_ITER_LOGS + 1)) |
+    while IFS= read -r f; do rm -- "$f"; done
 }
 
 # 회차 로그 + rc 로부터 결과 분류: success / limit / failure.
@@ -90,6 +97,7 @@ while [ "$iter" -lt "$MAX_ITER" ]; do
   if [ -f "$DONE_FILE" ]; then note "DONE file detected — backlog exhausted, exiting"; break; fi
 
   iter=$((iter + 1))
+  prune_iter_logs
   ITER_LOG="$LOG_DIR/iter-$(date '+%Y%m%d-%H%M%S').log"
   head_before="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)"
   note "iter $iter start → $ITER_LOG"

@@ -42,6 +42,7 @@ STOP/DONE 파일 검사 → claude -p 회차 실행 → classify_outcome → 분
 | `PAUSE` | 30s | 회차 간 간격 |
 | `MAX_CONSEC_FAIL` | 3 | 연속 실패 N회 시 **안전 중단**(깨진 상태로 토큰 소모 방지) |
 | `MAX_NO_PROGRESS` | 2 | success 인데 **새 커밋 없음** 연속 N회 시 안전 중단(Blocker 반복·빈 회차 — consec_fail 이 못 잡는 무진행 루프 차단) |
+| `KEEP_ITER_LOGS` | 30 | `iter-*.log` 최근 N개만 보존(회차 시작 시 초과분 삭제 — 로그 증식 통제, `runner.log` 는 항상 보존) |
 | `--once` | — | 1회차만 실행(검증용) |
 
 ### 3.2 결과 분류 — `classify_outcome` (run.sh 내 python3)
