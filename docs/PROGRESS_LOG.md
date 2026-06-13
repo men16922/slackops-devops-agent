@@ -4,6 +4,15 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — 하네스 개선 5/5: 품질 리뷰 회차 패턴 (NEXT_PLAN 체인)
+- Status: 완료. 개선안 5번 — "구현→리뷰→수정" 품질 루프를 1회차=1작업 불변과 호환되게 체인.
+- Changed: docs/NEXT_PLAN.md Day 9.5 신설 — `[auto]` 리뷰 회차(H0 milestone range read-only
+  리뷰, 보안/타입/단순화 관점, 코드 수정 금지, findings 는 `[auto]` 환류). LOOP_ENGINEERING
+  §3.4 에 품질 리뷰 회차 패턴 문서화. 실소비 검증은 다음 overnight 가동에서.
+- Verified: `python3 -m pytest tests/ -q` → 216 passed, 1 skipped. ruff/mypy green(최종 일괄 실측).
+- Blockers: 없음.
+- Next: 개선안 5건 완료 — 다음 overnight 가동으로 실전 검증. [auto] 잔여 = Day 8–9 OTel → Day 9.5 리뷰.
+
 ## 2026-06-13 — 하네스 개선 4/5: iter 로그 보존 정책 (KEEP_ITER_LOGS)
 - Status: 완료. 개선안 4번 — 장기 가동 시 iter-*.log 무한 증식 통제.
 - Changed: bin/overnight/run.sh — prune_iter_logs(회차 시작 시 `iter-*.log` 최근

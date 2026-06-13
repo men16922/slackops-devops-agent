@@ -1,5 +1,5 @@
 # NEXT_PLAN — slackops-devops-agent
-최종 갱신: 2026-06-12
+최종 갱신: 2026-06-13
 
 > **열린 작업만** (≤120줄). 완료 시 제거(이력은 PROGRESS_LOG/COMPLETED_SUMMARY). 권위: 이 파일 > docs/plans/.
 > 태그: `[auto]` = overnight 무인 회차 수행 가능(로컬 코드+테스트). `[manual]` = 운영자 수동(AWS/Slack/UI).
@@ -30,6 +30,11 @@
       exporter 또는 mock 테스트 green.
 - [ ] `[auto]` claude_runner·commands 에 telemetry 계측 결합 — 완료: 호출 시 지표 기록 테스트 green.
 - [ ] `[manual]` EC2 에 ADOT Collector 구성 + diagnose 1회 수치 캡처(N초/$0.0X/tool call M회).
+
+## Day 9.5 — 품질 리뷰 회차 (구현 체인 뒤 read-only 검증 단계)
+- [ ] `[auto]` 리뷰 회차 — H0 milestone 커밋 range(store~Observability)를 보안(주입 방어 우회)/
+      타입/단순화 관점으로 **read-only 리뷰**. 코드 수정 금지 — findings 는 이 파일에 `[auto]`
+      항목으로 환류 + PROGRESS_LOG 기록. 완료: findings 환류 또는 'clean' 기록.
 
 ## 이후 — 발표/아티클 (manual)
 - [ ] `[manual]` 데모 녹화 + 슬라이드 / AWSKRUG 발표 / PACE 문단 / 아티클 초안.

@@ -1,5 +1,5 @@
 # LOOP_ENGINEERING — slackops-devops-agent
-최종 갱신: 2026-06-12
+최종 갱신: 2026-06-13
 
 > 이 repo에 **현재 적용된** 자율 LOOP(overnight 무인 실행) 엔지니어링의 설명서.
 > "자는 동안 Claude Code Headless 가 백로그를 스스로 구현·검증·기록·커밋한다."
@@ -81,6 +81,11 @@ limit 을 **자유 텍스트 grep 이 아니라** 구조화 신호로 판정한�
 - `[manual]` = 운영자 수동(AWS/Slack/UI — 자격증명·외부 계정 필요)
 - `[blocked]` = 같은 항목 Blocker 2회 누적 — 사람 검수 전 무인 재시도 금지(회차가 자동 마킹)
 위에서 아래로 1개씩. 완료 시 제거(이력은 PROGRESS_LOG).
+
+**품질 리뷰 회차 패턴**: 구현 체인(milestone) 뒤에 read-only 리뷰형 `[auto]` 항목을 끼워 넣는다 —
+커밋 range 를 보안(주입 방어 우회)/타입/단순화 관점으로 리뷰하되 **코드 수정 금지**, findings 는
+NEXT_PLAN `[auto]` 항목으로 환류(다음 회차들이 소비). "구현→리뷰→수정"을 회차 단위로 체인해
+1회차=1작업 불변을 유지한 채 품질 루프를 형성한다.
 
 ### 3.5 문서 하네스 스킬 (`.claude/skills/`)
 경계가 겹치지 않게 분리 — LOOP 의 각 단계를 담당:
