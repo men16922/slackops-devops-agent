@@ -11,7 +11,7 @@
 > Worker 폴링 루프 + commands/{tf_review,pr}(pr 출력게이트 = CommandOutcome.diff 연결).
 > 로컬 [auto] 잔여는 Day 8–9 Observability 뿐.
 - [ ] `[manual]` v0 로 web/ Next.js 대시보드 스캐폴드 → server actions↔DynamoDB → Vercel 배포.
-- [ ] `[manual]` AWS/v0 크레딧 신청 + DynamoDB 테이블 provision + 실 EC2 e2e 1회 캡처.
+- [ ] `[manual]` AWS/v0 크레딧 신청 + DynamoDB 테이블 provision(`deploy/dynamodb/create-table.sh` — 온디맨드 PAY_PER_REQUEST) + 실 EC2 e2e 1회 캡처.
 - [ ] `[manual]` 제출물: 아키텍처 다이어그램·DynamoDB 스크린샷·3분 데모영상·텍스트설명·Vercel 링크/Team ID·(보너스)아티클.
 
 ## Day 1–3 잔여 — AWS/Slack 실행분 (deploy/README.md 순서)

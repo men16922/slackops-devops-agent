@@ -1,5 +1,5 @@
 # deploy/ — slackops-devops-agent
-최종 갱신: 2026-06-11
+최종 갱신: 2026-06-14
 
 > Day 1–3 인프라 산출물. **전부 ready-to-run — 실행은 유효한 AWS 자격증명(로컬 운영자)으로 수동 수행.**
 > 에이전트 런타임은 IAM Instance Profile 만 사용(Access Key 금지).
@@ -16,14 +16,20 @@
      ```
 2. **IAM Role + Instance Profile**: `iam/create-role.sh`
    - 읽기 전용 기준(CloudWatch/Logs/EKS Describe/SSM Read/S3 Read)
-     + OTel export 최소 쓰기(PutMetricData/PutLogEvents/X-Ray) — 계측 파이프라인용 예외, 그 외 쓰기 없음.
-3. **EC2 기동**: `ec2/launch-instance.sh`
+     + OTel export 최소 쓰기(PutMetricData/PutLogEvents/X-Ray) — 계측 파이프라인용 예외.
+   - DynamoDB 는 `slackops-agent` 테이블 + 인덱스 스코프로 GetItem/PutItem/UpdateItem/Query 만
+     (control-plane 큐 read/write — Scan/Delete·다른 테이블 불가). 그 외 쓰기 없음.
+3. **DynamoDB 단일테이블 provision**: `dynamodb/create-table.sh`
+   - **온디맨드(PAY_PER_REQUEST)** — bursty·저빈도 워크로드라 용량계획 불필요·idle 시 ~0원, GSI 도 자동 상속.
+   - `slackops-agent` (PK/SK + GSI1 status 질의 + GSI2 일자 feed). Job/Audit/Telemetry 공유.
+   - 멱등(이미 있으면 생략). 기본 region `ap-northeast-2`(`AWS_REGION` 으로 변경) — EC2 기동 전 선행.
+4. **EC2 기동**: `ec2/launch-instance.sh`
    - c7i.large, AL2023, IMDSv2 강제, **인바운드 규칙 없는 SG**(Socket Mode 아웃바운드 전용).
    - `user-data.sh` 가 도구 체인(kubectl/terraform/gh/helm/jq/Claude Code) 설치 + systemd 서비스 등록.
    - `REPO_URL` 의 `CHANGE_ME` 를 실제 GitHub repo 로 교체 필요.
-4. **EventBridge 스케줄**: `eventbridge/create-schedules.sh <instance-id>`
+5. **EventBridge 스케줄**: `eventbridge/create-schedules.sh <instance-id>`
    - 기본 평일 09:00 start / 19:00 stop (Asia/Seoul). 상시 가동 금지 불변.
-5. **ADOT Collector** (Day 8–9): `adot/collector-config.yaml` 로 EC2 에 collector 구성.
+6. **ADOT Collector** (Day 8–9): `adot/collector-config.yaml` 로 EC2 에 collector 구성.
 
 ## 검증
 - EC2 부팅 후: `systemctl status slackops-devops-agent` → active.

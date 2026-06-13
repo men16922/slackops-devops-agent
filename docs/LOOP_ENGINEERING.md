@@ -124,10 +124,15 @@ tail -f bin/overnight/logs/runner.log   # 관찰
   손실을 1회차로 bound 하는 설계.
 
 ## 6. 실측 효과 (이 repo)
-2026-06-11~12 무인 회차로 백엔드 백로그를 연속 구현: sanitizer → claude_runner → allowlist →
-logs → diagnose → 라우팅 → store(JobStore) → audit/telemetry store → telemetry → worker →
-tf_review/pr. 각 회차가 테스트 동반 커밋(누적 216 passed). 발견·자가수정 사례: limit 오판 버그(#6),
-중단된 회차 복구.
+2026-06-11~13 무인 회차로 백엔드 백로그를 **소진까지** 연속 구현: sanitizer → claude_runner → allowlist →
+logs → diagnose → 라우팅 → store(JobStore) → audit/telemetry store → worker → tf_review/pr →
+telemetry(OTel 파이프라인 setup_telemetry 실 구현 + record_run_metrics span emit) →
+계측 결합(run_for_command on_metrics + worker 실 tokens/cost write-back + tracer span) →
+store/_util 유틸 통합 리팩터. 각 회차가 테스트 동반 커밋(누적 **229 passed, 1 skipped** + ruff + mypy strict green).
+구현 체인 사이사이 **품질 리뷰 회차**(§3.4)를 끼워 보안/타입/단순화 관점 read-only 리뷰 → findings 를
+`[auto]` 로 환류 → 다음 회차가 수정(예: store/_util 통합은 리뷰 findings 환류분). 그 결과 로컬 `[auto]`
+백로그는 전부 소진, 잔여는 `[manual]`(AWS/Slack/UI)만 남았다. 발견·자가수정 사례: limit 오판 버그(#6),
+중단된 회차 복구(2026-06-12 tf_review/pr session limit → 다음 세션 복구, 이후 PROMPT 2단계로 자동화).
 
 ## 7. 관련 문서
 - 설계 불변: `harness/CORE_MANDATES.md` · 핸드오프: `harness/CONTEXT_BRIDGE.md`
