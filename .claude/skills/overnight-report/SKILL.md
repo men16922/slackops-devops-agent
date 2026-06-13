@@ -17,8 +17,9 @@ description: overnight 러너 상태/결과 점검 보고 — 프로세스 생�
    - FAILED 회차가 있으면 해당 `iter-*.log` 끝부분을 열어 원인 1줄 요약.
 3. **밤새 산출물**: `git log --oneline` 에서 러너 시작 시각 이후 커밋 나열 +
    `docs/PROGRESS_LOG.md` 상단의 해당 항목들(Status/Verified/Blockers 위주).
-4. **독립 재검증**: `python3 -m pytest tests/ -q` 직접 실행 — 에이전트 주장이 아닌
-   실측으로 green 확인. 실패 시 마지막 green 커밋을 `git log` 로 식별해 보고.
+4. **독립 재검증**: 게이트 3계층 직접 실행 — 에이전트 주장이 아닌 실측으로 green 확인:
+   `python3 -m pytest tests/ -q` + `python3 -m ruff check src tests` + `python3 -m mypy src`.
+   실패 시 마지막 green 커밋을 `git log` 로 식별해 보고.
 5. **잔여 백로그**: `docs/NEXT_PLAN.md` 의 남은 `[auto]` / `[manual]` 항목 수와 다음 작업.
 6. **보고 형식** (10–15줄):
    ```

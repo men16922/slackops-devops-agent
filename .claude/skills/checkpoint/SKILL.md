@@ -33,5 +33,7 @@ description: 작업 묶음 완료 시 변경을 수집해 PROGRESS_LOG append + 
 - **기록만.** Read Path 복원 요약(sync), archive 분리·중복 통합·삭제(tidy-docs)는 하지 않는다.
 - 예산 초과/중복이 보이면 직접 정리하지 말고 /tidy-docs 를 안내.
 
-## 검증 명령
-- `python -m pytest tests/ -q` (멀티파일 변경 후 전체 실행, pass/fail 보고. 통과 전 "완료" 선언 금지.)
+## 검증 명령 (게이트 3계층 — 전부 green 이어야 "완료")
+- `python3 -m pytest tests/ -q` (멀티파일 변경 후 전체 실행, pass/fail 보고. 통과 전 "완료" 선언 금지.)
+- `python3 -m ruff check src tests`
+- `python3 -m mypy src`

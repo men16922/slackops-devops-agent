@@ -17,7 +17,7 @@
 | --- | --- |
 | **회차당 fresh context** | 매 회차 새 프로세스(`claude -p`) → 컨텍스트 비대/요약(compaction) 문제 없음. Read Path(≈130줄)만 다시 읽으면 복원됨. |
 | **회차 = 작업 1개 + 즉시 커밋** | 한도/크래시가 언제 닥쳐도 미커밋 손실은 1회차뿐. 다음 회차가 `/sync`로 이어받음. |
-| **테스트가 영속성·정확성 게이트** | `pytest` 전체 통과를 통과 못 하면 커밋 안 함 → 깨진 코드가 쌓이지 않음. |
+| **검증 3계층이 커밋 게이트** | `pytest` 전체 + `ruff check` + `mypy src`(strict) 전부 green 못 하면 커밋 안 함 → 깨진/저품질 코드가 쌓이지 않음. 게이트 밀도가 아침 인간 리뷰 비용을 줄임. |
 | **상태는 파일에** | `NEXT_PLAN.md`(백로그) · `PROGRESS_LOG.md`(이력) · git history. 메모리가 아니라 디스크가 source of truth. |
 | **최소 권한 무인 실행** | `.claude/settings.json` allowlist + `aws`/`git push`/네트워크 deny → 자는 동안 위험 동작 차단. |
 
@@ -62,7 +62,8 @@ limit 을 **자유 텍스트 grep 이 아니라** 구조화 신호로 판정한�
    이번 회차의 작업 1묶음**. pytest green 이면 `[recovered]` 커밋으로 직행, red 면 건드리지 않고
    Blocker 기록 + `STOP` 생성(사람 검수 필요 상태 — graceful 정지). 잔여물 위 새 작업·커밋 혼입 금지.
 3. **작업 선택**: `NEXT_PLAN.md` 의 `[auto]` **최상위 미완료 1개만**. (`[manual]` 은 건너뜀, 없으면 `DONE` 생성 후 종료)
-4. **구현**: 완료 기준대로 코드+테스트 → `pytest` **전체 통과까지**. 실패 시 `git restore` 후 Blocker 기록.
+4. **구현**: 완료 기준대로 코드+테스트 → 게이트 3계층(`pytest` 전체 + `ruff check src tests` +
+   `mypy src`) **전부 green 까지**. 실패 시 `git restore` 후 Blocker 기록.
 5. **기록**: Skill `checkpoint` (PROGRESS_LOG append + STATUS/NEXT_PLAN 갱신)
 6. **커밋**: 먼저 `git status`로 파일 반영 확인(write 유실 방어) → `git add -A && git commit`(로컬만)
 

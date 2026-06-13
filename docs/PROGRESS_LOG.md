@@ -4,6 +4,17 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — 하네스 개선 1/5: 커밋 게이트 3계층화 (pytest + ruff + mypy)
+- Status: 완료. 루프 개선안(plans/cozy-munching-newt) 1번 — 검증 밀도 확장.
+- Changed: pyproject.toml mypy overrides(boto3/botocore/slack_bolt/fastapi stub 부재 한정
+  ignore_missing_imports + app.main 데코레이터 완화 — 실 타입 검사 약화 아님, 미설치 환경 noise 제거).
+  bin/overnight/PROMPT.md 4단계 게이트 = pytest + `ruff check src tests` + `mypy src` 전부 green.
+  skills/{checkpoint,overnight-report}/SKILL.md 검증 명령 동기화. LOOP_ENGINEERING §2/§3.3.
+- Verified: `python3 -m pytest tests/ -q` → 216 passed, 1 skipped. `ruff check src tests` clean.
+  `mypy src` → Success: no issues in 22 files (13 errors → 0, 전부 stub noise 였음).
+- Blockers: 없음.
+- Next: 개선 2 — run.sh no-progress 백스톱(HEAD 비교).
+
 ## 2026-06-12 — 하네스 개선: overnight 회차 시작 시 잔여물(dirty tree) 자동 복구 단계
 - Status: 완료. 제품 코드 변경 없음 — LOOP 하네스 자체 개선 1건(예측가능성/복구가능성).
 - Changed: bin/overnight/PROMPT.md 절차에 2단계 "잔여물 복구" 추가(이하 6단계로 재번호) —

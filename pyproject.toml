@@ -46,3 +46,12 @@ line-length = 100
 python_version = "3.11"
 strict = true
 mypy_path = "src"
+
+# 미설치(lazy import) / stub 부재 모듈 한정 완화 — overnight 게이트(mypy src) green 전제.
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*", "slack_bolt.*", "fastapi.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "app.main"
+disallow_untyped_decorators = false  # fastapi 미설치 환경에서 데코레이터가 Any 로 풀림

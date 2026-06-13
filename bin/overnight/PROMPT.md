@@ -17,9 +17,10 @@
 3. **작업 선택**: docs/NEXT_PLAN.md 에서 `[auto]` 태그가 붙은 **최상위 미완료 작업 1개만** 선택.
    `[manual]` 태그는 절대 수행하지 않는다(AWS/Slack 수동 단계).
    - `[auto]` 작업이 하나도 없으면: `bin/overnight/DONE` 파일을 생성하고(내용: 사유 1줄) 즉시 종료.
-4. **구현**: 선택한 작업을 항목의 완료 기준대로 구현 + 테스트 추가.
-   `python3 -m pytest tests/ -q` **전체 통과까지**. 통과시키지 못하면 해당 변경을 `git restore` 로
-   되돌리고 PROGRESS_LOG 에 Blocker 로 기록 후 5단계로 진행.
+4. **구현**: 선택한 작업을 항목의 완료 기준대로 구현 + 테스트 추가. 게이트 3계층 **전부 green 까지**:
+   `python3 -m pytest tests/ -q` + `python3 -m ruff check src tests` + `python3 -m mypy src`.
+   통과시키지 못하면 해당 변경을 `git restore` 로 되돌리고 PROGRESS_LOG 에 Blocker 로 기록 후
+   5단계로 진행.
 5. **기록**: Skill `checkpoint` 호출 — PROGRESS_LOG append(Verified 는 실제 실행한 검증만),
    STATUS/NEXT_PLAN 갱신(완료 항목 제거), 비가역 결정 시 DECISIONS 기록.
 6. **커밋**: 먼저 `git status`로 이번에 구현/수정한 파일이 실제로 변경 목록에 있는지 확인한다 —
