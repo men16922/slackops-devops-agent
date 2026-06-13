@@ -23,6 +23,7 @@ ITER_TIMEOUT="${ITER_TIMEOUT:-3600}"  # 회차당 최대 초
 LIMIT_WAIT="${LIMIT_WAIT:-1800}"      # limit 감지 시 대기 초
 PAUSE="${PAUSE:-30}"                  # 회차 간 간격 초
 MAX_CONSEC_FAIL="${MAX_CONSEC_FAIL:-3}"
+MAX_NO_PROGRESS="${MAX_NO_PROGRESS:-2}"  # success 인데 새 커밋 없음 연속 N회 시 중단 (Blocker 반복/빈 회차)
 
 mkdir -p "$LOG_DIR"
 cd "$REPO_ROOT"
@@ -82,6 +83,7 @@ PY
 note "runner start (max_iter=$MAX_ITER once=$once repo=$REPO_ROOT)"
 iter=0
 consec_fail=0
+no_progress=0
 
 while [ "$iter" -lt "$MAX_ITER" ]; do
   if [ -f "$STOP_FILE" ]; then note "STOP file detected — exiting"; break; fi
@@ -89,6 +91,7 @@ while [ "$iter" -lt "$MAX_ITER" ]; do
 
   iter=$((iter + 1))
   ITER_LOG="$LOG_DIR/iter-$(date '+%Y%m%d-%H%M%S').log"
+  head_before="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)"
   note "iter $iter start → $ITER_LOG"
 
   run_with_timeout claude -p "$(cat "$DIR/PROMPT.md")" \
@@ -116,7 +119,20 @@ while [ "$iter" -lt "$MAX_ITER" ]; do
     fi
   else
     consec_fail=0
-    note "iter $iter: ok (commit=$(git -C "$REPO_ROOT" log --oneline -1 2>/dev/null | head -1))"
+    head_after="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)"
+    if [ "$head_after" = "$head_before" ]; then
+      # 회차는 성공인데 커밋이 없음 — Blocker 반복/빈 회차가 MAX_ITER 까지 토큰을 태우는 것 방지.
+      # (DONE/STOP 생성 회차도 여기 걸리지만 다음 루프 진입 전 파일 검사가 먼저 종료시킨다.)
+      no_progress=$((no_progress + 1))
+      note "iter $iter: ok but no new commit (no_progress=$no_progress)"
+      if [ "$no_progress" -ge "$MAX_NO_PROGRESS" ]; then
+        note "aborting after $no_progress consecutive no-progress iterations — inspect $LOG_DIR + docs/PROGRESS_LOG.md"
+        break
+      fi
+    else
+      no_progress=0
+      note "iter $iter: ok (commit=$(git -C "$REPO_ROOT" log --oneline -1 2>/dev/null | head -1))"
+    fi
   fi
 
   $once && { note "once mode — exiting after single iteration"; break; }

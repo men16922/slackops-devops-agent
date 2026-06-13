@@ -41,6 +41,7 @@ STOP/DONE 파일 검사 → claude -p 회차 실행 → classify_outcome → 분
 | `LIMIT_WAIT` | 1800s | usage/session limit 감지 시 대기 후 재시도 |
 | `PAUSE` | 30s | 회차 간 간격 |
 | `MAX_CONSEC_FAIL` | 3 | 연속 실패 N회 시 **안전 중단**(깨진 상태로 토큰 소모 방지) |
+| `MAX_NO_PROGRESS` | 2 | success 인데 **새 커밋 없음** 연속 N회 시 안전 중단(Blocker 반복·빈 회차 — consec_fail 이 못 잡는 무진행 루프 차단) |
 | `--once` | — | 1회차만 실행(검증용) |
 
 ### 3.2 결과 분류 — `classify_outcome` (run.sh 내 python3)
@@ -53,7 +54,8 @@ limit 을 **자유 텍스트 grep 이 아니라** 구조화 신호로 판정한�
 분기:
 - `limit` → consec_fail 리셋, `LIMIT_WAIT` 대기 후 재시도(한도 윈도우 리셋되면 자동 속행)
 - `failure` → consec_fail++ → `MAX_CONSEC_FAIL` 도달 시 중단
-- `success` → consec_fail 리셋, 커밋 해시 로깅
+- `success` → consec_fail 리셋 + **HEAD 전후 비교**: 새 커밋 있으면 no_progress 리셋·해시 로깅,
+  없으면 no_progress++ → `MAX_NO_PROGRESS` 도달 시 중단(DONE/STOP 생성 회차는 루프 상단 파일 검사가 먼저 종료)
 
 ### 3.3 회차 지시문 — `bin/overnight/PROMPT.md`
 헤드리스 에이전트가 매 회차 수행하는 고정 절차:
@@ -100,7 +102,7 @@ touch bin/overnight/STOP        # graceful 중단 (현재 회차 마치고 종�
 tail -f bin/overnight/logs/runner.log   # 관찰
 # 아침에: /overnight-report  (또는 git log --oneline + docs/PROGRESS_LOG.md)
 ```
-종료 조건: `DONE`(백로그 소진) · `STOP`(수동) · `MAX_ITER` 도달 · 연속 실패 N회.
+종료 조건: `DONE`(백로그 소진) · `STOP`(수동) · `MAX_ITER` 도달 · 연속 실패 N회 · 무진행(no-progress) N회.
 
 ## 5. 한계 / 알려진 동작
 - **Mac 절전/덮개**: `caffeinate` 필수, 전원 연결 권장(배터리+덮개 닫힘은 잠듦).

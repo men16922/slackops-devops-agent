@@ -4,6 +4,15 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — 하네스 개선 2/5: 러너 no-progress 백스톱 (HEAD 전후 비교)
+- Status: 완료. 개선안 2번 — "success+커밋 없음" 무진행 루프를 consec_fail 이 못 잡는 맹점 차단.
+- Changed: bin/overnight/run.sh — 회차 전 `git rev-parse HEAD` 기록, success 분기에서 HEAD 불변이면
+  no_progress++(`MAX_NO_PROGRESS` 기본 2 도달 시 안전 중단), 새 커밋이면 리셋. DONE/STOP 생성
+  회차는 루프 상단 파일 검사가 먼저 종료하므로 충돌 없음. LOOP_ENGINEERING §3.1 표/§3.2/§4 갱신.
+- Verified: `bash -n run.sh` clean. 분기 데스크체크(STOP/DONE 선행, limit 분기는 카운터 무영향).
+- Blockers: 없음.
+- Next: 개선 3 — 반복 Blocker `[blocked]` 태그 전략 적응.
+
 ## 2026-06-13 — 하네스 개선 1/5: 커밋 게이트 3계층화 (pytest + ruff + mypy)
 - Status: 완료. 루프 개선안(plans/cozy-munching-newt) 1번 — 검증 밀도 확장.
 - Changed: pyproject.toml mypy overrides(boto3/botocore/slack_bolt/fastapi stub 부재 한정
