@@ -27,10 +27,12 @@
 ## Day 8–9 — Observability
 - [ ] `[manual]` EC2 에 ADOT Collector 구성 + diagnose 1회 수치 캡처(N초/$0.0X/tool call M회).
 
-## Day 9.5 — 품질 리뷰 회차 (구현 체인 뒤 read-only 검증 단계)
-- [ ] `[auto]` 리뷰 회차 — H0 milestone 커밋 range(store~Observability)를 보안(주입 방어 우회)/
-      타입/단순화 관점으로 **read-only 리뷰**. 코드 수정 금지 — findings 는 이 파일에 `[auto]`
-      항목으로 환류 + PROGRESS_LOG 기록. 완료: findings 환류 또는 'clean' 기록.
+## Day 9.5 — 리뷰 findings 환류 (2026-06-13 리뷰 회차 산출)
+- [ ] `[auto]` store/ 유틸 통합 + stale 주석 정리 — `_utcnow_iso`/`_day_of`/`_encode` 가
+      sqlite/dynamodb/audit/telemetry store 4곳에 중복 → `store/_util.py` 로 통합.
+      main.py /metrics 주석의 "Day 8–9 후 노출" 문구를 현 상태(store/OTel 수집 완료,
+      endpoint 는 liveness)로 갱신 + pr 의 prepare/execute 2회 metric 기록이 의도임을
+      worker 문서에 명시. 완료: 게이트 3계층 green + 동작 불변(테스트 무수정 통과).
 
 ## 이후 — 발표/아티클 (manual)
 - [ ] `[manual]` 데모 녹화 + 슬라이드 / AWSKRUG 발표 / PACE 문단 / 아티클 초안.

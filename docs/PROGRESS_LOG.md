@@ -4,6 +4,18 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — Day 9.5 품질 리뷰 회차 (read-only, 2관점 병렬)
+- Status: 완료. 코드 무수정 — findings 환류만(리뷰 회차 패턴 첫 실사용).
+- Changed: docs 만. NEXT_PLAN Day 9.5 를 findings 환류 [auto] 1건으로 교체(store 유틸 통합
+  + stale 주석 정리). 리뷰 범위 = src/app 전체(H0 milestone 산출물).
+- Verified(리뷰 결과): **보안(주입 방어 우회) 관점 clean** — 4계층(sanitizer 태그 위조/argv
+  플래그 주입/allowlist 좁히기/출력 게이트) 우회 불발견. 품질 관점 10건 보고 중 채택 2건
+  (store 4곳 _utcnow_iso/_day_of/_encode 중복, main.py /metrics stale 주석), 기각 다수
+  — tool_calls None(stream-json 전 의도)·게이트 거부 미계측(테스트로 강제한 설계)·
+  Decimal 왕복·tracer=None silent skip(전부 기존 결정/문서화됨).
+- Blockers: 없음.
+- Next: [auto] 잔여 = Day 9.5 findings 환류 1건. 이후 [auto] 소진 — [manual] 트랙만.
+
 ## 2026-06-13 — claude_runner·commands telemetry 계측 결합 (Day 8–9 [auto] 완결)
 - Status: 완료. H0 로컬 [auto] Observability 마지막 항목 — 호출 계측이 끊기던 갭 해소
   (핸들러가 문자열만 반환해 RunResult 의 tokens/cost 가 유실되던 구조).
