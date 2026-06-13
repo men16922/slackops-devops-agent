@@ -3,6 +3,57 @@
 
 > docs/PROGRESS_LOG.md 예산(≤120줄) 초과로 분리된 원문 (최신이 위). 현재 증분은 docs/PROGRESS_LOG.md.
 
+## 2026-06-12 — commands/{tf_review,pr} 구현 + pr 출력게이트 worker 연결 (overnight 회차)
+- Status: 완료. H0 트랙 [auto] 마지막 항목 — Day 6–7 [auto] 2건도 함께 충족(같은 작업의 상세 기준).
+- Changed: commands/tf_review.py(handle_tf_review — PlanFetcher 주입(기본 = TF_PLAN_ARGS 고정
+  `terraform plan -no-color -input=false -lock=false`, apply 불가), plan 격리 → 위험/비용/보안
+  리뷰 프롬프트 → run_for_command). commands/pr.py(handle_pr 2단계 — prepare: PR_GATED_TOOLS
+  (`git push`/`gh pr create`) 를 argv 에서 제거 + 마커(===DIFF_BEGIN/END===)로 diff 추출 →
+  PrResult.diff, execute(approved_diff 전달 시): 전체 allowlist 로 push+PR; 설명은 검증
+  (비어있지 않음/≤2000자) 후 격리 블록으로만 전달). allowlist.run_for_command 에
+  exclude_tools(좁히기 전용) 추가. worker.default_executors — pr_executor(approved_by 있으면
+  job.diff 를 approved_diff 로 전달, PrResult→CommandOutcome.diff 연결), tf-review 에 runner
+  전달. slack_handler.register_default_commands 에 tf-review 등록(pr 은 동기 경로 의도적
+  미등록 — 게이트가 store 상태 요구, worker 경유 전용). tests: test_tf_review_command.py 9종
+  (조립/allowlist argv/apply 부재(argv+기본 fetcher)/빈 plan/실행 실패/태그 위조 무력화),
+  test_pr_command.py 13종(prepare 게이트 도구 부재 = 게이트 없이 PR 생성 불가, 격리/위조,
+  마커 파서, execute 전체 allowlist, 입력 검증), test_worker.py +2(default_executors pr e2e —
+  prepare 게이트→approve→execute argv 검증, tf-review e2e), test_slack_routing.py 갱신.
+- Verified: `python3 -m pytest tests/ -q` → 216 passed, 1 skipped. `python3 -m ruff check`
+  변경 9파일 clean.
+- Blockers: 없음.
+- Next: [auto] 잔여 = Day 8–9 telemetry OTel 파이프라인 + 계측 결합. [manual] = v0 대시보드/크레딧/provision.
+
+## 2026-06-12 — worker.py 폴링 루프 (claim→실행→게이트/complete + write-back, overnight 회차)
+- Status: 완료. H0 트랙 [auto] 3번 항목 — 이중 컨트롤플레인 consumer 골격.
+- Changed: src/app/worker.py 신규 — Worker(job/audit/telemetry store 주입, process_one =
+  claim→executor 실행→outcome.diff 있고 미승인이면 await_approval(출력 게이트), 아니면
+  complete(DONE), 예외는 FAILED — 모두 audit append + record_run_metrics write-back),
+  run_forever(주입 sleep/max_iterations 폴링), CommandOutcome(result/diff/tokens/cost_usd/
+  tool_calls), default_executors(ping/logs/diagnose/tf-review/pr — 호출 시점 모듈 조회,
+  runner 전달; tf-review/pr 은 현 스텁이 NotImplementedError → FAILED 경로),
+  매핑 외 명령은 실행 없이 FAILED(default deny). tests/test_worker.py 9종(빈 큐/폴링 sleep,
+  logs e2e mock runner+fetcher → DONE+audit[claimed,done]+metric, ping default_executors,
+  주입 monotonic duration_ms, pr diff → AWAITING_APPROVAL 게이트, approve 후 재claim →
+  게이트 재진입 없이 DONE, executor 예외 → FAILED+metric success=False, 미정의 명령 거부).
+- Verified: `python3 -m pytest tests/ -q` → 192 passed, 1 skipped. `python3 -m ruff check`
+  신규 2파일 clean.
+- Blockers: 없음.
+- Next: [auto] commands/{tf_review,pr}.py 구현(pr 출력게이트 = CommandOutcome.diff 연결).
+
+## 2026-06-12 — telemetry.py record_run_metrics → TelemetryStore (overnight 회차)
+- Status: 완료. H0 트랙 [auto] 2번 항목 — telemetry 가 store 레이어를 소비하는 첫 결합.
+- Changed: src/app/telemetry.py 재작성 — record_run_metrics(store, job_id, *, command/duration_ms/
+  tokens/cost_usd/tool_calls/success/error) 가 주입된 TelemetryStore.record 에 위임(MetricRecord 반환).
+  구 시그니처(step_latencies_ms/failed)는 store 스키마(duration_ms/success)로 정렬. setup_telemetry 는
+  lazy stub 로 전환 — opentelemetry lazy import, 미설치면 None(기존 NotImplementedError 제거).
+  tests/test_telemetry.py 신규 5종(주입 store 기록 roundtrip, 실패 error 보존, 기본값, 일자 피드 노출,
+  setup_telemetry import-safe).
+- Verified: `python3 -m pytest tests/ -q` → 183 passed, 1 skipped. `ruff check` 신규/변경 파일 clean.
+  `mypy src/app/telemetry.py` — telemetry 자체 오류 0(잔여는 기존 boto3 stub 부재 noise).
+- Blockers: 없음.
+- Next: [auto] worker.py 폴링 루프(claim→run_for_command→complete/await_approval+audit/metric write-back).
+
 ## 2026-06-12 — AuditStore + TelemetryStore (단일테이블 Audit/Metric 항목, overnight 회차)
 - Status: 완료. H0 트랙 [auto] 1번 항목 — store 레이어 확장.
 - Changed: src/app/store/audit_store.py(AuditEvent/AuditStore 프로토콜 + Sqlite/DynamoDb 구현 —

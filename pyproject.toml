@@ -49,7 +49,7 @@ mypy_path = "src"
 
 # 미설치(lazy import) / stub 부재 모듈 한정 완화 — overnight 게이트(mypy src) green 전제.
 [[tool.mypy.overrides]]
-module = ["boto3.*", "botocore.*", "slack_bolt.*", "fastapi.*"]
+module = ["boto3.*", "botocore.*", "slack_bolt.*", "fastapi.*", "opentelemetry.exporter.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

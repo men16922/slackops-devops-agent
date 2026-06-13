@@ -25,9 +25,6 @@
 - [ ] `[manual]` GitHub App 최소 스코프 + branch protection(자동 머지 차단) 설정.
 
 ## Day 8–9 — Observability
-- [ ] `[auto]` `telemetry.py` OTel 파이프라인 — setup_telemetry 실 구현(TracerProvider+OTLP exporter,
-      lazy import 유지) + record_run_metrics 의 OTel 지표 emit(store 기록은 완료). 완료: in-memory
-      exporter 또는 mock 테스트 green.
 - [ ] `[auto]` claude_runner·commands 에 telemetry 계측 결합 — 완료: 호출 시 지표 기록 테스트 green.
 - [ ] `[manual]` EC2 에 ADOT Collector 구성 + diagnose 1회 수치 캡처(N초/$0.0X/tool call M회).
 
