@@ -63,7 +63,9 @@ limit 을 **자유 텍스트 grep 이 아니라** 구조화 신호로 판정한�
 2. **잔여물 복구**: `git status --porcelain` 검사. dirty = 이전 회차 중단 잔여물 → **복구가 곧
    이번 회차의 작업 1묶음**. pytest green 이면 `[recovered]` 커밋으로 직행, red 면 건드리지 않고
    Blocker 기록 + `STOP` 생성(사람 검수 필요 상태 — graceful 정지). 잔여물 위 새 작업·커밋 혼입 금지.
-3. **작업 선택**: `NEXT_PLAN.md` 의 `[auto]` **최상위 미완료 1개만**. (`[manual]` 은 건너뜀, 없으면 `DONE` 생성 후 종료)
+3. **작업 선택**: `NEXT_PLAN.md` 의 `[auto]` **최상위 미완료 1개만**. (`[manual]`/`[blocked]` 는 건너뜀.)
+   같은 항목 Blocker 2회 누적이면 `[blocked]` 태그를 덧붙이고 다음 후보로 — 막힌 작업이 백로그를
+   잠그지 않게 **전략 적응**. 남은 `[auto]` 가 없거나 전부 blocked 면 `DONE`(사유 구분) 생성 후 종료.
 4. **구현**: 완료 기준대로 코드+테스트 → 게이트 3계층(`pytest` 전체 + `ruff check src tests` +
    `mypy src`) **전부 green 까지**. 실패 시 `git restore` 후 Blocker 기록.
 5. **기록**: Skill `checkpoint` (PROGRESS_LOG append + STATUS/NEXT_PLAN 갱신)
@@ -76,6 +78,7 @@ limit 을 **자유 텍스트 grep 이 아니라** 구조화 신호로 판정한�
 러너가 소비하는 작업 큐. 각 항목에 태그 + **완료 기준 1줄**(scope 폭주 방지):
 - `[auto]` = 로컬 코드+테스트로 무인 수행 가능
 - `[manual]` = 운영자 수동(AWS/Slack/UI — 자격증명·외부 계정 필요)
+- `[blocked]` = 같은 항목 Blocker 2회 누적 — 사람 검수 전 무인 재시도 금지(회차가 자동 마킹)
 위에서 아래로 1개씩. 완료 시 제거(이력은 PROGRESS_LOG).
 
 ### 3.5 문서 하네스 스킬 (`.claude/skills/`)

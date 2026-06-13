@@ -15,8 +15,12 @@
      PROGRESS_LOG 에 Blocker(`git status --porcelain` 목록 + pytest 실패 요약) 기록 후
      `bin/overnight/STOP` 을 생성하고 즉시 종료(러너가 graceful 정지). 커밋하지 않는다.
 3. **작업 선택**: docs/NEXT_PLAN.md 에서 `[auto]` 태그가 붙은 **최상위 미완료 작업 1개만** 선택.
-   `[manual]` 태그는 절대 수행하지 않는다(AWS/Slack 수동 단계).
-   - `[auto]` 작업이 하나도 없으면: `bin/overnight/DONE` 파일을 생성하고(내용: 사유 1줄) 즉시 종료.
+   `[manual]` 태그는 절대 수행하지 않는다(AWS/Slack 수동 단계). `[blocked]` 태그도 건너뛴다.
+   - 선택 전 docs/PROGRESS_LOG.md 에서 후보 항목의 Blocker 이력 확인 — **같은 항목 Blocker 가
+     이미 2회**면 같은 방식 재시도 금지: NEXT_PLAN 해당 줄에 `[blocked]` 태그를 덧붙이고(사유 1줄)
+     다음 `[auto]` 후보로 넘어간다.
+   - 남은 `[auto]` 가 없거나 전부 `[blocked]` 면: `bin/overnight/DONE` 파일을 생성하고
+     (내용: 사유 1줄 — 소진/전원 blocked 구분) 즉시 종료.
 4. **구현**: 선택한 작업을 항목의 완료 기준대로 구현 + 테스트 추가. 게이트 3계층 **전부 green 까지**:
    `python3 -m pytest tests/ -q` + `python3 -m ruff check src tests` + `python3 -m mypy src`.
    통과시키지 못하면 해당 변경을 `git restore` 로 되돌리고 PROGRESS_LOG 에 Blocker 로 기록 후

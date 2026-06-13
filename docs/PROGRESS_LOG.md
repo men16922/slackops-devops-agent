@@ -4,6 +4,16 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — 하네스 개선 3/5: 반복 Blocker 전략 적응 ([blocked] 태그)
+- Status: 완료. 개선안 3번 — 막힌 작업 1개가 백로그 전체를 잠그는 것 방지(러너 백스톱은 "멈춤"만,
+  이건 "건너뛰고 계속").
+- Changed: bin/overnight/PROMPT.md 3단계 — 선택 전 PROGRESS_LOG Blocker 이력 확인, 같은 항목
+  2회면 NEXT_PLAN 에 `[blocked]` 마킹(사유 1줄) 후 다음 후보로; 전부 blocked/소진이면 DONE(사유
+  구분). NEXT_PLAN 헤더·LOOP_ENGINEERING §3.3/§3.4 에 `[blocked]` 규약 추가.
+- Verified: `python3 -m pytest tests/ -q` → 216 passed, 1 skipped(문서 변경 무회귀).
+- Blockers: 없음.
+- Next: 개선 4 — run.sh iter 로그 보존 정책.
+
 ## 2026-06-13 — 하네스 개선 2/5: 러너 no-progress 백스톱 (HEAD 전후 비교)
 - Status: 완료. 개선안 2번 — "success+커밋 없음" 무진행 루프를 consec_fail 이 못 잡는 맹점 차단.
 - Changed: bin/overnight/run.sh — 회차 전 `git rev-parse HEAD` 기록, success 분기에서 HEAD 불변이면
