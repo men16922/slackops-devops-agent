@@ -15,19 +15,11 @@ import itertools
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from app.store._util import day_of as _day_of, utcnow_iso as _utcnow_iso
+
 _SEQ_PAD = 6  # SK 문자열 정렬용 zero-pad 자릿수
-
-
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def _day_of(ts: str) -> str:
-    """ISO ts → 일자 파티션 키(yyyymmdd)."""
-    return ts[:10].replace("-", "")
 
 
 @dataclass

@@ -9,8 +9,8 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
 
+from app.store._util import utcnow_iso as _utcnow_iso
 from app.store.base import (
     CLAIMABLE_STATUSES,
     Job,
@@ -45,10 +45,6 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at);
 """
-
-
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 class SqliteJobStore:

@@ -4,6 +4,16 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — 리뷰 findings 환류: store 유틸 통합 + stale 주석 (로컬 [auto] 소진)
+- Status: 완료. **NEXT_PLAN [auto] 전부 소진** — 잔여는 [manual] 트랙만.
+- Changed: store/_util.py 신규(utcnow_iso/day_of/encode_for_dynamodb) — sqlite/dynamodb/
+  audit/telemetry 4개 store 의 중복 정의 제거(기존 이름 alias import 로 call site 무변경).
+  main.py /metrics 주석을 현 상태로 갱신(수집은 TelemetryStore/OTel, endpoint 는 liveness).
+  worker.process_one 에 pr 의 prepare/execute 2회 metric 기록이 의도임을 명시.
+- Verified: pytest 229 passed, 1 skipped(**테스트 무수정** = 동작 불변) + ruff/mypy green.
+- Blockers: 없음.
+- Next: [manual]만 — 크레딧 → Slack App+deploy → ping e2e → provision → 대시보드 → 제출물.
+
 ## 2026-06-13 — Day 9.5 품질 리뷰 회차 (read-only, 2관점 병렬)
 - Status: 완료. 코드 무수정 — findings 환류만(리뷰 회차 패턴 첫 실사용).
 - Changed: docs 만. NEXT_PLAN Day 9.5 를 findings 환류 [auto] 1건으로 교체(store 유틸 통합

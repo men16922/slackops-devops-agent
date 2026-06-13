@@ -13,10 +13,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any
 
+from app.store._util import encode_for_dynamodb as _encode, utcnow_iso as _utcnow_iso
 from app.store.base import (
     CLAIMABLE_STATUSES,
     Job,
@@ -27,10 +26,6 @@ from app.store.base import (
 META_SK = "META"
 FEED_PK = "FEED"
 _CLAIM_SCAN_LIMIT = 10  # 경합 시 다음 후보까지 시도할 최대 수
-
-
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 class DynamoDbJobStore:
@@ -203,13 +198,6 @@ class DynamoDbJobStore:
                 return None
             raise
         return _from_item(resp["Attributes"])
-
-
-def _encode(value: object) -> object:
-    """DynamoDB 는 float 를 직접 못 받는다 — Decimal 로 변환."""
-    if isinstance(value, float):
-        return Decimal(str(value))
-    return value
 
 
 def _to_item(job: Job) -> dict[str, Any]:

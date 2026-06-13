@@ -47,7 +47,8 @@
   Worker tracer 주입 시 OTel span emit). stub 잔여 없음.
 
 ## Active Focus
-- [auto] 잔여: Day 9.5 품질 리뷰 회차(read-only)만.
+- **[auto] 백로그 소진** (리뷰 회차 + findings 환류까지 완료) — 잔여는 전부 [manual]:
+  크레딧/Slack App+deploy/ping e2e/DynamoDB provision/v0 대시보드/ADOT 캡처/제출물.
 - 운영자 수동: v0 대시보드 + AWS/v0 크레딧 + DynamoDB provision + deploy/README.md 1–4단계 → ping e2e.
 
 ## Open Risks

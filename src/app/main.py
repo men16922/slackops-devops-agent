@@ -33,8 +33,9 @@ def create_app() -> Any:
 
     @api.get("/metrics")
     def metrics() -> dict[str, str]:
-        # Day 8–9: OTel 계측 연동 후 실제 지표 노출. 현재는 liveness 수준.
-        return {"status": "ok", "note": "OTel metrics pipeline pending (Day 8-9)"}
+        # 지표 수집은 TelemetryStore(+선택 OTel span emit)가 담당 — 대시보드는 store
+        # 피드를 읽는다. 이 endpoint 는 liveness 확인용 placeholder 로 유지.
+        return {"status": "ok", "note": "metrics are collected in TelemetryStore/OTel"}
 
     return api
 

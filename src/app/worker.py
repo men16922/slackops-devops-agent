@@ -196,6 +196,8 @@ class Worker:
         duration_ms = self._duration_ms(started)
         # 출력 게이트(주입 방어 3계층): diff 가 있는 L1 쓰기는 사람 승인 전에
         # 멈춘다. 이미 승인된 job(approved_by 기록)은 게이트를 재통과하지 않는다.
+        # 게이트를 거치는 job(pr)은 prepare/execute 각 1회씩 metric 이 2건 기록된다 —
+        # 실행(Claude 호출)이 실제로 2회이므로 의도된 동작(대시보드는 job 단위 집계).
         if outcome.diff is not None and job.approved_by is None:
             updated = self._jobs.await_approval(job.id, outcome.diff)
             self._audit.append(

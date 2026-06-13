@@ -15,18 +15,13 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any, Protocol
 
-
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def _day_of(ts: str) -> str:
-    """ISO ts → 일자 파티션 키(yyyymmdd)."""
-    return ts[:10].replace("-", "")
+from app.store._util import (
+    day_of as _day_of,
+    encode_for_dynamodb as _encode,
+    utcnow_iso as _utcnow_iso,
+)
 
 
 @dataclass
@@ -282,13 +277,6 @@ class DynamoDbTelemetryStore:
             Limit=limit,
         )
         return [_from_item(item) for item in resp.get("Items", [])]
-
-
-def _encode(value: object) -> object:
-    """DynamoDB 는 float 를 직접 못 받는다 — Decimal 로 변환."""
-    if isinstance(value, float):
-        return Decimal(str(value))
-    return value
 
 
 def _from_item(item: dict[str, Any]) -> MetricRecord:
