@@ -22,6 +22,7 @@ from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
 from app.commands._replies import exec_failed_reply
 from app.sanitizer import build_prompt
+from app.telemetry import RunMetricsHook
 
 _USAGE_HINT = "사용법: `/devops pr <설명>`"
 
@@ -132,6 +133,7 @@ def handle_pr(
     approved_diff: str | None = None,
     runner: SubprocessRunner | None = None,
     timeout_s: int = DEFAULT_TIMEOUT_S,
+    on_metrics: RunMetricsHook | None = None,
 ) -> PrResult:
     """설명을 받아 PR 을 2단계(prepare → 승인 → execute)로 진행.
 
@@ -141,6 +143,7 @@ def handle_pr(
             값이 있으면 execute 단계(push + gh pr create 허용).
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
         timeout_s: Claude 실행 타임아웃(초).
+        on_metrics: Claude 호출 계측 hook(run_for_command 로 전달).
 
     Returns:
         PrResult — prepare 성공 시 diff 가 채워져 worker 출력 게이트로 분기한다.
@@ -155,15 +158,25 @@ def handle_pr(
             )
         )
     if approved_diff is None:
-        return _prepare(desc, runner, timeout_s)
-    return _execute(desc, approved_diff, runner, timeout_s)
+        return _prepare(desc, runner, timeout_s, on_metrics)
+    return _execute(desc, approved_diff, runner, timeout_s, on_metrics)
 
 
-def _prepare(desc: str, runner: SubprocessRunner | None, timeout_s: int) -> PrResult:
+def _prepare(
+    desc: str,
+    runner: SubprocessRunner | None,
+    timeout_s: int,
+    on_metrics: RunMetricsHook | None,
+) -> PrResult:
     """prepare 단계 — 게이트 도구(push/PR) 없이 branch→수정→test + diff 생성."""
     prompt = build_prompt(PR_PREPARE_PROMPT_TEMPLATE, desc)
     result = run_for_command(
-        "pr", prompt, timeout_s=timeout_s, runner=runner, exclude_tools=PR_GATED_TOOLS
+        "pr",
+        prompt,
+        timeout_s=timeout_s,
+        runner=runner,
+        exclude_tools=PR_GATED_TOOLS,
+        on_metrics=on_metrics,
     )
     if result.exit_code != 0:
         return PrResult(
@@ -189,14 +202,20 @@ def _prepare(desc: str, runner: SubprocessRunner | None, timeout_s: int) -> PrRe
 
 
 def _execute(
-    desc: str, approved_diff: str, runner: SubprocessRunner | None, timeout_s: int
+    desc: str,
+    approved_diff: str,
+    runner: SubprocessRunner | None,
+    timeout_s: int,
+    on_metrics: RunMetricsHook | None,
 ) -> PrResult:
     """execute 단계 — 승인된 diff 컨텍스트로 push + gh pr create(머지 금지)."""
     untrusted = (
         f"=== change request ===\n{desc}\n\n=== approved diff ===\n{approved_diff}"
     )
     prompt = build_prompt(PR_EXECUTE_PROMPT_TEMPLATE, untrusted)
-    result = run_for_command("pr", prompt, timeout_s=timeout_s, runner=runner)
+    result = run_for_command(
+        "pr", prompt, timeout_s=timeout_s, runner=runner, on_metrics=on_metrics
+    )
     if result.exit_code != 0:
         return PrResult(
             summary=exec_failed_reply(

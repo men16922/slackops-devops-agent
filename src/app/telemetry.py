@@ -9,11 +9,36 @@ span 으로 추가 emit 한다. opentelemetry 미설치 환경에서도 전 경�
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable
 
 from app.store import MetricRecord, TelemetryStore
 
 _DEFAULT_OTLP_ENDPOINT = "http://127.0.0.1:4317"  # 같은 호스트의 ADOT Collector gRPC
+
+
+@dataclass(frozen=True)
+class RunMetrics:
+    """Claude Headless 호출 1건의 계측 스냅샷 — allowlist.run_for_command 가 emit.
+
+    Attributes:
+        command: 실행된 subcommand(logs/diagnose/tf-review/pr).
+        duration_ms: 호출 latency(권한 게이트 통과 후 subprocess 구간).
+        tokens / cost_usd: RunResult 의 계측 메타(없으면 None).
+        success: exit_code == 0 (timeout/실행기 예외는 False).
+        error: 실패 사유(success=False 일 때).
+    """
+
+    command: str
+    duration_ms: float
+    tokens: int | None = None
+    cost_usd: float | None = None
+    success: bool = True
+    error: str | None = None
+
+
+# 계측 수신 시그니처 — 호출부(worker/슬랙 동기 경로)가 store/OTel 로 연결한다.
+RunMetricsHook = Callable[[RunMetrics], None]
 
 
 def setup_telemetry(

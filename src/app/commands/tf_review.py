@@ -15,6 +15,7 @@ from typing import Callable
 
 from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
+from app.telemetry import RunMetricsHook
 from app.commands._replies import exec_failed_reply, no_data_reply
 from app.sanitizer import build_prompt
 
@@ -88,6 +89,8 @@ def handle_tf_review(
     fetcher: PlanFetcher | None = None,
     runner: SubprocessRunner | None = None,
     timeout_s: int = DEFAULT_TIMEOUT_S,
+    *,
+    on_metrics: RunMetricsHook | None = None,
 ) -> str:
     """terraform plan 을 수집·리뷰해 위험/비용/보안 요약 반환.
 
@@ -99,6 +102,7 @@ def handle_tf_review(
         fetcher: plan 수집 의존성(테스트 주입점). None 이면 terraform 기본 fetcher.
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
         timeout_s: Claude 실행 타임아웃(초).
+        on_metrics: Claude 호출 계측 hook(run_for_command 로 전달).
 
     Returns:
         Slack 에 게시할 리뷰 요약(또는 수집/실행 오류 안내).
@@ -110,7 +114,9 @@ def handle_tf_review(
     if not raw_plan.strip():
         return no_data_reply(_TARGET_LABEL, "plan 출력을")
     prompt = build_tf_review_prompt(raw_plan)
-    result = run_for_command("tf-review", prompt, timeout_s=timeout_s, runner=runner)
+    result = run_for_command(
+        "tf-review", prompt, timeout_s=timeout_s, runner=runner, on_metrics=on_metrics
+    )
     if result.exit_code != 0:
         return exec_failed_reply(
             _TARGET_LABEL, "plan 리뷰", result.exit_code, result.output

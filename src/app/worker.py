@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from app.claude_runner import SubprocessRunner
 from app.store import (
@@ -24,7 +24,7 @@ from app.store import (
     JobStore,
     TelemetryStore,
 )
-from app.telemetry import record_run_metrics
+from app.telemetry import RunMetrics, record_run_metrics
 
 # 폴링 간격 기본값(초) — 큐가 비었을 때만 대기한다.
 POLL_INTERVAL_S = 2.0
@@ -75,25 +75,52 @@ def default_executors(
     """
     from app.commands import diagnose, logs, ping, pr, tf_review
 
+    def _merge_metrics(
+        outcome: CommandOutcome, captured: list[RunMetrics]
+    ) -> CommandOutcome:
+        # run_for_command 가 emit 한 마지막 호출 계측(tokens/cost)을 outcome 에 병합 —
+        # 핸들러는 텍스트만 반환하므로 hook 없이는 계측이 유실된다.
+        if captured:
+            outcome.tokens = captured[-1].tokens
+            outcome.cost_usd = captured[-1].cost_usd
+        return outcome
+
+    def logs_executor(job: Job) -> CommandOutcome:
+        captured: list[RunMetrics] = []
+        text = logs.handle_logs(job.args, runner=runner, on_metrics=captured.append)
+        return _merge_metrics(CommandOutcome(result=text), captured)
+
+    def diagnose_executor(job: Job) -> CommandOutcome:
+        captured: list[RunMetrics] = []
+        text = diagnose.handle_diagnose(
+            job.args, runner=runner, on_metrics=captured.append
+        )
+        return _merge_metrics(CommandOutcome(result=text), captured)
+
+    def tf_review_executor(_job: Job) -> CommandOutcome:
+        captured: list[RunMetrics] = []
+        text = tf_review.handle_tf_review(runner=runner, on_metrics=captured.append)
+        return _merge_metrics(CommandOutcome(result=text), captured)
+
     def pr_executor(job: Job) -> CommandOutcome:
         # 승인된 job(approved_by 기록)만 execute 단계 — job.diff 가 승인된 diff 다.
         approved_diff = job.diff if job.approved_by is not None else None
+        captured: list[RunMetrics] = []
         pr_result = pr.handle_pr(
-            job.args, approved_diff=approved_diff, runner=runner
+            job.args,
+            approved_diff=approved_diff,
+            runner=runner,
+            on_metrics=captured.append,
         )
-        return CommandOutcome(result=pr_result.summary, diff=pr_result.diff)
+        return _merge_metrics(
+            CommandOutcome(result=pr_result.summary, diff=pr_result.diff), captured
+        )
 
     return {
         "ping": lambda _job: CommandOutcome(result=ping.handle_ping()),
-        "logs": lambda job: CommandOutcome(
-            result=logs.handle_logs(job.args, runner=runner)
-        ),
-        "diagnose": lambda job: CommandOutcome(
-            result=diagnose.handle_diagnose(job.args, runner=runner)
-        ),
-        "tf-review": lambda _job: CommandOutcome(
-            result=tf_review.handle_tf_review(runner=runner)
-        ),
+        "logs": logs_executor,
+        "diagnose": diagnose_executor,
+        "tf-review": tf_review_executor,
         "pr": pr_executor,
     }
 
@@ -114,6 +141,7 @@ class Worker:
         executors: dict[str, CommandExecutor] | None = None,
         runner: SubprocessRunner | None = None,
         monotonic: Callable[[], float] | None = None,
+        tracer: Any | None = None,
     ) -> None:
         """worker 구성 — 모든 협력자는 주입 가능.
 
@@ -125,6 +153,8 @@ class Worker:
                 매핑에 없는 명령은 실행 없이 FAILED(default deny).
             runner: 기본 실행기에 전달할 subprocess 실행기(테스트 주입점).
             monotonic: duration_ms 계측용 단조 시계(테스트 주입점).
+            tracer: telemetry.setup_telemetry 가 돌려준 OTel tracer. None 이면
+                store 기록만 하고 OTel emit 은 생략한다.
         """
         self._jobs = job_store
         self._audit = audit_store
@@ -133,6 +163,7 @@ class Worker:
             executors if executors is not None else default_executors(runner)
         )
         self._monotonic = monotonic if monotonic is not None else time.monotonic
+        self._tracer = tracer
 
     def process_one(self) -> Job | None:
         """claim 가능한 job 1건을 소비 — 실행 → 게이트/종료 전이 + audit/metric.
@@ -230,6 +261,7 @@ class Worker:
             duration_ms=self._duration_ms(started),
             success=False,
             error=error,
+            tracer=self._tracer,
         )
         return updated
 
@@ -245,4 +277,5 @@ class Worker:
             cost_usd=outcome.cost_usd,
             tool_calls=outcome.tool_calls,
             success=success,
+            tracer=self._tracer,
         )

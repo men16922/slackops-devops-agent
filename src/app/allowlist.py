@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Mapping
 
 from app import permissions
@@ -21,6 +22,7 @@ from app.claude_runner import (
     SubprocessRunner,
     run_headless,
 )
+from app.telemetry import RunMetrics, RunMetricsHook
 
 
 class AllowlistDenied(Exception):
@@ -146,11 +148,13 @@ def run_for_command(
     runner: SubprocessRunner | None = None,
     *,
     exclude_tools: frozenset[str] = frozenset(),
+    on_metrics: RunMetricsHook | None = None,
 ) -> RunResult:
     """명령의 allowlist 를 강제해 Claude Code Headless 를 실행하는 단일 진입점.
 
     permissions 게이트(레벨 + 금지 불변) → allowlist 조회 → run_headless 순서로,
-    어느 단계든 거부되면 subprocess 는 실행되지 않는다.
+    어느 단계든 거부되면 subprocess 는 실행되지 않는다. 모든 Claude 호출이 이 함수를
+    지나므로 계측(on_metrics)도 여기서 emit 한다 — 게이트 거부는 호출이 아니라서 제외.
 
     Args:
         command: subcommand 이름(logs/diagnose/tf-review/pr).
@@ -160,6 +164,8 @@ def run_for_command(
         exclude_tools: allowlist 에서 추가로 **제거**할 도구(좁히기만 — 도구를
             더할 수는 없다). pr 출력 게이트의 prepare 단계가 push/PR 도구를
             argv 수준에서 제거할 때 쓴다.
+        on_metrics: 호출 1건의 RunMetrics 수신 hook(테스트/worker/슬랙 경로 주입점).
+            None 이면 계측 생략. 실행기 예외 시에도 success=False 로 emit 후 재전파.
 
     Raises:
         permissions.PermissionDenied: 권한 레벨 초과/미정의/금지 불변.
@@ -170,4 +176,29 @@ def run_for_command(
             f"command not allowed by permission engine: {command!r}"
         )
     tools = [t for t in allowed_tools(command) if t not in exclude_tools]
-    return run_headless(prompt, tools, timeout_s=timeout_s, runner=runner)
+    started = time.monotonic()
+    try:
+        result = run_headless(prompt, tools, timeout_s=timeout_s, runner=runner)
+    except Exception as exc:
+        if on_metrics is not None:
+            on_metrics(
+                RunMetrics(
+                    command=command,
+                    duration_ms=(time.monotonic() - started) * 1000.0,
+                    success=False,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            )
+        raise
+    if on_metrics is not None:
+        on_metrics(
+            RunMetrics(
+                command=command,
+                duration_ms=(time.monotonic() - started) * 1000.0,
+                tokens=result.tokens,
+                cost_usd=result.cost_usd,
+                success=result.exit_code == 0,
+                error=None if result.exit_code == 0 else result.output,
+            )
+        )
+    return result

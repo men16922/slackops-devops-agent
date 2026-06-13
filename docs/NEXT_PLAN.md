@@ -25,7 +25,6 @@
 - [ ] `[manual]` GitHub App 최소 스코프 + branch protection(자동 머지 차단) 설정.
 
 ## Day 8–9 — Observability
-- [ ] `[auto]` claude_runner·commands 에 telemetry 계측 결합 — 완료: 호출 시 지표 기록 테스트 green.
 - [ ] `[manual]` EC2 에 ADOT Collector 구성 + diagnose 1회 수치 캡처(N초/$0.0X/tool call M회).
 
 ## Day 9.5 — 품질 리뷰 회차 (구현 체인 뒤 read-only 검증 단계)

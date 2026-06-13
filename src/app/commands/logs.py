@@ -14,6 +14,7 @@ from typing import Callable
 
 from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
+from app.telemetry import RunMetricsHook
 from app.commands._replies import (
     exec_failed_reply,
     invalid_service_reply,
@@ -127,6 +128,8 @@ def handle_logs(
     fetcher: LogFetcher | None = None,
     runner: SubprocessRunner | None = None,
     timeout_s: int = DEFAULT_TIMEOUT_S,
+    *,
+    on_metrics: RunMetricsHook | None = None,
 ) -> str:
     """서비스의 CloudWatch 로그를 조회·분석해 요약 반환.
 
@@ -138,6 +141,7 @@ def handle_logs(
         fetcher: 로그 조회 의존성(테스트 주입점). None 이면 boto3 기본 fetcher.
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
         timeout_s: Claude 실행 타임아웃(초).
+        on_metrics: Claude 호출 계측 hook(run_for_command 로 전달).
 
     Returns:
         Slack 에 게시할 분석 요약(또는 입력/실행 오류 안내).
@@ -151,7 +155,9 @@ def handle_logs(
     if not raw_logs.strip():
         return no_data_reply(validated, "최근 로그 이벤트를")
     prompt = build_logs_prompt(validated, raw_logs)
-    result = run_for_command("logs", prompt, timeout_s=timeout_s, runner=runner)
+    result = run_for_command(
+        "logs", prompt, timeout_s=timeout_s, runner=runner, on_metrics=on_metrics
+    )
     if result.exit_code != 0:
         return exec_failed_reply(validated, "로그 분석", result.exit_code, result.output)
     return result.output

@@ -19,8 +19,8 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   complete + audit/metric write-back) + tf-review(plan 격리 리뷰, apply 경로 부재)
   + pr(2단계 출력게이트 — prepare 는 push/PR 도구 argv 제거 + diff 추출, execute 는
   승인 후만) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료.
-- **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(220 passed, 1 skipped) + ruff + mypy(strict).
-- **현재 초점:** [auto] claude_runner·commands 계측 결합 → Day 9.5 리뷰 회차. [manual](크레딧/provision/대시보드).
+- **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(229 passed, 1 skipped) + ruff + mypy(strict).
+- **현재 초점:** [auto] Day 9.5 리뷰 회차만 잔여. [manual](크레딧/provision/대시보드/ADOT).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)
 - Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).

@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from typing import Callable
 
 from app.allowlist import run_for_command
+from app.telemetry import RunMetricsHook
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
 from app.commands._replies import (
     exec_failed_reply,
@@ -164,6 +165,8 @@ def handle_diagnose(
     fetchers: Mapping[str, SourceFetcher] | None = None,
     runner: SubprocessRunner | None = None,
     timeout_s: int = DEFAULT_TIMEOUT_S,
+    *,
+    on_metrics: RunMetricsHook | None = None,
 ) -> str:
     """서비스 상태를 CloudWatch·kubectl·git diff 로 종합 진단.
 
@@ -176,6 +179,7 @@ def handle_diagnose(
             (cloudwatch-logs / kubectl-describe / git-diff).
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
         timeout_s: Claude 실행 타임아웃(초).
+        on_metrics: Claude 호출 계측 hook(run_for_command 로 전달).
 
     Returns:
         Slack 에 게시할 진단 요약(또는 입력/실행 오류 안내).
@@ -189,7 +193,9 @@ def handle_diagnose(
     if all(not content.strip() for _, content in sections):
         return no_data_reply(validated, "진단에 쓸 데이터를")
     prompt = build_diagnose_prompt(validated, sections)
-    result = run_for_command("diagnose", prompt, timeout_s=timeout_s, runner=runner)
+    result = run_for_command(
+        "diagnose", prompt, timeout_s=timeout_s, runner=runner, on_metrics=on_metrics
+    )
     if result.exit_code != 0:
         return exec_failed_reply(validated, "진단", result.exit_code, result.output)
     return result.output

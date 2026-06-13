@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- 게이트 3계층: `python3 -m pytest tests/ -q` → **220 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
+- 게이트 3계층: `python3 -m pytest tests/ -q` → **229 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
   + `ruff check src tests` + `mypy src`(strict) 전부 green.
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
 - code-review(high) 후속 10 findings 수정 완료 — route 예외 안전망, sanitizer 미완성태그,
@@ -41,10 +41,13 @@
   전체 allowlist 로 push+`gh pr create`; 설명은 길이 검증 후 격리 블록으로만 전달),
   slack 동기 경로에 tf-review 등록(pr 은 게이트가 store 상태를 요구해 worker 경유 전용).
 - telemetry(setup_telemetry 실 구현 — TracerProvider+SimpleSpanProcessor, exporter 주입/OTLP lazy,
-  미설치 None; record_run_metrics tracer 주입 시 devops.run span emit, store 기록 불변). stub 잔여 없음.
+  미설치 None; record_run_metrics tracer 주입 시 devops.run span emit, store 기록 불변),
+  계측 결합(run_for_command on_metrics — 모든 Claude 호출 단일 진입점 계측, 핸들러 4종
+  passthrough, worker 가 실 tokens/cost 를 CommandOutcome/metric/job 에 write-back,
+  Worker tracer 주입 시 OTel span emit). stub 잔여 없음.
 
 ## Active Focus
-- [auto] 잔여: claude_runner·commands telemetry 계측 결합 → Day 9.5 품질 리뷰 회차.
+- [auto] 잔여: Day 9.5 품질 리뷰 회차(read-only)만.
 - 운영자 수동: v0 대시보드 + AWS/v0 크레딧 + DynamoDB provision + deploy/README.md 1–4단계 → ping e2e.
 
 ## Open Risks

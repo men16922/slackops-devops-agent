@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 
 import pytest
 
@@ -13,8 +14,9 @@ from app.allowlist import (
     run_for_command,
     validate_mapping,
 )
-from app.claude_runner import build_command
+from app.claude_runner import ClaudeTimeoutError, build_command
 from app.permissions import FORBIDDEN_ACTIONS, PermissionDenied
+from app.telemetry import RunMetrics
 from tests._helpers import RecordingRunner, result_json as _result_json
 
 
@@ -144,3 +146,45 @@ def test_run_for_command_ping_has_no_claude_path() -> None:
     with pytest.raises(AllowlistDenied):
         run_for_command("ping", "p", runner=runner)
     assert runner.calls == []
+
+
+# ── run_for_command — 계측 hook(on_metrics) ──────────────────────
+
+
+def test_run_for_command_on_metrics_emits_success_metrics() -> None:
+    runner = RecordingRunner(stdout=_result_json("ok", cost=0.02))
+    captured: list[RunMetrics] = []
+
+    run_for_command("logs", "analyze", runner=runner, on_metrics=captured.append)
+
+    [m] = captured
+    assert m.command == "logs"
+    assert m.success is True
+    assert m.cost_usd == 0.02
+    assert m.duration_ms >= 0.0
+    assert m.error is None
+
+
+def test_run_for_command_on_metrics_failure_emits_then_raises() -> None:
+    def timeout_runner(cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
+        raise subprocess.TimeoutExpired(cmd, timeout_s)
+
+    captured: list[RunMetrics] = []
+    with pytest.raises(ClaudeTimeoutError):
+        run_for_command(
+            "logs", "analyze", runner=timeout_runner, on_metrics=captured.append
+        )
+
+    [m] = captured
+    assert m.success is False
+    assert m.error is not None and "Timeout" in m.error
+
+
+def test_run_for_command_on_metrics_skipped_when_denied_before_runner() -> None:
+    """게이트 거부는 Claude 호출이 아니다 — 계측 emit 없음."""
+    captured: list[RunMetrics] = []
+    with pytest.raises(PermissionDenied):
+        run_for_command(
+            "apply", "p", runner=RecordingRunner(), on_metrics=captured.append
+        )
+    assert captured == []

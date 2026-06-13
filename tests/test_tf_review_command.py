@@ -148,3 +148,19 @@ def test_template_places_plan_inside_untrusted_block() -> None:
     prompt = build_tf_review_prompt("PLAN-BODY")
     assert prompt.index(UNTRUSTED_OPEN) < prompt.index("PLAN-BODY")
     assert prompt.index("PLAN-BODY") < prompt.index(UNTRUSTED_CLOSE)
+
+
+def test_handle_tf_review_on_metrics_passthrough() -> None:
+    """on_metrics 가 run_for_command 까지 전달돼 Claude 호출 계측이 emit 된다."""
+    from app.telemetry import RunMetrics
+
+    captured: list[RunMetrics] = []
+    handle_tf_review(
+        fetcher=RecordingPlanFetcher(),
+        runner=RecordingRunner(stdout=result_json("리뷰", cost=0.04)),
+        on_metrics=captured.append,
+    )
+    [m] = captured
+    assert m.command == "tf-review"
+    assert m.success is True
+    assert m.cost_usd == 0.04

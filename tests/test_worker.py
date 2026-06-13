@@ -286,3 +286,47 @@ def test_unknown_command_fails_without_execution(stores) -> None:
     assert failed is not None
     assert failed.status is JobStatus.FAILED
     assert failed.error is not None and "default deny" in failed.error
+
+
+# ── telemetry 계측 결합 (on_metrics → CommandOutcome → metric) ───
+
+
+def test_default_executors_metric_carries_real_cost(
+    stores, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """run_for_command 가 emit 한 호출 계측(cost)이 metric write-back 까지 흐른다."""
+    jobs, _, metrics = stores
+    monkeypatch.setattr(logs, "fetch_cloudwatch_logs", RecordingFetcher("ERROR boom"))
+    runner = RecordingRunner(stdout=result_json("분석 결과", cost=0.05))
+
+    job = jobs.enqueue("logs", "payments-api", source=JobSource.SLACK)
+    worker = make_worker(stores, executors=default_executors(runner))
+    done = worker.process_one()
+
+    assert done is not None and done.status is JobStatus.DONE
+    assert done.cost_usd == 0.05  # complete() 에도 실 cost 가 실린다
+    [recorded] = metrics.list_for_job(job.id)
+    assert recorded.cost_usd == 0.05
+
+
+def test_worker_tracer_emits_otel_span(stores) -> None:
+    """tracer 주입 시 metric write-back 이 OTel span 으로도 emit 된다."""
+    pytest.importorskip("opentelemetry.sdk")
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+
+    from app.telemetry import setup_telemetry
+
+    exporter = InMemorySpanExporter()
+    tracer = setup_telemetry(span_exporter=exporter)
+    jobs, _, _ = stores
+    jobs.enqueue("ping", source=JobSource.WEB)
+    worker = make_worker(stores, executors=default_executors(), tracer=tracer)
+
+    done = worker.process_one()
+
+    assert done is not None and done.status is JobStatus.DONE
+    [span] = exporter.get_finished_spans()
+    assert span.name == "devops.run"
+    assert dict(span.attributes)["devops.command"] == "ping"

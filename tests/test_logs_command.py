@@ -147,3 +147,20 @@ def test_logs_module_import_safe_without_boto3_loaded() -> None:
     fresh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fresh)
     assert callable(fresh.fetch_cloudwatch_logs)
+
+
+def test_handle_logs_on_metrics_passthrough() -> None:
+    """on_metrics 가 run_for_command 까지 전달돼 Claude 호출 계측이 emit 된다."""
+    from app.telemetry import RunMetrics
+
+    captured: list[RunMetrics] = []
+    handle_logs(
+        "payments-api",
+        fetcher=RecordingFetcher("ERROR boom"),
+        runner=RecordingRunner(stdout=_result_json("분석", cost=0.01)),
+        on_metrics=captured.append,
+    )
+    [m] = captured
+    assert m.command == "logs"
+    assert m.success is True
+    assert m.cost_usd == 0.01

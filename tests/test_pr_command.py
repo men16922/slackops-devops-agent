@@ -154,3 +154,19 @@ def test_extract_diff_variants() -> None:
     assert extract_diff("no markers at all") is None
     assert extract_diff(f"{DIFF_BEGIN_MARKER}\nd1") is None  # 닫는 마커 없음
     assert extract_diff(f"{DIFF_BEGIN_MARKER}\n  \n{DIFF_END_MARKER}") is None  # 빈 diff
+
+
+def test_handle_pr_on_metrics_passthrough_in_prepare() -> None:
+    """prepare 단계의 Claude 호출도 on_metrics 로 계측된다."""
+    from app.telemetry import RunMetrics
+
+    captured: list[RunMetrics] = []
+    handle_pr(
+        "fix typo in readme",
+        runner=RecordingRunner(stdout=result_json(prepare_output(), cost=0.06)),
+        on_metrics=captured.append,
+    )
+    [m] = captured
+    assert m.command == "pr"
+    assert m.success is True
+    assert m.cost_usd == 0.06

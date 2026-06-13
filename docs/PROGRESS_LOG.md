@@ -4,6 +4,20 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
 
+## 2026-06-13 — claude_runner·commands telemetry 계측 결합 (Day 8–9 [auto] 완결)
+- Status: 완료. H0 로컬 [auto] Observability 마지막 항목 — 호출 계측이 끊기던 갭 해소
+  (핸들러가 문자열만 반환해 RunResult 의 tokens/cost 가 유실되던 구조).
+- Changed: telemetry.py RunMetrics(frozen)+RunMetricsHook. allowlist.run_for_command 에
+  on_metrics — 모든 Claude 호출의 단일 진입점에서 duration/tokens/cost/success emit
+  (실행기 예외도 success=False emit 후 재전파, 게이트 거부는 호출 아님 — 미계측).
+  commands/{logs,diagnose,tf_review,pr} on_metrics passthrough(pr 은 prepare/execute 양쪽).
+  worker.default_executors — hook capture 로 실 tokens/cost 를 CommandOutcome 에 병합
+  (complete()의 job.cost_usd 에도 실림), Worker(tracer=...) 주입 시 metric write-back 이
+  OTel span 으로도 emit. tests +9(allowlist hook 3종/핸들러 passthrough 4종/worker 2종).
+- Verified: `python3 -m pytest tests/ -q` → 229 passed, 1 skipped. ruff/mypy green.
+- Blockers: 없음. tool_calls 는 여전히 None(stream-json 파싱 도입 전 — 기존 결정 유지).
+- Next: [auto] Day 9.5 품질 리뷰 회차. [manual] ADOT Collector + 실측 캡처.
+
 ## 2026-06-13 — telemetry.py OTel 파이프라인 (setup_telemetry 실 구현 + span emit)
 - Status: 완료. Day 8–9 [auto] 1번 — store 가 source of truth 인 채로 OTel 을 부가 emit 으로 결합.
 - Changed: src/app/telemetry.py — setup_telemetry 실 구현(TracerProvider + Resource service.name
