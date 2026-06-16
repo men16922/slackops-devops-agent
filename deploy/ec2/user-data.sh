@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # EC2 user-data — Amazon Linux 2023 기준 도구 체인 설치 + systemd 서비스 등록.
 # 자격증명은 Instance Profile 로 주입 — 이 스크립트에 키/토큰 하드코딩 금지.
-# Slack 토큰은 SSM Parameter Store(SecureString)에서 부팅 시 로드.
+# Slack 토큰 + Claude 구독 OAuth 토큰은 SSM Parameter Store(SecureString)에서 부팅 시 로드.
+# Claude 추론은 구독 계정(CLAUDE_CODE_OAUTH_TOKEN)으로만 — ANTHROPIC_API_KEY 는 설정 금지(API 결제 경로 차단).
 set -euo pipefail
 
 # --- 기본 도구 ---
@@ -45,6 +46,8 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
 {
   echo "SLACK_BOT_TOKEN=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_BOT_TOKEN --with-decryption --query Parameter.Value --output text)"
   echo "SLACK_APP_TOKEN=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_APP_TOKEN --with-decryption --query Parameter.Value --output text)"
+  # Claude Code Headless 추론 인증 — 구독 계정 장수명 토큰(`claude setup-token` 산출물).
+  echo "CLAUDE_CODE_OAUTH_TOKEN=$(aws ssm get-parameter --region "$REGION" --name /slackops/CLAUDE_CODE_OAUTH_TOKEN --with-decryption --query Parameter.Value --output text)"
   echo "AWS_REGION=$REGION"
   echo "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317"
   echo "OTEL_SERVICE_NAME=slackops-devops-agent"

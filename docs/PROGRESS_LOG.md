@@ -1,8 +1,25 @@
 # PROGRESS_LOG — slackops-devops-agent
-최종 갱신: 2026-06-13
+최종 갱신: 2026-06-16
 
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
+
+## 2026-06-16 — web/ 대시보드(Next.js, 로컬 Docker) + USER_GUIDE.md + Claude 구독 추론 결정
+- Status: 완료. H0 핵심 스택(Vercel 프론트 + DynamoDB)의 프론트 첫 구현 — 로컬 e2e 검증까지.
+- Changed: **web/** 신규 — Next.js 14.2.35 App Router(TS). lib/{types,time,ddb,format}.ts
+  (단일테이블 계약 TS 미러 — GSI2 FEED/AUDIT/METRIC 질의, _util.py utcnow_iso/day_of 동형),
+  app/{page(jobs feed),jobs/[id](상세+diff 출력게이트+Approve/Reject+audit),metrics},
+  actions.ts(승인 server action = _conditional_set ConditionExpression + audit append 미러),
+  scripts/seed.mjs(create-table.sh 스키마로 테이블 생성 + mock 22건). docker-compose(dynamodb-local
+  오프라인 + seed + web, **포트 8930**, 더미 키 — 실 AWS 불필요), Dockerfile, .env.local.example.
+  **USER_GUIDE.md**(루트) — 시크릿 수동 입력 가이드(Slack/Claude→SSM, AWS 키는 Vercel/실DynamoDB
+  읽을 때만 최소권한 IAM, 발급·정책·회전·심사기간 비용절약). deploy/{ec2/user-data.sh,README.md}
+  에 CLAUDE_CODE_OAUTH_TOKEN(SSM) 로드 추가. .gitignore web/ 항목.
+- Verified: `next build` green(TS strict) + **docker compose up e2e**: seed 22건, web 8930 응답,
+  jobs/상세/metrics 렌더 + **승인 전이 동작·중복승인 ConditionalCheckFailed 거부**(낙관적 락) 확인.
+  게이트 3계층: pytest 229 passed/1 skipped · ruff green · mypy green(src 무변경).
+- Blockers: 없음. (잔여 postcss moderate/high 취약점은 Next 16 메이저 필요 — 보류.)
+- Next: [manual] — DynamoDB provision → EC2 e2e 캡처 → Vercel 배포(실 DynamoDB, 읽기키 env) → 제출물.
 
 ## 2026-06-13 — 리뷰 findings 환류: store 유틸 통합 + stale 주석 (로컬 [auto] 소진)
 - Status: 완료. **NEXT_PLAN [auto] 전부 소진** — 잔여는 [manual] 트랙만.

@@ -1,5 +1,5 @@
 # AGENT_BRIEF — slackops-devops-agent
-최종 갱신: 2026-06-13
+최종 갱신: 2026-06-16
 
 > 1분 압축 진입점 (≤60줄). 표준은 harness/CORE_MANDATES.md, 작업 권위는 NEXT_PLAN.md > docs/plans/.
 
@@ -18,9 +18,12 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   주입 store, OTel 은 lazy stub) + worker(폴링 consumer — claim→실행→출력게이트/
   complete + audit/metric write-back) + tf-review(plan 격리 리뷰, apply 경로 부재)
   + pr(2단계 출력게이트 — prepare 는 push/PR 도구 argv 제거 + diff 추출, execute 는
-  승인 후만) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료.
+  승인 후만) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료. **web/ 대시보드(Next.js)**
+  = jobs feed/상세(diff 출력게이트+Approve/Reject)/metrics, DynamoDB Local 오프라인 docker(포트
+  8930) 로컬 e2e 검증. DDB_ENDPOINT 토글로 실 DynamoDB(Vercel) 전환(D7). 추론=구독 OAuth(D6).
 - **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(229 passed, 1 skipped) + ruff + mypy(strict).
-- **현재 초점:** [auto] 소진 — [manual] 만 잔여(크레딧/Slack+deploy/provision/대시보드/ADOT/제출물).
+  web/ 는 `next build` + `docker compose up` e2e green.
+- **현재 초점:** 로컬 완성 — [manual] 만 잔여(크레딧 거절→무료티어/DynamoDB provision/Vercel 배포/EC2 e2e/제출물).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)
 - Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).

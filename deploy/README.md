@@ -14,6 +14,12 @@
      aws ssm put-parameter --name /slackops/SLACK_BOT_TOKEN --type SecureString --value 'xoxb-...'
      aws ssm put-parameter --name /slackops/SLACK_APP_TOKEN --type SecureString --value 'xapp-...'
      ```
+   - **Claude 추론 인증 (구독 계정)**: 로컬에서 장수명 토큰 발급 후 SSM 저장.
+     추론비는 구독 계정에 귀속 → AWS 크레딧과 분리. EC2 엔 `ANTHROPIC_API_KEY` 를 두지 않는다.
+     ```sh
+     claude setup-token   # 구독 로그인 → sk-ant-oat... 토큰 출력
+     aws ssm put-parameter --name /slackops/CLAUDE_CODE_OAUTH_TOKEN --type SecureString --value 'sk-ant-oat...'
+     ```
 2. **IAM Role + Instance Profile**: `iam/create-role.sh`
    - 읽기 전용 기준(CloudWatch/Logs/EKS Describe/SSM Read/S3 Read)
      + OTel export 최소 쓰기(PutMetricData/PutLogEvents/X-Ray) — 계측 파이프라인용 예외.

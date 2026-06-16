@@ -1,0 +1,39 @@
+# 로컬 대시보드 — DynamoDB Local(오프라인) + 시드 + Next.js.
+# 실 AWS 자격증명 불필요(더미 키). 기동: `docker compose up --build`
+# 포트: 호스트 8930 -> 컨테이너 3000 (기존 컨테이너와 충돌 시 web.ports 만 변경).
+
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    # -sharedDb: 자격증명/region 무관 단일 DB(seed 와 web 이 같은 데이터 공유). -inMemory: 휘발성.
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    # 호스트 포트 노출 없음(내부 네트워크 전용) — 기존 8000 사용 컨테이너와 충돌 회피.
+
+  # 1회성: 테이블 생성 + mock 데이터 주입 후 종료.
+  seed:
+    build: .
+    depends_on:
+      - dynamodb-local
+    environment:
+      DDB_ENDPOINT: http://dynamodb-local:8000
+      DDB_TABLE: slackops-agent
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    command: ["node", "scripts/seed.mjs"]
+    restart: "no"
+
+  web:
+    build: .
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DDB_ENDPOINT: http://dynamodb-local:8000
+      DDB_TABLE: slackops-agent
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      DASHBOARD_APPROVER: web-operator
+    ports:
+      - "8930:3000"

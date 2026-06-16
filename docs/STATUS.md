@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-최종 갱신: 2026-06-13
+최종 갱신: 2026-06-16
 
 > 현재 상태/검증/risks (≤120줄). source of truth. 갱신은 /checkpoint.
 
@@ -11,6 +11,8 @@
 ## 검증 Baseline
 - 게이트 3계층: `python3 -m pytest tests/ -q` → **229 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
   + `ruff check src tests` + `mypy src`(strict) 전부 green.
+- web/: `next build` green(TS strict) + `docker compose up` e2e — seed 22건, 8930 응답, jobs/상세/metrics
+  렌더 + 승인 전이·중복승인 ConditionalCheckFailed 거부 확인(2026-06-16).
 - lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
 - code-review(high) 후속 10 findings 수정 완료 — route 예외 안전망, sanitizer 미완성태그,
   kubectl 플래그 주입, CloudWatch 최신 이벤트, run.sh limit 판정, 명령 레지스트리 단일화 등.
@@ -45,11 +47,18 @@
   계측 결합(run_for_command on_metrics — 모든 Claude 호출 단일 진입점 계측, 핸들러 4종
   passthrough, worker 가 실 tokens/cost 를 CommandOutcome/metric/job 에 write-back,
   Worker tracer 주입 시 OTel span emit). stub 잔여 없음.
+- **web/ 대시보드(Next.js 14.2.35 App Router, TS)** — 로컬 e2e 검증 완료. lib/ddb(단일테이블 계약
+  TS 미러: GSI2 FEED/AUDIT/METRIC 질의), app/{jobs feed, 상세=diff 출력게이트+Approve/Reject+audit,
+  metrics 집계}, actions(승인 server action = ConditionExpression 전이+audit append, 낙관적 락),
+  scripts/seed.mjs(create-table.sh 스키마 + mock 22건). docker-compose(dynamodb-local 오프라인+seed+web,
+  포트 8930, 더미 키=실 AWS 불필요). DDB_ENDPOINT 토글로 로컬↔실 DynamoDB 전환(D7).
+- 운영 배포 준비: user-data.sh/deploy README 에 Claude 구독 OAuth 토큰(SSM) 로드 추가(D6).
+  USER_GUIDE.md(루트) — 운영자 시크릿 수동 입력 가이드.
 
 ## Active Focus
-- **[auto] 백로그 소진** (리뷰 회차 + findings 환류까지 완료) — 잔여는 전부 [manual]:
-  크레딧/Slack App+deploy/ping e2e/DynamoDB provision/v0 대시보드/ADOT 캡처/제출물.
-- 운영자 수동: v0 대시보드 + AWS/v0 크레딧 + DynamoDB provision + deploy/README.md 1–4단계 → ping e2e.
+- 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 로컬). 잔여는 전부 **[manual] AWS/배포/제출**.
+- AWS 크레딧 신청 **거절** → 보유 $63.91 + 무료티어로 진행. 다음: DynamoDB provision →
+  Vercel 배포(실 DynamoDB) → EC2 e2e 캡처 → 제출물. 심사기간(~7/24) EC2 stop(비용 ~$0).
 
 ## Open Risks
 - untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.

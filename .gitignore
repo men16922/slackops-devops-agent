@@ -19,6 +19,11 @@ venv/
 # SQLite job queue (MVP)
 *.db
 
+# web/ 대시보드 (Next.js)
+web/node_modules/
+web/.next/
+web/.env.local
+
 # overnight runner 런타임 산출물
 bin/overnight/logs/
 bin/overnight/STOP
