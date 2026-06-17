@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-최종 갱신: 2026-06-16
+최종 갱신: 2026-06-17
 
 > 현재 상태/검증/risks (≤120줄). source of truth. 갱신은 /checkpoint.
 
@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- 게이트 3계층: `python3 -m pytest tests/ -q` → **229 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
+- 게이트 3계층: `python3 -m pytest tests/ -q` → **249 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
   + `ruff check src tests` + `mypy src`(strict) 전부 green.
 - web/: `next build` green(TS strict) + `docker compose up` e2e — seed 22건, 8930 응답, jobs/상세/metrics
   렌더 + 승인 전이·중복승인 ConditionalCheckFailed 거부 확인(2026-06-16).
@@ -54,6 +54,13 @@
   포트 8930, 더미 키=실 AWS 불필요). DDB_ENDPOINT 토글로 로컬↔실 DynamoDB 전환(D7).
 - 운영 배포 준비: user-data.sh/deploy README 에 Claude 구독 OAuth 토큰(SSM) 로드 추가(D6).
   USER_GUIDE.md(루트) — 운영자 시크릿 수동 입력 가이드.
+- **에이전트 자율 제안 루프(D9)** — control plane 을 사람+에이전트 공유 producer 로 확장.
+  mcp_server(propose_job/list_pending — FastMCP server=slackops, 순수로직/래퍼 분리, permissions
+  default-deny 재사용), agent_monitor(Tier1 시뮬레이터 detect 규칙 + Tier2 실제 claude -p
+  --mcp-config), claude_runner.build_command(mcp_config). 기존 출력 게이트 재사용(신규 store 상태
+  없음): 제안=PENDING/source=agent, L1 은 await_approval 로 사람 승인 대기. store 에 JobSource.AGENT
+  +Job.rationale 추가. web/ 에 사람 producer(NewCommand 채팅/selectbox+enqueueJob) + agent 뱃지·
+  rationale 표시, seed 에이전트 샘플 2건, dynamodb-local 8931 노출. 런북 docs/runbooks/agent-mcp-demo.md.
 
 ## Active Focus
 - 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 로컬). 잔여는 전부 **[manual] AWS/배포/제출**.

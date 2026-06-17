@@ -63,3 +63,18 @@
   gate 를 흡수 가능해 수렴이 깔끔(스킬 코드는 플러그인에, 콘텐츠는 리포에).
 - Impact: 스킬 호출은 플러그인 제공(`/sync` 등). 러너 경로 bin→scripts, gate 가 `make check` 로 통일,
   아카이브 docs/archive. 무인 권한경계는 `scripts/overnight/overnight-settings.json`(--settings 격리).
+
+## D9 — 에이전트 자율 제안: Job Queue 를 MCP 서버로 노출 (사람/에이전트 공유 producer)
+- Decision: control plane 을 사람(slack/web)에서 **에이전트(MCP)**까지 확장. `src/app/mcp_server.py`
+  가 `propose_job`/`list_pending`(FastMCP, server=`slackops`)을 노출 → 운영 에이전트가 큐에 제안.
+  **기존 출력 게이트 재사용**(신규 store 상태 없음): 제안=PENDING/source=agent, L1 쓰기는
+  worker 의 await_approval 에서 awaiting_approval 로 정지→사람 승인. `JobSource.AGENT` +
+  `Job.rationale` 전용 필드 추가(extra 는 store 에 미영속이라 전용 필드 필수). 데모는 Tier1
+  시뮬레이터(규칙기반·토큰불필요)가 기본, Tier2 실제 `claude -p --mcp-config`는 옵션(토큰 필요).
+- Reason: 프로젝트 thesis("에이전트를 안전하게 운영")의 구현 — 에이전트는 L0 관찰은 자유, L1
+  이상은 제안만 하고 처분은 사람. MCP 가 "에이전트에 도구 노출"의 표준이라 propose_job 에 적합.
+  default-deny(permissions 레지스트리)로 자유 텍스트 직결 금지(주입 방어) 유지.
+- Impact: `mcp>=1.0` 코어 의존성(lazy import). claude_runner.build_command(mcp_config) 추가.
+  web 은 agent 뱃지+rationale 표시. dynamodb-local 호스트 8931 노출(호스트 모니터 접근).
+  로컬 데모는 worker 미가동이라 제안이 pending 정지(전체 실행은 claude+worker 필요). 런북
+  `docs/runbooks/agent-mcp-demo.md`.
