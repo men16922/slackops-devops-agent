@@ -28,6 +28,16 @@ export default async function JobDetailPage({
       </h1>
       <p className="page-sub mono">JOB#{job.id}</p>
 
+      {job.source === "agent" && (
+        <div className="panel rationale">
+          <div className="rationale-label">🤖 에이전트 자율 제안</div>
+          <p>
+            {job.rationale ??
+              "운영 에이전트가 시스템을 관찰하고 이 작업을 제안했습니다. 실행은 사람 승인 후에만 진행됩니다."}
+          </p>
+        </div>
+      )}
+
       <div className="panel">
         <dl className="kv">
           <dt>Args</dt>

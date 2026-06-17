@@ -56,6 +56,7 @@ class DynamoDbJobStore:
         source: JobSource = JobSource.WEB,
         requested_by: str = "",
         channel: str | None = None,
+        rationale: str | None = None,
     ) -> Job:
         now = self._clock()
         job = Job(
@@ -68,6 +69,7 @@ class DynamoDbJobStore:
             channel=channel,
             created_at=now,
             updated_at=now,
+            rationale=rationale,
         )
         self._table.put_item(Item=_to_item(job))
         return job
@@ -227,6 +229,7 @@ def _to_item(job: Job) -> dict[str, Any]:
         "approved_by": job.approved_by,
         "approved_at": job.approved_at,
         "trace_id": job.trace_id,
+        "rationale": job.rationale,
     }
     for key, value in optional.items():
         if value is not None:
@@ -255,4 +258,5 @@ def _from_item(item: dict[str, Any]) -> Job:
         approved_by=item.get("approved_by"),
         approved_at=item.get("approved_at"),
         trace_id=item.get("trace_id"),
+        rationale=item.get("rationale"),
     )

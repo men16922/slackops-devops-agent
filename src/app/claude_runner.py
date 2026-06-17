@@ -53,17 +53,28 @@ class RunResult:
     cost_usd: float | None = None
 
 
-def build_command(prompt: str, allowed_tools: list[str]) -> list[str]:
+def build_command(
+    prompt: str,
+    allowed_tools: list[str],
+    mcp_config: str | None = None,
+) -> list[str]:
     """`claude -p` 호출 인자 리스트 생성(shell 미사용 — 인자 주입 불가).
 
     allowlist 가 비면 `--allowedTools` 자체를 생략한다 — headless 모드는
     승인 프롬프트가 불가능하므로 모든 tool 사용이 거부된다(default deny).
 
+    mcp_config 가 주어지면 `--mcp-config <json|path>` + `--strict-mcp-config`(프로젝트/유저
+    .mcp.json 무시, 전달 설정만 사용)를 추가한다 — 에이전트 모니터가 propose_job MCP 서버를
+    등록하는 경로. 허용 도구는 `mcp__<server>__<tool>` 형태로 allowed_tools 에 넣는다.
+
     Args:
         prompt: sanitizer.build_prompt 로 생성된 검증된 프롬프트.
         allowed_tools: 이 명령에 허용된 도구 목록(Tool Allowlist).
+        mcp_config: MCP 서버 설정(인라인 JSON 또는 파일 경로). None 이면 미등록(기존 동작).
     """
     cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "json"]
+    if mcp_config:
+        cmd.extend(["--mcp-config", mcp_config, "--strict-mcp-config"])
     if allowed_tools:
         cmd.extend(["--allowedTools", *allowed_tools])
     return cmd
@@ -118,6 +129,7 @@ def run_headless(
     allowed_tools: list[str],
     timeout_s: int = DEFAULT_TIMEOUT_S,
     runner: SubprocessRunner | None = None,
+    mcp_config: str | None = None,
 ) -> RunResult:
     """Claude Code Headless 를 subprocess 로 실행.
 
@@ -126,6 +138,7 @@ def run_headless(
         allowed_tools: 이 명령에 허용된 도구 목록(Tool Allowlist).
         timeout_s: 실행 타임아웃(초).
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
+        mcp_config: MCP 서버 설정(인라인 JSON/경로). 주어지면 --mcp-config + --strict-mcp-config.
 
     Returns:
         RunResult — 출력 + 계측 메타. 실패는 raise 하지 않고 exit_code 로 전달.
@@ -134,7 +147,7 @@ def run_headless(
         ClaudeTimeoutError: timeout_s 초과.
     """
     active_runner: SubprocessRunner = runner if runner is not None else _default_runner
-    cmd = build_command(prompt, allowed_tools)
+    cmd = build_command(prompt, allowed_tools, mcp_config)
     try:
         exit_code, stdout, stderr = active_runner(cmd, timeout_s)
     except subprocess.TimeoutExpired as exc:

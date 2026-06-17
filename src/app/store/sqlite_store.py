@@ -20,7 +20,7 @@ from app.store.base import (
 
 _COLUMNS = (
     "id, command, args, source, status, requested_by, channel, created_at, updated_at, "
-    "diff, result, cost_usd, tokens, error, approved_by, approved_at, trace_id"
+    "diff, result, cost_usd, tokens, error, approved_by, approved_at, trace_id, rationale"
 )
 
 _SCHEMA = """
@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     error        TEXT,
     approved_by  TEXT,
     approved_at  TEXT,
-    trace_id     TEXT
+    trace_id     TEXT,
+    rationale    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at);
 """
@@ -75,6 +76,7 @@ class SqliteJobStore:
         source: JobSource = JobSource.WEB,
         requested_by: str = "",
         channel: str | None = None,
+        rationale: str | None = None,
     ) -> Job:
         now = self._clock()
         job = Job(
@@ -87,12 +89,13 @@ class SqliteJobStore:
             channel=channel,
             created_at=now,
             updated_at=now,
+            rationale=rationale,
         )
         self._conn.execute(
             f"INSERT INTO jobs ({_COLUMNS}) VALUES "
             "(:id, :command, :args, :source, :status, :requested_by, :channel, "
             ":created_at, :updated_at, :diff, :result, :cost_usd, :tokens, :error, "
-            ":approved_by, :approved_at, :trace_id)",
+            ":approved_by, :approved_at, :trace_id, :rationale)",
             _to_row(job),
         )
         return job
@@ -233,6 +236,7 @@ def _to_row(job: Job) -> dict[str, object]:
         "approved_by": job.approved_by,
         "approved_at": job.approved_at,
         "trace_id": job.trace_id,
+        "rationale": job.rationale,
     }
 
 
@@ -255,4 +259,5 @@ def _from_row(row: sqlite3.Row) -> Job:
         approved_by=row["approved_by"],
         approved_at=row["approved_at"],
         trace_id=row["trace_id"],
+        rationale=row["rationale"],
     )

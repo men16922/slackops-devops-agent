@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listRecentJobs } from "../lib/ddb";
 import { fmtCost, fmtTime } from "../lib/format";
+import { NewCommand } from "./NewCommand";
 
 // 요청 시점에 DynamoDB 조회 — 정적 캐시 금지.
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ export default async function JobsPage() {
       <p className="page-sub">
         Slack/Web 두 producer 가 넣은 작업의 최신 피드 (GSI2 <span className="mono">FEED</span>).
       </p>
+
+      <NewCommand />
 
       <div className="panel">
         {jobs.length === 0 ? (
@@ -45,7 +48,13 @@ export default async function JobsPage() {
                     </Link>
                   </td>
                   <td className="mono muted">{j.args || "—"}</td>
-                  <td>{j.source}</td>
+                  <td>
+                    {j.source === "agent" ? (
+                      <span className="src-agent">🤖 agent</span>
+                    ) : (
+                      j.source
+                    )}
+                  </td>
                   <td className="mono">{j.requested_by || "—"}</td>
                   <td className="muted">{fmtTime(j.created_at)}</td>
                   <td>{fmtCost(j.cost_usd)}</td>

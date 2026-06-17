@@ -23,6 +23,7 @@ venv/
 web/node_modules/
 web/.next/
 web/.env.local
+web/tsconfig.tsbuildinfo
 
 # overnight runner 런타임 산출물 (scripts/overnight — overnight-harness 플러그인)
 scripts/overnight/logs/

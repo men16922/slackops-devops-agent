@@ -42,6 +42,7 @@ class JobSource(str, Enum):
 
     SLACK = "slack"
     WEB = "web"
+    AGENT = "agent"  # 운영 에이전트가 MCP propose_job 로 자율 제안(사람 승인 대기)
 
 
 @dataclass
@@ -63,6 +64,7 @@ class Job:
         error: 실패 사유.
         approved_by / approved_at: 승인 메타.
         trace_id: OTel 연계용.
+        rationale: source=agent 제안의 근거(에이전트가 왜 이 작업을 올렸는지) — 대시보드 표시용.
     """
 
     id: str
@@ -82,6 +84,7 @@ class Job:
     approved_by: str | None = None
     approved_at: str | None = None
     trace_id: str | None = None
+    rationale: str | None = None
     extra: dict[str, object] = field(default_factory=dict)
 
 
@@ -99,6 +102,7 @@ class JobStore(Protocol):
         source: JobSource = JobSource.WEB,
         requested_by: str = "",
         channel: str | None = None,
+        rationale: str | None = None,
     ) -> Job:
         """새 job 을 PENDING 으로 추가."""
         ...

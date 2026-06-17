@@ -10,7 +10,7 @@ export type JobStatus =
   | "failed"
   | "rejected";
 
-export type JobSource = "slack" | "web";
+export type JobSource = "slack" | "web" | "agent";
 
 export interface Job {
   id: string;
@@ -30,6 +30,7 @@ export interface Job {
   approved_by?: string;
   approved_at?: string;
   trace_id?: string;
+  rationale?: string;
 }
 
 export interface AuditEvent {

@@ -281,6 +281,62 @@ button.btn.reject {
   color: var(--amber);
 }
 
+/* 에이전트 자율 제안 — 근거 콜아웃 + source 뱃지 */
+.rationale {
+  border-left: 3px solid var(--green);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.rationale-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+  margin-bottom: 6px;
+}
+.rationale p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.src-agent {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  color: var(--green);
+}
+
+/* 웹 producer composer (명령 선택 + 인자칸) */
+.composer {
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.composer-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.composer-cmd,
+.composer-args {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.composer-args {
+  flex: 1;
+  min-width: 200px;
+}
+.composer-args:disabled {
+  opacity: 0.5;
+}
+.composer-hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
 .notice {
   padding: 40px;
   text-align: center;

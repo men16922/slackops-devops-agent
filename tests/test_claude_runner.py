@@ -54,6 +54,23 @@ def test_build_command_empty_allowlist_omits_flag() -> None:
     assert "--allowedTools" not in cmd
 
 
+def test_build_command_mcp_config_adds_strict_flags() -> None:
+    """mcp_config 주어지면 --mcp-config + --strict-mcp-config 추가(전달 설정만 사용)."""
+    cfg = '{"mcpServers":{"slackops":{"command":"python","args":["-m","app.mcp_server"]}}}'
+    cmd = build_command("p", ["mcp__slackops__propose_job"], mcp_config=cfg)
+    idx = cmd.index("--mcp-config")
+    assert cmd[idx + 1] == cfg
+    assert "--strict-mcp-config" in cmd
+    # allowedTools 는 그대로 유지
+    assert cmd[cmd.index("--allowedTools") + 1] == "mcp__slackops__propose_job"
+
+
+def test_build_command_no_mcp_config_by_default() -> None:
+    cmd = build_command("p", ["Read"])
+    assert "--mcp-config" not in cmd
+    assert "--strict-mcp-config" not in cmd
+
+
 def test_build_command_is_arg_list_no_shell() -> None:
     """shell 문자열이 아닌 인자 리스트 — 프롬프트 내 메타문자가 해석되지 않는다."""
     cmd = build_command("x; rm -rf / && echo $(pwd)", ["Read"])

@@ -158,6 +158,17 @@ index 8a1c0fe..b27d4aa 100644
    desired_capacity = 3
 `;
 
+const DIFF_AGENT_SAMPLE = `diff --git a/deploy/nginx/api.conf b/deploy/nginx/api.conf
+index 3f2a1bc..9d4e5af 100644
+--- a/deploy/nginx/api.conf
++++ b/deploy/nginx/api.conf
+@@ -8,7 +8,7 @@ location /checkout {
+   proxy_pass http://checkout_upstream;
+-  proxy_read_timeout 30s;
++  proxy_read_timeout 60s;
+   proxy_next_upstream error timeout;
+`;
+
 async function seedData() {
   const items = [];
 
@@ -283,6 +294,46 @@ async function seedData() {
       success: false,
       error: "timeout",
     }),
+  );
+
+  // 6) 에이전트 자율 제안 — 승인 대기 PR(diff + 근거). "감지→제안→사람 승인" 핵심 서사.
+  const agentPr = {
+    id: "agent-2001",
+    command: "pr",
+    args: "bump nginx proxy_read_timeout for /checkout 30s->60s",
+    source: "agent",
+    status: "awaiting_approval",
+    requested_by: "agent",
+    created_at: isoAt(-300),
+    updated_at: isoAt(-280),
+    diff: DIFF_AGENT_SAMPLE,
+    rationale:
+      "checkout-api 504 게이트웨이 타임아웃 급증(p99 8.1s) 감지 — proxy_read_timeout 상향 PR을 제안합니다. 승인 시에만 push/PR 생성(L1 출력 게이트).",
+  };
+  items.push(jobItem(agentPr));
+  items.push(
+    auditItem(agentPr.id, 1, isoAt(-300), "proposed", "agent", "504 spike detected"),
+  );
+  items.push(auditItem(agentPr.id, 2, isoAt(-290), "claimed", "worker"));
+  items.push(
+    auditItem(agentPr.id, 3, isoAt(-280), "awaiting_approval", "worker", "diff posted"),
+  );
+
+  // 7) 에이전트 제안 — 진단(PENDING, worker 픽업 전 = 막 올라온 제안).
+  const agentDiag = {
+    id: "agent-2002",
+    command: "diagnose",
+    args: "api",
+    source: "agent",
+    status: "pending",
+    requested_by: "agent",
+    created_at: isoAt(-60),
+    updated_at: isoAt(-60),
+    rationale: "api 5xx 오류율 12% 감지 — 다중 소스 종합 진단을 제안합니다.",
+  };
+  items.push(jobItem(agentDiag));
+  items.push(
+    auditItem(agentDiag.id, 1, isoAt(-60), "proposed", "agent", "error rate 12%"),
   );
 
   for (const item of items) await put(item);

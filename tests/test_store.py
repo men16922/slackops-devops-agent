@@ -58,6 +58,24 @@ def test_enqueue_creates_pending_job(store: object) -> None:
 
 
 @_both
+def test_enqueue_persists_rationale_and_agent_source(store: object) -> None:
+    """source=agent + rationale 이 양 backend 에 영속(에이전트 제안용)."""
+    job = store.enqueue(
+        "diagnose", "api", source=JobSource.AGENT, requested_by="agent", rationale="5xx 급증"
+    )
+    assert job.source is JobSource.AGENT
+    fetched = store.get(job.id)
+    assert fetched.source is JobSource.AGENT
+    assert fetched.rationale == "5xx 급증"
+
+
+@_both
+def test_enqueue_rationale_defaults_none(store: object) -> None:
+    job = store.enqueue("logs", "api")
+    assert store.get(job.id).rationale is None
+
+
+@_both
 def test_get_missing_returns_none(store: object) -> None:
     assert store.get("nope") is None
 
