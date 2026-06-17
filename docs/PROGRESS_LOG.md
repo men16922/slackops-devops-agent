@@ -1,8 +1,22 @@
 # PROGRESS_LOG — slackops-devops-agent
 최종 갱신: 2026-06-16
 
-> 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
-> 2026-06-11~12 전반부 항목 원문: bin/docs/archive/progress-2026-06.md
+> 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
+> 2026-06-11~12 전반부 항목 원문: docs/archive/progress-2026-06.md
+
+## 2026-06-17 — overnight-harness 플러그인 수렴 (리포 로컬 하네스 중복 제거)
+- Status: 완료. 자작 플러그인을 단일 소스로 — 스킬/러너/엔지니어링 문서 3계층 중복 제거(DECISIONS D8).
+- Changed: harness-init 스캐폴드(scripts/overnight/* + docs/engineering/* bibles + .claude/harness-config.json
+  + docs/test/bible + Makefile snippet). 리포 로컬 스킬 4종 삭제(.claude/skills/{sync,checkpoint,tidy-docs,
+  overnight-report}) → 플러그인 사용. 러너 bin/overnight → scripts/overnight 이전(PROMPT 에 리포 불변
+  CORE_MANDATES/aws→mock/lazy import/CONTEXT_BRIDGE read path/한국어 포팅, overnight-settings 에 aws deny 보강).
+  docs/LOOP_ENGINEERING.md → docs/engineering/interp/INTERPRETATION.md 흡수 후 삭제. Makefile 신규
+  (check=pytest+ruff+mypy + overnight 타깃). 아카이브 bin/docs/archive → docs/archive 이전.
+  CLAUDE.md/DOCS_POLICY/README/.gitignore 참조 갱신. (보존: harness/ mandates, docs 상태문서, 인터랙티브 settings.)
+- Verified: `make check` green(229 passed, 1 skipped · ruff · mypy). 구조 검증(중복 스킬 0, bin 제거,
+  활성 문서 bin 참조 0, run.sh/status.sh 문법 OK). 라이브 overnight-once 스모크는 커밋 후 진행.
+- Blockers: 없음. (스킬 bare 호출명 `/sync` 해석은 실사용 확인 예정.)
+- Next: H0 [manual] — DynamoDB provision/Vercel 배포/제출물.
 
 ## 2026-06-16 — web/ 대시보드(Next.js, 로컬 Docker) + USER_GUIDE.md + Claude 구독 추론 결정
 - Status: 완료. H0 핵심 스택(Vercel 프론트 + DynamoDB)의 프론트 첫 구현 — 로컬 e2e 검증까지.

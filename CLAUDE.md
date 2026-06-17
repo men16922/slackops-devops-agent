@@ -1,10 +1,12 @@
 # CLAUDE.md — slackops-devops-agent
-최종 갱신: 2026-06-11
+최종 갱신: 2026-06-17
 
 > 하네스 진입 규칙. 설계 근간은 harness/CORE_MANDATES.md, 현재 맥락은 harness/CONTEXT_BRIDGE.md 최우선 참조.
-> 세션 시작 시 /sync, 작업 묶음 완료 시 /checkpoint, 문서 비대 시 /tidy-docs.
+> 세션 시작 시 /sync, 작업 묶음 완료 시 /checkpoint, 문서 비대 시 /tidy-docs
+>   — 스킬은 **overnight-harness 플러그인** 제공(리포 특화는 .claude/harness-config.json,
+>     바이블↔리포 매핑은 docs/engineering/interp/INTERPRETATION.md).
 > Read Path: harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NEXT_PLAN.md.
-> docs/ 전체 bulk-read 금지. 운영 규칙은 docs/DOCS_POLICY.md.
+> docs/ 전체 bulk-read 금지. 운영 규칙은 docs/DOCS_POLICY.md. gate = `make check`(pytest+ruff+mypy).
 
 - 통신: 한국어. 단, 식별자/명령/경로/코드는 영어 원문 그대로.
 
@@ -61,7 +63,8 @@ EC2 DevOps Agent (c7i.large, EventBridge 스케줄 가동)
 ## 작업 방식 (운영 규칙 — /insights 반영)
 - **Status 질문:** "상태/진행" 요청엔 git/코드 탐색 전에 **Read Path(/sync)·docs 먼저** 읽는다.
 - **Overnight 회차:** 한 회차 = 상태복원(/sync) → `[auto]` **정확히 1개** → 전체 `pytest` → /checkpoint
-  → 로컬 commit. **commit 전략·scope 를 과분석하지 말고 그냥 커밋**한다. 규약은 bin/overnight/{run.sh,PROMPT.md}.
+  → 로컬 commit. **commit 전략·scope 를 과분석하지 말고 그냥 커밋**한다. 규약은 scripts/overnight/{run.sh,PROMPT.md}
+  (러너: `make overnight` / 단발 `make overnight-once`).
 - **Testing:** 멀티파일 변경 후 전체 `pytest` 실행 + **pass 카운트 보고**(예: "216 passed, 1 skipped").
 - **Shell & 검증:** 절대경로 사용·`cd` 후 상태 의존 금지. **복합 bash(`&&`/`;` 다단계)는 단계 분리**
   (권한 거부·디버그난 회피). 커밋 전 `git status`로 기대 파일이 실제 반영됐는지 확인(write 유실/중단 방어).

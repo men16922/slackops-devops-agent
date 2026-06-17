@@ -1,0 +1,30 @@
+# ===== overnight harness targets (append to your Makefile) =====
+# The loop's commit gate is $GATE_CMD (default `make check`). Define a `check`
+# (or `test`/`lint`) target that proves correctness OFFLINE + DETERMINISTICALLY,
+# and make sure it is allow-listed in scripts/overnight/overnight-settings.json.
+#
+# Example gate (replace with your project's real checks):
+# check:
+# 	@echo "TODO: wire your lint + typecheck + tests here"; false
+
+OVN := scripts/overnight
+
+overnight:           ## run the unattended loop (caffeinate keeps macOS awake)
+	caffeinate -dimsu $(OVN)/run.sh &
+overnight-watch: overnight ## start the loop and tail its log
+	@sleep 1; tail -f $(OVN)/logs/runner.log
+overnight-once:      ## single iteration (smoke test the loop)
+	$(OVN)/run.sh --once
+overnight-stop:      ## graceful stop after the current iteration
+	@touch $(OVN)/STOP && echo "STOP created — loop will exit after current iteration"
+overnight-clean:     ## clear STOP/DONE sentinels before the next run
+	@rm -f $(OVN)/STOP $(OVN)/DONE && echo "cleared STOP/DONE"
+overnight-status:    ## aggregate iteration status across lanes
+	@bash $(OVN)/status.sh
+overnight-logs:      ## tail the runner log
+	@tail -f $(OVN)/logs/runner.log
+overnight-dashboard: ## tmux dashboard (falls back to status.sh)
+	@bash $(OVN)/dashboard.sh
+
+.PHONY: overnight overnight-watch overnight-once overnight-stop overnight-clean overnight-status overnight-logs overnight-dashboard
+# ===== end overnight harness targets =====

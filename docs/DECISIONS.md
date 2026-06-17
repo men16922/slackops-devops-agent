@@ -1,5 +1,5 @@
 # DECISIONS — slackops-devops-agent
-최종 갱신: 2026-06-16
+최종 갱신: 2026-06-17
 
 > 되돌리기 어려운 결정만. 형식: Decision / Reason / Impact. 갱신은 /checkpoint.
 
@@ -52,3 +52,14 @@
   Vercel 실배포 전환(env 만 변경). 심사기간 EC2 stop 후에도 Vercel+DynamoDB 만으로 동작.
 - Impact: web/ 는 Python 무관 별도 surface(스키마 단일 진실원은 src/app/store/, TS 는 미러만).
   실 DynamoDB 읽기는 최소권한 IAM 키 필요(USER_GUIDE.md §5). 포트 8930 기본.
+
+## D8 — overnight 하네스: 자작 플러그인(overnight-harness) 단일 소스로 수렴
+- Decision: 리포 home-grown 하네스(`.claude/skills/*`, `bin/overnight/*`, `docs/LOOP_ENGINEERING.md`)를
+  retire 하고 **overnight-harness 플러그인을 단일 소스**로. 러너=`scripts/overnight/`, 리포 특화=
+  `.claude/harness-config.json`(gate=`make check`, docs.*, budgets, archive_dir=docs/archive), 바이블↔리포
+  매핑=`docs/engineering/interp/INTERPRETATION.md`. 보존: `harness/{CORE_MANDATES,CONTEXT_BRIDGE}`,
+  docs 상태문서, 인터랙티브 `.claude/settings.json`.
+- Reason: 같은 개념 2벌 유지 비용/혼동 제거 + 다른 리포 재사용. 플러그인 스킬이 harness-config 로 경로·
+  gate 를 흡수 가능해 수렴이 깔끔(스킬 코드는 플러그인에, 콘텐츠는 리포에).
+- Impact: 스킬 호출은 플러그인 제공(`/sync` 등). 러너 경로 bin→scripts, gate 가 `make check` 로 통일,
+  아카이브 docs/archive. 무인 권한경계는 `scripts/overnight/overnight-settings.json`(--settings 격리).

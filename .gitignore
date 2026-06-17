@@ -24,7 +24,8 @@ web/node_modules/
 web/.next/
 web/.env.local
 
-# overnight runner 런타임 산출물
-bin/overnight/logs/
-bin/overnight/STOP
-bin/overnight/DONE
+# overnight runner 런타임 산출물 (scripts/overnight — overnight-harness 플러그인)
+scripts/overnight/logs/
+scripts/overnight/STOP
+scripts/overnight/DONE
+docs/test/history/*-overnight-review-checklist.md

@@ -1,7 +1,7 @@
 # COMPLETED_SUMMARY — slackops-devops-agent
 최종 갱신: 2026-06-16
 
-> 완료 milestone 압축 + 링크. 상세 이력은 PROGRESS_LOG / bin/docs/archive/. 갱신은 /checkpoint.
+> 완료 milestone 압축 + 링크. 상세 이력은 PROGRESS_LOG / docs/archive/. 갱신은 /checkpoint.
 
 ## Milestones
 - **2026-06-16 — web/ 대시보드 로컬 완성 (H0 프론트 first cut)**: Next.js App Router(jobs/상세/metrics

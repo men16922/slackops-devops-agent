@@ -5,7 +5,7 @@
 
 ## Read Path (세션 시작/재개)
 harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NEXT_PLAN.md
-→ (필요 시) docs/PROGRESS_LOG.md 상단 → (필요 시) bin/docs/archive/
+→ (필요 시) docs/PROGRESS_LOG.md 상단 → (필요 시) docs/archive/
 
 ## Snapshot
 - **무엇:** Slack 자연어 명령 → EC2 의 Claude Code Headless 가 AWS/K8s/Terraform/GitHub 컨텍스트 분석 → 운영 자동화.

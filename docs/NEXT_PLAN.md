@@ -6,7 +6,7 @@
 > `[blocked]` = 같은 항목 Blocker 2회 누적 — 사람 검수 전 무인 재시도 금지(회차가 덧붙이고 건너뜀).
 > 무인 회차는 위에서 아래로 `[auto]` 1개씩 수행. 각 항목의 "완료:" 기준을 충족해야 종료.
 
-## ★ Active — H0 해커톤 피벗 (제출 2026-06-29 / 심사 ~7-24, 상세 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5·D6·D7)
+## ★ Active — H0 해커톤 피벗 (제출 2026-06-29 / 심사 ~7-24, 제출계획 docs/plans/2026-06-17-h0-submission.md, 피벗 docs/plans/2026-06-12-h0-hackathon.md, DECISIONS D5·D6·D7)
 > 백엔드(store/worker/commands) + **web/ 대시보드 로컬 완성**: Next.js App Router, jobs/상세
 > (diff 출력게이트+Approve/Reject)/metrics, DynamoDB Local 오프라인 docker(포트 8930) — e2e 검증.
 > AWS 크레딧 신청은 **거절** → 보유 $63.91 + 무료티어로 진행(추론은 구독 OAuth=D6).
