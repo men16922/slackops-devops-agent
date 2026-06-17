@@ -10,7 +10,7 @@
 | `AGENT_BRIEF.md` | ≤ 60줄 | 1분 압축 문맥, snapshot, 현재 초점, guardrails |
 | `STATUS.md` | ≤ 120줄 | 현재 구현 상태, 검증 baseline, active focus, open risks |
 | `NEXT_PLAN.md` | ≤ 120줄 | **열린 작업만**(완료 이력 아님) |
-| `PROGRESS_LOG.md` | ≤ 120줄 | 최신 3–5개 증분. 넘치면 bin/docs/archive/progress-YYYY-MM.md 분리 |
+| `PROGRESS_LOG.md` | ≤ 120줄 | 최신 3–5개 증분. 넘치면 docs/archive/progress-YYYY-MM.md 분리 |
 
 규칙: `docs/` 전체 bulk-read 금지(Read Path 만). 완료 체크리스트는 `COMPLETED_SUMMARY.md` 로 압축+링크.
 비가역 선택은 `DECISIONS.md`(Decision/Reason/Impact). 추측 금지 — 없으면 "문서에 없음".
