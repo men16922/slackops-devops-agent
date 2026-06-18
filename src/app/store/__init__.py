@@ -20,6 +20,16 @@ from app.store.base import (
     JobStatus,
     JobStore,
 )
+from app.store.chat_store import (
+    CHAT_CLAIMABLE,
+    ChatRole,
+    ChatStatus,
+    ChatStore,
+    Conversation,
+    DynamoDbChatStore,
+    Message,
+    SqliteChatStore,
+)
 from app.store.dynamodb_store import DynamoDbJobStore
 from app.store.sqlite_store import SqliteJobStore
 from app.store.telemetry_store import (
@@ -30,19 +40,27 @@ from app.store.telemetry_store import (
 )
 
 __all__ = [
+    "CHAT_CLAIMABLE",
     "CLAIMABLE_STATUSES",
     "TERMINAL_STATUSES",
     "AuditEvent",
     "AuditStore",
+    "ChatRole",
+    "ChatStatus",
+    "ChatStore",
+    "Conversation",
     "DynamoDbAuditStore",
+    "DynamoDbChatStore",
     "DynamoDbJobStore",
     "DynamoDbTelemetryStore",
     "Job",
     "JobSource",
     "JobStatus",
     "JobStore",
+    "Message",
     "MetricRecord",
     "SqliteAuditStore",
+    "SqliteChatStore",
     "SqliteJobStore",
     "SqliteTelemetryStore",
     "TelemetryStore",
