@@ -62,20 +62,28 @@ docker compose up --build
 
 > **AI가 코드를 만들어도, 사람이 버튼을 눌러야만 실제로 진행된다** — 출력 게이트(주입 방어 3계층).
 
-### 2.4 웹에서 직접 명령 보내기
-첫 화면 상단 입력칸: **드롭다운**(`logs`/`diagnose`/`tf-review`/`pr`/`ping`) + **인자칸** → **Send**.
-→ 목록 맨 위 `pending` 등장. 🔒 자유 문장이 아니라 **정해진 명령+인자**로만 받음(모르는 명령 거부 = 주입 방어).
+### 2.4 대화형 producer — 에이전트와 대화해 작업 제안받기 🆕
+첫 화면 상단의 **채팅**에 자연어로 입력(예: `api 5xx 늘었어, 원인 봐줘`). 입력은 Claude 에 직접
+가지 않고 **DynamoDB 대화 버스**에 적재되고, 에이전트(chat_agent)가 폴링·sanitizer 격리 후 Claude 로
+**스트리밍 응답**한다(~800ms 폴링으로 자라나는 답을 Markdown 렌더). 에이전트가 구체 작업이
+필요하다 판단하면 **propose_job** 으로 Job Queue 에 제안 → "🤖 작업이 제안되었습니다" 콜아웃 →
+아래 큐에서 **승인/거절**(기존 출력 게이트).
+> 🔒 자유 텍스트지만 Claude 에 **직접 전달하지 않는다** — 대화 버스 경유 + sanitizer 격리 +
+> 에이전트는 `propose_job`(read-only)만 호출 가능(직접 실행 도구 없음). 에이전트는 DynamoDB 를
+> **폴링(outbound)만** 하므로 인바운드 포트 0 / Socket Mode 불변 유지 → **Vercel 배포본에서도 동작**.
 
-### 2.5 전체 실행 루프 — 에이전트 제안 → 승인 → **실제 실행**
-제안/승인 뒤 **실제 실행**까지 보려면 worker 를 띄운다(실 Claude — `CLAUDE_CODE_OAUTH_TOKEN` 필요).
+### 2.5 전체 실행 루프 — 대화/제안 → 승인 → **실제 실행**
+실 Claude 로 돌리려면(`CLAUDE_CODE_OAUTH_TOKEN` 필요):
 ```sh
-make agent-monitor                           # 에이전트가 신호 감지 → 제안(pending)
-# 웹 8930 에서 제안 Approve
 export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
-make worker ARGS=--once                       # 승인분 실제 실행 → done + audit/metric 반영
+make chat-agent ARGS=--once     # 채팅: 대기 대화 1건 처리(스트리밍 응답 + 필요시 propose_job)
+make agent-monitor              # (대안) 신호 감지 → 자율 제안(pending)
+# 웹 8930 에서 제안 Approve
+make worker ARGS=--once          # 승인분 실제 실행 → done + audit/metric 반영
 ```
 - L0(diagnose)는 즉시 실행→`done`, L1(pr)은 prepare→`awaiting_approval`, 승인분은 execute→`done`.
-- 검증 체크리스트는 [QA_LIST.md](QA_LIST.md) §3, 루프 상세는 `docs/runbooks/agent-mcp-demo.md`.
+- 운영(EC2)에선 chat-agent/worker 가 systemd 로 상주 폴링. 검증은 [QA_LIST.md](QA_LIST.md) §3,
+  루프 상세는 `docs/runbooks/agent-mcp-demo.md`.
 
 ### 2.6 Telemetry — 사용량 통계
 위쪽 카드(실행 횟수/총비용/토큰/도구 호출/성공률) + 아래 명령어별 집계·최근 실행. 비용은 보통 한 번에 몇 센트.

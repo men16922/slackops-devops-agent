@@ -91,6 +91,35 @@ make worker                         # 무한 폴링(운영 모드 대역)
 > L0 데모(diagnose)는 push 부작용이 없어 가장 깔끔한 풀 루프다. L1(pr)의 execute 는
 > 실제 `git push`+`gh pr create` 를 시도하므로 GitHub 인증이 있는 환경(=AWS/EC2)에서 검증한다.
 
+## 대화형 producer (web 채팅 → 에이전트 → 제안)
+
+selectbox 대신 **자연어 채팅**으로 작업을 제안받는 경로. web 은 사용자 turn 을 DynamoDB
+대화 버스에 쓰고, `chat_agent` 가 폴링(outbound-only)해 Claude 를 스트리밍 실행하며 응답
+청크를 DynamoDB 에 append → web 이 ~800ms 폴링해 Markdown 으로 렌더. Claude 가 `propose_job`
+하면 Job Queue 에 제안되고 콜아웃 링크로 승인/거절. **인바운드 0 유지 → Vercel 배포본에서 동작.**
+
+```
+브라우저 ──turn write──▶ DynamoDB(CHAT#) ◀─poll─ chat_agent ─claude stream-json→ 청크 append
+   ▲ poll(~800ms)                                              │ propose_job MCP
+   └──assistant 청크 read / 제안 콜아웃◀── DynamoDB ──▶ Job Queue(승인/거절)
+```
+
+```bash
+# 1) 대시보드 기동(8930) + DynamoDB Local(8931)
+cd web && docker compose up -d --build && cd ..
+# 2) 채팅 에이전트(실 Claude — OAuth 토큰 필요)
+export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
+make chat-agent ARGS=--once          # 대기 대화 1건 처리(무한 폴링은 ARGS 없이)
+```
+대시보드(http://localhost:8930) 채팅에 `api 5xx 늘었어, 원인 봐줘` 입력 → 에이전트 응답이
+스트리밍 렌더되고, 제안이 뜨면 "🤖 작업이 제안되었습니다 → 승인/거절". 구성요소:
+`store/chat_store.py`(대화 버스), `claude_runner.run_headless_stream`(stream-json),
+`chat_agent.py`(폴링 consumer), web `Chat.tsx`/`chat-actions.ts`/`api/chat/[conv]`.
+
+> ⚠️ 사용자 입력은 Claude 에 **직접 전달 금지** — sanitizer 격리 + 에이전트는 `propose_job`(read-only)만.
+> page reload 시 채팅 state 초기화(convId 미영속 — 데모는 새로고침 없이). 토큰 없이 배선만 보려면
+> chat_agent.process_one 에 mock StreamRunner 주입(tests/test_chat_agent.py 참고).
+
 ## 캐비엇
 - L2(Execute)/Production/IAM/DB 변경 불변 유지 — `propose_job` 도 permissions default-deny 게이트 안에서만.
 - worker 의 pr execute 는 실 push — 로컬에선 diagnose 풀 루프로 데모하고, pr push 는 GitHub 인증 환경에서.
