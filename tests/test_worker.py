@@ -330,3 +330,28 @@ def test_worker_tracer_emits_otel_span(stores) -> None:
     [span] = exporter.get_finished_spans()
     assert span.name == "devops.run"
     assert dict(span.attributes)["devops.command"] == "ping"
+
+
+def test_main_once_processes_pending(
+    monkeypatch: pytest.MonkeyPatch,
+    stores: tuple[SqliteJobStore, SqliteAuditStore, SqliteTelemetryStore],
+) -> None:
+    """CLI 엔트리(`python -m app.worker --once`) e2e — stores_from_env 주입,
+    ping job 1건을 외부 호출 없이 DONE 으로 전이(엔트리 배선 + claim→실행→종료 검증)."""
+    import sys
+
+    import app.worker as worker_mod
+
+    job_store, audit_store, telemetry_store = stores
+    enqueued = job_store.enqueue("ping", source=JobSource.WEB, requested_by="cli")
+    monkeypatch.setattr(
+        worker_mod,
+        "stores_from_env",
+        lambda: (job_store, audit_store, telemetry_store),
+    )
+    monkeypatch.setattr(sys, "argv", ["app.worker", "--once"])
+
+    worker_mod.main()
+
+    done = job_store.get(enqueued.id)
+    assert done is not None and done.status is JobStatus.DONE

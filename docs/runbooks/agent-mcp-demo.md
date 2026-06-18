@@ -66,8 +66,32 @@ python3 -m app.agent_monitor --real
   버전에 따라 차이 가능 — `claude --version` 확인 후 1회 스모크 권장.
 - `--allowedTools` 로 **propose/list 만** 허용(직접 실행 도구 없음) — 에이전트는 제안만 한다.
 
+## 전체 실행 루프 — worker 기동 (승인 → 실제 실행)
+
+제안/승인까지는 위로 끝나지만, **승인된 job 을 실제로 실행**하려면 worker 를 띄운다.
+worker 는 같은 DynamoDB Local 을 폴링해 `APPROVED` 를 우선 재claim(출력 게이트 이후
+execute) 하고, 신규 `PENDING` 은 L0 즉시 / L1 은 게이트로 멈춘다. 실행은 실 Claude
+Code Headless(runner 미주입) — `CLAUDE_CODE_OAUTH_TOKEN` + claude CLI 필요.
+
+```bash
+# 별도 터미널에서 폴링 루프 기동(같은 DynamoDB Local 8931 공유)
+export CLAUDE_CODE_OAUTH_TOKEN="$(... 또는 claude setup-token)"
+make worker                         # 무한 폴링(운영 모드 대역)
+#   또는 1건만: make worker ARGS=--once
+#   직접:  DDB_ENDPOINT=http://localhost:8931 python3 -m app.worker --once
+```
+
+전체 로컬 e2e 흐름(토큰 필요):
+1. `docker compose up -d --build` — 대시보드 + DynamoDB Local(8930/8931)
+2. `make agent-monitor` (또는 `--real`) — 에이전트가 신호 감지 → 제안(`pending`)
+3. 대시보드(http://localhost:8930) 에서 제안 확인 → (L1=pr 이면) diff 보고 **Approve**
+4. `make worker` — L0(diagnose)은 즉시 실행→`done`, L1(pr)은 prepare→`awaiting_approval`,
+   승인분은 execute→`done`. audit/metric 이 대시보드에 라이브로 반영된다.
+
+> L0 데모(diagnose)는 push 부작용이 없어 가장 깔끔한 풀 루프다. L1(pr)의 execute 는
+> 실제 `git push`+`gh pr create` 를 시도하므로 GitHub 인증이 있는 환경(=AWS/EC2)에서 검증한다.
+
 ## 캐비엇
-- 로컬 데모엔 worker 가 안 떠 있어 제안은 `pending`(또는 seed 의 `awaiting_approval`)에서 정지한다.
-  전체 실행 루프(worker→게이트→승인 후 실제 pr push)는 claude + worker 가 필요.
 - L2(Execute)/Production/IAM/DB 변경 불변 유지 — `propose_job` 도 permissions default-deny 게이트 안에서만.
+- worker 의 pr execute 는 실 push — 로컬에선 diagnose 풀 루프로 데모하고, pr push 는 GitHub 인증 환경에서.
 - DynamoDB Local 은 in-memory — `docker compose down` 시 데이터 소멸, `up` 시 seed 재주입.

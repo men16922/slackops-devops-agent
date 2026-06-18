@@ -12,6 +12,8 @@ SqliteJobStore + mock 으로 실 AWS/Claude 호출 없이 e2e 를 검증한다.
 
 from __future__ import annotations
 
+import argparse
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -281,3 +283,95 @@ class Worker:
             success=success,
             tracer=self._tracer,
         )
+
+
+def stores_from_env() -> tuple[JobStore, AuditStore, TelemetryStore]:
+    """환경에서 job/audit/telemetry store 3종을 같은 DynamoDB(단일테이블)로 구성.
+
+    DDB_ENDPOINT 있으면 DynamoDB Local, 없으면 실 DynamoDB. 대시보드(web/)가 읽는
+    같은 `slackops-agent` 테이블을 공유한다 — worker 의 전이/audit/metric 이 라이브로
+    노출된다. boto3 는 lazy import(미설치 환경 import-safe).
+    """
+    import boto3  # lazy: 선택 의존성
+
+    table = os.environ.get("DDB_TABLE", "slackops-agent")
+    endpoint = os.environ.get("DDB_ENDPOINT")
+    region = os.environ.get("AWS_REGION", "us-east-1")
+    kwargs: dict[str, Any] = {"region_name": region}
+    if endpoint:
+        kwargs["endpoint_url"] = endpoint
+    dynamodb = boto3.resource("dynamodb", **kwargs)
+
+    from app.store import (
+        DynamoDbAuditStore,
+        DynamoDbJobStore,
+        DynamoDbTelemetryStore,
+    )
+
+    return (
+        DynamoDbJobStore(table, dynamodb=dynamodb),
+        DynamoDbAuditStore(table, dynamodb=dynamodb),
+        DynamoDbTelemetryStore(table, dynamodb=dynamodb),
+    )
+
+
+def main() -> None:
+    """CLI — 공유 큐 폴링 worker. `python -m app.worker`.
+
+    DDB_ENDPOINT 로 DynamoDB Local↔실 DynamoDB 전환. 명령 실행은 실 Claude Code
+    Headless(runner 미주입 = 기본 SubprocessRunner) — `CLAUDE_CODE_OAUTH_TOKEN` +
+    claude CLI 필요. 승인된 job(APPROVED)을 우선 재claim 해 출력 게이트 이후 execute
+    단계를 이어가고, 신규 PENDING 은 L0 즉시 / L1 은 게이트(AWAITING_APPROVAL)로 멈춘다.
+    """
+    import structlog  # lazy
+
+    parser = argparse.ArgumentParser(
+        description="SlackOps EC2 Agent Worker (공유 큐 consumer)"
+    )
+    parser.add_argument(
+        "--once", action="store_true", help="claim 가능한 job 1건만 처리하고 종료"
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="폴링 횟수 상한(기본 무한 — 운영 모드)",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=POLL_INTERVAL_S,
+        help="큐가 비었을 때 대기 간격(초)",
+    )
+    args = parser.parse_args()
+
+    log = structlog.get_logger()
+    job_store, audit_store, telemetry_store = stores_from_env()
+    worker = Worker(job_store, audit_store, telemetry_store)  # runner=None → 실 claude
+
+    if args.once:
+        job = worker.process_one()
+        if job is None:
+            log.info("worker.idle")
+        else:
+            log.info(
+                "worker.processed",
+                job_id=job.id,
+                command=job.command,
+                status=job.status.value,
+            )
+        return
+
+    log.info(
+        "worker.run_forever",
+        poll_interval_s=args.poll_interval,
+        max_iterations=args.max_iterations,
+    )
+    processed = worker.run_forever(
+        poll_interval_s=args.poll_interval, max_iterations=args.max_iterations
+    )
+    log.info("worker.stopped", processed=processed)
+
+
+if __name__ == "__main__":
+    main()

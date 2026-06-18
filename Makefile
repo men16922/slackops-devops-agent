@@ -1,7 +1,7 @@
 # slackops-devops-agent — Makefile
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
-.PHONY: check test lint typecheck smoke-local mcp-server agent-monitor quarkify-setup quarkify quarkify-check
+.PHONY: check test lint typecheck smoke-local mcp-server agent-monitor worker quarkify-setup quarkify quarkify-check
 
 check: test lint typecheck   ## 커밋 게이트 3계층 (pytest + ruff + mypy)
 
@@ -20,6 +20,10 @@ mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config �
 	DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} python3 -m app.mcp_server
 agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `python3 -m app.agent_monitor --real`
 	DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} python3 -m app.agent_monitor
+worker:        ## 공유 큐 폴링 worker(승인된 job 실행 — 실 Claude). 1건만: `make worker ARGS=--once`
+	DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} AWS_REGION=$${AWS_REGION:-us-east-1} \
+	AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-local} AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-local} \
+	python3 -m app.worker $(ARGS)
 
 # ===== Quarkify (선택적 탐색 가속 — gitignore 생성물, 게이트 아님) =====
 # 코드 심볼·호출그래프 인덱스. make check 에 절대 미포함(부재 산출물의 빌드의존화 금지).
