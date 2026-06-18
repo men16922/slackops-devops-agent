@@ -22,6 +22,25 @@ export function Chat() {
   const [err, setErr] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
+  const STORAGE_KEY = "slackops_conv";
+
+  // 새로고침해도 대화 유지 — convId 를 localStorage 에서 복원/저장.
+  useEffect(() => {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved) setConvId(saved);
+  }, []);
+  useEffect(() => {
+    if (convId) window.localStorage.setItem(STORAGE_KEY, convId);
+  }, [convId]);
+
+  function newConversation() {
+    window.localStorage.removeItem(STORAGE_KEY);
+    setConvId(null);
+    setMessages([]);
+    setConv(null);
+    setErr(null);
+  }
+
   // convId 가 생기면 메시지/상태를 주기적으로 폴링.
   useEffect(() => {
     if (!convId) return;
@@ -78,6 +97,13 @@ export function Chat() {
 
   return (
     <div className="panel chat">
+      {messages.length > 0 && (
+        <div className="chat-header">
+          <button className="chat-new" onClick={newConversation} disabled={agentBusy}>
+            ＋ 새 대화
+          </button>
+        </div>
+      )}
       <div className="chat-log">
         {messages.length === 0 ? (
           <p className="chat-empty muted">
