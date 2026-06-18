@@ -21,6 +21,16 @@ CLAUDE_BIN = "claude"
 
 DEFAULT_TIMEOUT_S = 300
 
+# CLI 도구(kubectl/git/aws)가 색상 출력을 켜면 ANSI 이스케이프(CSI)가 결과 텍스트에 섞인다.
+# 저장 전 여기서 제거 — web/Slack 등 모든 소비자가 깨끗한 텍스트를 받는다(렌더링은 표시만 담당).
+_CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _strip_ansi(text: str) -> str:
+    """ANSI CSI 이스케이프 시퀀스 제거(색상/커서 등). 일반 텍스트는 그대로."""
+    return _CSI_RE.sub("", text)
+
+
 # 실행기 시그니처: (cmd, timeout_s) → (exit_code, stdout, stderr).
 # timeout 초과 시 subprocess.TimeoutExpired 를 raise 해야 한다(기본 실행기와 동일 규약).
 SubprocessRunner = Callable[[list[str], int], tuple[int, str, str]]
@@ -116,14 +126,15 @@ def _parse_result(exit_code: int, stdout: str, stderr: str) -> RunResult:
         payload = None
     if isinstance(payload, dict):
         result_text = payload.get("result")
+        output = result_text if isinstance(result_text, str) else stdout
         return RunResult(
-            output=result_text if isinstance(result_text, str) else stdout,
+            output=_strip_ansi(output),
             exit_code=exit_code,
             tokens=_parse_tokens(payload),
             cost_usd=_parse_cost(payload),
         )
     output = stdout if stdout.strip() else stderr
-    return RunResult(output=output, exit_code=exit_code)
+    return RunResult(output=_strip_ansi(output), exit_code=exit_code)
 
 
 # ── 스트리밍(대화 producer 용) ─────────────────────────────────────────────
@@ -217,7 +228,7 @@ def _handle_stream_event(
     if etype in ("content_block_delta", "stream_event"):
         delta = event.get("delta")
         if isinstance(delta, dict) and isinstance(delta.get("text"), str):
-            text = delta["text"]
+            text = _strip_ansi(delta["text"])
             parts.append(text)
             on_chunk(text)
         return
@@ -230,8 +241,9 @@ def _handle_stream_event(
                 if not isinstance(block, dict):
                     continue
                 if block.get("type") == "text" and isinstance(block.get("text"), str):
-                    parts.append(block["text"])
-                    on_chunk(block["text"])
+                    text = _strip_ansi(block["text"])
+                    parts.append(text)
+                    on_chunk(text)
                 elif block.get("type") == "tool_use" and isinstance(
                     block.get("name"), str
                 ):
@@ -247,7 +259,7 @@ def _handle_stream_event(
         result.cost_usd = _parse_cost(event)
         final_text = event.get("result")
         if not parts and isinstance(final_text, str):
-            parts.append(final_text)
+            parts.append(_strip_ansi(final_text))
         if result.proposed_job_id is None:
             result.proposed_job_id = _scan_job_id(event)
 

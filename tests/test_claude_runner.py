@@ -12,6 +12,7 @@ from app.claude_runner import (
     ClaudeRunnerError,
     ClaudeTimeoutError,
     RunResult,
+    _strip_ansi,
     build_command,
     build_stream_command,
     run_headless,
@@ -267,3 +268,41 @@ def test_stream_captures_propose_job_id_and_tool_use() -> None:
     res = run_headless_stream("p", [], on_chunk=lambda _t: None, runner=_stream_lines(lines))
     assert res.proposed_job_id == "job-777"
     assert res.tool_uses == ["mcp__slackops__propose_job"]
+
+
+# ── ANSI 이스케이프 제거 ───────────────────────────────────────────────────
+
+
+def test_strip_ansi_removes_csi_sequences() -> None:
+    assert _strip_ansi("\x1b[1mBOLD\x1b[0m text") == "BOLD text"
+    assert _strip_ansi("\x1b[32mgreen\x1b[0m") == "green"
+    # 색상/커서 외 일반 텍스트는 보존.
+    assert _strip_ansi("plain | a | b |") == "plain | a | b |"
+
+
+def test_run_headless_strips_ansi_from_result() -> None:
+    runner = RecordingRunner(stdout=_result_json(result="\x1b[1m진단\x1b[0m: 504"))
+    res = run_headless("p", [], runner=runner)
+    assert res.output == "진단: 504"
+
+
+def test_run_headless_strips_ansi_from_raw_fallback() -> None:
+    # JSON 이 아닌 raw stdout 경로도 strip.
+    runner = RecordingRunner(stdout="\x1b[33mraw warn\x1b[0m")
+    res = run_headless("p", [], runner=runner)
+    assert res.output == "raw warn"
+
+
+def test_stream_strips_ansi_from_chunks() -> None:
+    lines = [
+        json.dumps(
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "\x1b[1m진단\x1b[0m"}]},
+            }
+        ),
+    ]
+    chunks: list[str] = []
+    res = run_headless_stream("p", [], on_chunk=chunks.append, runner=_stream_lines(lines))
+    assert chunks == ["진단"]
+    assert res.output == "진단"

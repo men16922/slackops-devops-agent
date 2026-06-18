@@ -418,6 +418,41 @@ button.btn.reject {
   font-size: 12.5px;
   line-height: 1.55;
 }
+.md .md-table {
+  margin: 12px 0;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  display: block;
+  overflow-x: auto;
+}
+.md .md-table th,
+.md .md-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.md .md-table th {
+  background: var(--panel-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.md .md-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+.md .md-hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+.md a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.md a:hover {
+  text-decoration: underline;
+}
 
 /* 대화형 producer (Chat) */
 .chat {
