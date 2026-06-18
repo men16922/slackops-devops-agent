@@ -32,7 +32,8 @@ npm install -g @anthropic-ai/claude-code
 # --- 서비스 사용자 + 앱 배치 ---
 useradd --system --create-home --shell /sbin/nologin devopsagent || true
 APP_DIR=/opt/slackops-devops-agent
-REPO_URL="${REPO_URL:-https://github.com/CHANGE_ME/slackops-devops-agent.git}"
+# 기본값 = 실 repo. private repo 면 clone 인증 필요(public 전환 또는 SSM PAT) — deploy/README §B-3 / action_item §B-3.
+REPO_URL="${REPO_URL:-https://github.com/men16922/slackops-devops-agent.git}"
 git clone "$REPO_URL" "$APP_DIR" || true
 python3.11 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR"
