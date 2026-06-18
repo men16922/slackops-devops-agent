@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listRecentJobs } from "../lib/ddb";
 import { fmtCost, fmtTime } from "../lib/format";
-import { NewCommand } from "./NewCommand";
+import { Chat } from "./Chat";
 
 // 요청 시점에 DynamoDB 조회 — 정적 캐시 금지.
 export const dynamic = "force-dynamic";
@@ -13,10 +13,11 @@ export default async function JobsPage() {
     <>
       <h1>Job Queue</h1>
       <p className="page-sub">
-        Slack/Web 두 producer 가 넣은 작업의 최신 피드 (GSI2 <span className="mono">FEED</span>).
+        에이전트와 대화해 작업을 제안받고(아래 채팅), 승인하면 Slack/Web 공유 큐로 실행됩니다 (GSI2{" "}
+        <span className="mono">FEED</span>).
       </p>
 
-      <NewCommand />
+      <Chat />
 
       <div className="panel">
         {jobs.length === 0 ? (

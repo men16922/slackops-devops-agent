@@ -418,3 +418,89 @@ button.btn.reject {
   font-size: 12.5px;
   line-height: 1.55;
 }
+
+/* 대화형 producer (Chat) */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+.chat-empty {
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 18px 6px;
+}
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chat-msg.user {
+  align-items: flex-end;
+}
+.chat-role {
+  font-size: 11px;
+  color: var(--muted);
+}
+.chat-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.chat-msg.user .chat-bubble {
+  background: #16233f;
+  border-color: #24395f;
+}
+.chat-user-text {
+  font-size: 13.5px;
+  white-space: pre-wrap;
+}
+.chat-typing {
+  font-size: 12px;
+  padding-left: 4px;
+}
+.chat-typing::after {
+  content: "▍";
+  animation: chat-blink 1s step-start infinite;
+}
+@keyframes chat-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.chat-proposed {
+  padding: 10px 14px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: rgba(63, 185, 80, 0.08);
+  font-size: 13px;
+}
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.chat-input {
+  flex: 1;
+  resize: vertical;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.chat-input:disabled {
+  opacity: 0.6;
+}

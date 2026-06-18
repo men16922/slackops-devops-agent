@@ -12,7 +12,13 @@ import {
   GetCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
-import type { AuditEvent, Job, Metric } from "./types";
+import type {
+  AuditEvent,
+  ChatMessage,
+  Conversation,
+  Job,
+  Metric,
+} from "./types";
 import { recentDays } from "./time";
 
 export const TABLE = process.env.DDB_TABLE ?? "slackops-agent";
@@ -65,6 +71,39 @@ export async function listAuditForJob(
     }),
   );
   return (r.Items ?? []).map((it) => it as AuditEvent);
+}
+
+// ── 대화 버스(chat_store.py 미러) ──────────────────────────
+export async function getConversation(
+  convId: string,
+): Promise<Conversation | null> {
+  const r = await doc.send(
+    new GetCommand({ TableName: TABLE, Key: { PK: `CHAT#${convId}`, SK: "META" } }),
+  );
+  return r.Item ? (r.Item as Conversation) : null;
+}
+
+export async function listChatMessages(convId: string): Promise<ChatMessage[]> {
+  // PK=CHAT#conv & SK begins_with MSG# — 청크 리스트를 content 로 join(chat_store.py 미러).
+  const r = await doc.send(
+    new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      ExpressionAttributeValues: { ":pk": `CHAT#${convId}`, ":sk": "MSG#" },
+      ScanIndexForward: true,
+    }),
+  );
+  return (r.Items ?? []).map((it) => {
+    const chunks = (it.chunks as string[] | undefined) ?? [];
+    return {
+      conv_id: it.conv_id,
+      seq: it.seq,
+      role: it.role,
+      content: chunks.join(""),
+      done: Boolean(it.done),
+      created_at: it.created_at,
+    } as ChatMessage;
+  });
 }
 
 export async function listMetricsFeed(

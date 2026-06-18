@@ -54,6 +54,28 @@ export interface Metric {
   error?: string;
 }
 
+// ── 대화 버스(web↔에이전트) — store/chat_store.py 계약 미러 ──
+export type ChatStatus = "open" | "awaiting_agent" | "streaming" | "done";
+export type ChatRole = "user" | "assistant";
+
+export interface Conversation {
+  id: string;
+  status: ChatStatus;
+  created_at: string;
+  updated_at: string;
+  msg_count: number;
+  proposed_job_id?: string;
+}
+
+export interface ChatMessage {
+  conv_id: string;
+  seq: number;
+  role: ChatRole;
+  content: string;
+  done: boolean;
+  created_at: string;
+}
+
 // 종료 상태(더 이상 전이 없음) — store/base.py TERMINAL_STATUSES 미러.
 export const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   "done",

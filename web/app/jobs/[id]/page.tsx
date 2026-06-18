@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getJob, listAuditForJob } from "../../../lib/ddb";
 import { fmtCost, fmtNum, fmtTime } from "../../../lib/format";
 import { ApprovalButtons } from "./ApprovalButtons";
-import { Markdown } from "./Markdown";
+import { Markdown } from "../../Markdown";
 
 export const dynamic = "force-dynamic";
 
