@@ -1,9 +1,9 @@
 # QA_LIST — 직접 검증 체크리스트 (P1 로컬 e2e 우선)
 
-최종 갱신: 2026-06-18
+최종 갱신: 2026-06-19
 
 > **사람(운영자/제출자)이 직접 눈으로 확인해야 하는 것**을 모은 문서.
-> 자동 게이트(pytest/ruff/mypy)가 검증하는 코드 정합은 여기 없다 — 그건 `make check`(250 passed).
+> 자동 게이트(pytest/ruff/mypy)가 검증하는 코드 정합은 여기 없다 — 그건 `make check`(270 passed).
 > 여기는 **사람만 판단 가능한 것**(실제 동작·UX·실측치·심사 충족)만 다룬다.
 > 실행 방법 상세는 [USER_GUIDE.md](USER_GUIDE.md), 에이전트 루프는 [docs/runbooks/agent-mcp-demo.md](docs/runbooks/agent-mcp-demo.md).
 
@@ -55,19 +55,18 @@
 
 ---
 
-## 3. ★ 내가 지금 직접 검증할 것 — 로컬 풀 e2e (P1)
+## 3. 로컬 풀 e2e (P1) — ✅ 전부 검증 완료 (사람 재확인 불필요)
 
-> 준비물: **Docker 데몬** + **Claude 구독 토큰**(`claude setup-token`). AWS 자격증명 **불필요**(DynamoDB Local).
+> 준비물(재현 시): **Docker 데몬** + **Claude 구독 토큰**(`claude setup-token`). AWS 자격증명 **불필요**(DynamoDB Local).
 > 상세 절차: [docs/runbooks/agent-mcp-demo.md](docs/runbooks/agent-mcp-demo.md) "전체 실행 루프".
 
-> **✅ §3-A 대시보드 클릭 UX(7종) + §3-B 에이전트 자율 제안 — 2026-06-18 라이브 검증 완료, 사람 재확인 불필요.**
+> **✅ §3-A 대시보드 클릭 UX(7종) + §3-B 에이전트 자율 제안 — 2026-06-18 라이브 검증 완료.**
 > 목록·🤖 agent 뱃지/rationale·diff 출력게이트·Approve 전이·낙관적 락(두 탭 레이스→"이미 처리된 작업" 거부)·
 > Metrics 카드·웹 producer Send·agent-monitor 제안 적재 — 전부 라이브 DynamoDB Local 대상으로 통과.
-> 증빙: `docs/images/p1-job-queue-verified.png`.
+> 증빙: `docs/images/p1-job-queue-verified.png`, `docs/images/chat-producer-e2e.png`.
 
-### 3-C. 승인 → 실제 실행 풀 루프 (★ 남은 1건 — 토큰 필요, 실 Claude)
-> ⚠️ 검증 중 pr 2건이 `approved`로 남아 있다 — worker 는 `APPROVED` 를 먼저 claim 해 **실제 `git push`+`gh pr create`** 를
-> 시도한다. 깔끔한 **L0(diagnose)** 풀 루프를 보려면 **스택을 리셋**해 approved pr 을 비우고 pending diagnose 만 남긴다.
+### 3-C. 승인 → 실제 실행 풀 루프 — ✅ 2026-06-18 검증 완료 (실 Claude, $0.25 / 4838 tok)
+> diagnose `pending → running → done` 풀 루프를 실 Claude로 1회 통과(PROGRESS_LOG 2026-06-18). 재현 절차:
 ```bash
 cd web && docker compose down && docker compose up -d   # 시드 리셋(approved pr 제거)
 cd ..
@@ -75,10 +74,10 @@ make agent-monitor                                       # diagnose 제안(pendi
 export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
 make worker ARGS=--once                                  # pending diagnose claim → 실 Claude → done
 ```
-- [ ] `diagnose` 작업이 `pending` → `running` → **`done`** 으로 전이.
-- [ ] 결과에 **실제 Claude 진단 텍스트**가 채워짐(로컬에선 git diff 소스가 주재료).
-- [ ] 대시보드 상세에 **비용/토큰 실측치** + Audit `claimed`/`done` 기록.
-- [ ] Metrics(Telemetry)에 실행 1건 반영(실 토큰/비용).
+- [x] `diagnose` 작업이 `pending` → `running` → **`done`** 으로 전이.
+- [x] 결과에 **실제 Claude 진단 텍스트**가 채워짐(로컬에선 git diff 소스가 주재료).
+- [x] 대시보드 상세에 **비용/토큰 실측치** + Audit `claimed`/`done` 기록.
+- [x] Metrics(Telemetry)에 실행 1건 반영(실 토큰/비용).
 
 > **주의(예상 동작):** 로컬 diagnose는 CloudWatch·kubectl 소스가 자격증명/클러스터 부재로 **실패 격리**되고
 > **git diff 소스**로 Claude가 진단한다 — "다중소스 + 소스별 실패격리 + 실 Claude 호출" 확인엔 충분.
@@ -86,9 +85,11 @@ make worker ARGS=--once                                  # pending diagnose clai
 
 ---
 
-## 4. 내가 직접 검증할 것 — AWS 배포 후 (P4, 나중)
+## 4. ★ 내가 직접 수행/검증할 것 — AWS 배포 후 (유일한 잔여 트랙)
 
-> 로컬에선 "설명"일 뿐, AWS에서만 "실증"되는 차별화 축. 상세 [USER_GUIDE.md](USER_GUIDE.md) §6 + action_item.md.
+> **§3 로컬 e2e 는 전부 완료 → 사람이 실제로 남은 일은 이 §4 + 제출물뿐.**
+> 로컬에선 "설명"일 뿐, AWS에서만 "실증"되는 차별화 축. 실행 순서는 [action_item.md](action_item.md) [A]~[G],
+> 상세는 [USER_GUIDE.md](USER_GUIDE.md) §6. 제출물(다이어그램/스크린샷/데모영상/링크/아티클)은 action_item.md [G].
 
 - [ ] **Socket Mode 인바운드 0** — EC2 SG에 인바운드 규칙 없이 `/devops ping` → `pong`(스크린샷).
 - [ ] **IAM Instance Profile** — EC2에 Access Key 없이 CloudWatch RO/SSM Read 동작(role 캡처).
