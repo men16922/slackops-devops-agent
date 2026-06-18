@@ -77,4 +77,6 @@ EC2 DevOps Agent (c7i.large, EventBridge 스케줄 가동)
 - **언제 쓰지 마라**: 드문 리터럴·단일 후보는 grep 이 더 싸다. **본 repo 는 ~3.6K LOC 소형 — 일상 탐색은 grep 우선**,
   인덱스는 넓은 심볼 탐색에서만(measured adoption — harness/CORE_MANDATES.md §7).
 - **권위는 항상 원본**: 리프는 빈 폴더(위치만, 라인 번호 없음) → 위치를 짚은 뒤 본문은 원본 파일을 읽는다.
+- **실측 앵커(2026-06-18, 3.7K LOC)**: 인덱스가 grep 을 이기는 건 고빈도 심볼 ~5개(job/command/store/run/def)뿐
+  — 희소·호출처 탐색은 grep 우선(빈 리프의 원본-read 세금). scale law 확인 → 위 정책의 실측 근거.
 - 없거나 stale 면 `make quarkify`(최초 `make quarkify-setup`). 신선도 점검 `make quarkify-check`(비차단, `make check` 미포함).
