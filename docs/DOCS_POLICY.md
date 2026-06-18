@@ -1,44 +1,44 @@
 # DOCS_POLICY — slackops-devops-agent
-최종 갱신: 2026-06-17
+Last updated: 2026-06-17
 
-> 문서 운영 규칙(context budget). 상세 표준은 harness/CORE_MANDATES.md.
-> 스킬·예산은 **overnight-harness 플러그인** + `.claude/harness-config.json`(budgets) 가 단일 소스.
+> Doc operating rules (context budget). Full standards in harness/CORE_MANDATES.md.
+> Skills and budgets: the **overnight-harness plugin** + `.claude/harness-config.json` (budgets) are the single source.
 
-## Context Budget (생명선)
-| 문서 | 예산 | 내용 |
+## Context Budget (lifeline)
+| Doc | Budget | Contents |
 | --- | --- | --- |
-| `AGENT_BRIEF.md` | ≤ 60줄 | 1분 압축 문맥, snapshot, 현재 초점, guardrails |
-| `STATUS.md` | ≤ 120줄 | 현재 구현 상태, 검증 baseline, active focus, open risks |
-| `NEXT_PLAN.md` | ≤ 120줄 | **열린 작업만**(완료 이력 아님) |
-| `PROGRESS_LOG.md` | ≤ 120줄 | 최신 3–5개 증분. 넘치면 docs/archive/progress-YYYY-MM.md 분리 |
+| `AGENT_BRIEF.md` | ≤ 60 lines | 1-minute compressed context, snapshot, current focus, guardrails |
+| `STATUS.md` | ≤ 120 lines | current implementation state, verification baseline, active focus, open risks |
+| `NEXT_PLAN.md` | ≤ 120 lines | **open work only** (not completed history) |
+| `PROGRESS_LOG.md` | ≤ 120 lines | latest 3–5 increments. When over, split into docs/archive/progress-YYYY-MM.md |
 
-규칙: `docs/` 전체 bulk-read 금지(Read Path 만). 완료 체크리스트는 `COMPLETED_SUMMARY.md` 로 압축+링크.
-비가역 선택은 `DECISIONS.md`(Decision/Reason/Impact). 추측 금지 — 없으면 "문서에 없음".
+Rules: no bulk-read of the whole `docs/` (Read Path only). Compress completed checklists into `COMPLETED_SUMMARY.md` + link.
+Record irreversible choices in `DECISIONS.md` (Decision/Reason/Impact). No guessing — if absent, say "not in docs".
 
-## Read Path (세션 시작/재개)
+## Read Path (session start/resume)
 ```
 harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NEXT_PLAN.md
-→ (필요 시) docs/PROGRESS_LOG.md 상단 → (필요 시) docs/archive/
+→ (if needed) top of docs/PROGRESS_LOG.md → (if needed) docs/archive/
 ```
-권위 순서: `NEXT_PLAN.md` > `docs/plans/`(historical). 불변 표준 = `harness/CORE_MANDATES.md`.
+Authority order: `NEXT_PLAN.md` > `docs/plans/` (historical). Immutable standard = `harness/CORE_MANDATES.md`.
 
-## skill 경계 (overnight-harness 플러그인 제공 — 겹치지 않게)
-| skill | 언제 | 한 일 |
+## skill boundaries (provided by overnight-harness plugin — no overlap)
+| skill | when | what it does |
 | --- | --- | --- |
-| `/sync` | 세션 시작/재개 | Read Path 대로 current docs 만 읽고 5–10줄 요약. **읽기만.** |
-| `/checkpoint` | 작업 묶음 완료 | 변경 수집 → PROGRESS_LOG append → STATUS/BRIEF/NEXT 조건부 갱신 → milestone/결정 기록. **기록만.** 커밋은 요청 시만. |
-| `/tidy-docs` | 예산 초과/중복 | PROGRESS_LOG 월별 archive 분리, 완료 압축, 중복 통합·은퇴. **정리만.** 삭제는 마지막 수단, 파괴 전 승인. |
-| `/overnight-report` | 아침 검수 | 러너 상태·회차·커밋·gate 재실측·잔여 백로그 보고. **읽기+검증만.** |
-| `/overnight-seed` | 무인 가동 전 | `[auto]` 백로그 충분량 판단·후보 조사·승인분만 plan 에 기록. **기록만.** |
+| `/sync` | session start/resume | read only the current docs per the Read Path and give a 5–10 line summary. **Read only.** |
+| `/checkpoint` | work bundle done | collect changes → append to PROGRESS_LOG → conditionally update STATUS/BRIEF/NEXT → record milestone/decision. **Record only.** Commit only on request. |
+| `/tidy-docs` | over budget / duplication | split PROGRESS_LOG into monthly archive, compress completed items, merge/retire duplicates. **Tidy only.** Deletion is a last resort, approve before destroying. |
+| `/overnight-report` | morning review | report runner state, iterations, commits, re-measured gate, residual backlog. **Read + verify only.** |
+| `/overnight-seed` | before unattended run | judge whether `[auto]` backlog is sufficient, survey candidates, record only approved items into plan. **Record only.** |
 
-경계 원칙: **/sync 는 읽기만, /checkpoint 는 기록만, /tidy-docs 는 정리만.** 서로의 일을 하지 않는다.
+Boundary principle: **/sync reads only, /checkpoint records only, /tidy-docs tidies only.** None does another's job.
 
-## PROGRESS_LOG 항목 형식
+## PROGRESS_LOG entry format
 ```text
-## YYYY-MM-DD — <한 줄 제목>
+## YYYY-MM-DD — <one-line title>
 - Status:
 - Changed:
-- Verified:   # 실제로 돌린 검증만. 안 돌렸으면 "미검증".
+- Verified:   # only verification actually run. If not run, "unverified".
 - Blockers:
 - Next:
 ```

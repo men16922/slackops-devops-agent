@@ -1,9 +1,12 @@
 # slackops-devops-agent — Makefile
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
-.PHONY: check test lint typecheck smoke-local demo mcp-server agent-monitor worker chat-agent quarkify-setup quarkify quarkify-check
+.PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent quarkify-setup quarkify quarkify-check
 
-check: test lint typecheck   ## 커밋 게이트 3계층 (pytest + ruff + mypy)
+check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
+
+check-doc-budget: ## entry-doc line caps (context budget — mirrors harness-config budgets)
+	@bash harness/check-doc-budget.sh
 
 test:        ## pytest 전체
 	python3 -m pytest tests/ -q

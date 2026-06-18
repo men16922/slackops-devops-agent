@@ -18,11 +18,11 @@ point loses at most one iteration.
 - Only take work that the gate can prove correct **offline and deterministically**.
 - The gate is the env var `$GATE_CMD` (default `make check` = pytest + ruff + mypy strict). Run it exactly as given.
 
-### Repo-specific invariants (slackops-devops-agent) — 위반 금지
-- `harness/CORE_MANDATES.md` 전체 준수: 타입힌트 필수, `print` 금지(structlog), lazy import 유지.
-- `aws` CLI 실 호출 금지(자격증명 없음/금지). AWS 연동 코드는 **mock/주입 가능 의존성**으로 단위테스트까지만.
-- 새 의존성은 `pyproject.toml` 갱신 + 미설치 환경에서도 테스트 통과(lazy import) 유지.
-- 통신은 한국어, 단 식별자/명령/경로/코드는 영어 원문 그대로.
+### Repo-specific invariants (slackops-devops-agent) — do not violate
+- Fully comply with `harness/CORE_MANDATES.md`: type hints required, no `print` (structlog), keep lazy import.
+- No real `aws` CLI calls (no credentials / forbidden). AWS-integration code is unit-tested only via **mock/injectable dependencies**.
+- New dependencies: update `pyproject.toml` + keep tests passing even in an environment where they are not installed (lazy import).
+- Communicate in Korean, but keep identifiers/commands/paths/code in the original English.
 
 ## 1. Restore state
 

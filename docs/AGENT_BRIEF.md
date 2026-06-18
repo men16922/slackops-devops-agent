@@ -1,50 +1,50 @@
 # AGENT_BRIEF — slackops-devops-agent
-최종 갱신: 2026-06-19
+Last updated: 2026-06-19
 
-> 1분 압축 진입점 (≤60줄). 표준은 harness/CORE_MANDATES.md, 작업 권위는 NEXT_PLAN.md > docs/plans/.
+> 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
-## Read Path (세션 시작/재개)
+## Read Path (session start/resume)
 harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NEXT_PLAN.md
-→ (필요 시) docs/PROGRESS_LOG.md 상단 → (필요 시) docs/archive/
+→ (if needed) top of docs/PROGRESS_LOG.md → (if needed) docs/archive/
 
 ## Snapshot
-- **무엇:** Slack 자연어 명령 → EC2 의 Claude Code Headless 가 AWS/K8s/Terraform/GitHub 컨텍스트 분석 → 운영 자동화.
-  MVP = Read-Only 분석 + PR 생성까지.
-- **차별화:** 단순 봇이 아니라 "에이전트를 안전하게 운영하는 법"의 레퍼런스 — 보안(권한 + 주입 방어) + 계측(OTel).
-- **동작:** 명령 라우팅(ping/logs/diagnose 등록 완료) + job queue + permission gate + sanitizer
-  + claude_runner + allowlist(run_for_command 단일 진입점) + logs/diagnose 핸들러(fetcher
-  주입→격리→조립, diagnose 는 다중 소스+소스별 실패 격리) + store/(H0 단일테이블 —
-  Job/Audit/Telemetry 각각 Sqlite+DynamoDb 양 구현) + telemetry(record_run_metrics→
-  주입 store, OTel 은 lazy stub) + worker(폴링 consumer — claim→실행→출력게이트/
-  complete + audit/metric write-back) + tf-review(plan 격리 리뷰, apply 경로 부재)
-  + pr(2단계 출력게이트 — prepare 는 push/PR 도구 argv 제거 + diff 추출, execute 는
-  승인 후만) — 로컬 검증. AWS/Slack 실행분은 deploy/ 준비 완료. **web/ 대시보드(Next.js)**
-  = jobs feed/상세(diff 출력게이트+Approve/Reject)/metrics, DynamoDB Local 오프라인 docker(포트
-  8930) 로컬 e2e 검증. DDB_ENDPOINT 토글로 실 DynamoDB(Vercel) 전환(D7). 추론=구독 OAuth(D6).
-  + **에이전트 자율 제안(D9)** — mcp_server(propose_job MCP)+agent_monitor(Tier1 시뮬레이터/Tier2
-  claude -p)로 에이전트가 큐에 제안→기존 출력게이트로 사람 승인. web 에 사람 producer(채팅/selectbox)
-  +agent 뱃지·rationale. JobSource.AGENT+Job.rationale. 런북 docs/runbooks/agent-mcp-demo.md.
-  + **대화형 producer(D10)** — selectbox→자연어 채팅. DynamoDB 대화 버스(chat_store, GSI1 오버로딩)
-  +claude_runner 스트리밍(stream-json)+chat_agent 폴링 consumer+web Chat(폴링 Markdown 렌더). 에이전트
-  인바운드 0(폴링만)→Vercel 동작. 실 Claude e2e 검증. (web 결과 Markdown 렌더, Quarkify, worker 엔트리도 동봉.)
-- **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(274 passed, 1 skipped) + ruff + mypy(strict).
-  web/ 는 `next build` + `docker compose up` e2e green. **`make demo`** 로 로컬 풀스택(web+DB+chat_agent+worker) 한 방.
-- **현재 초점:** 로컬 완성 — [manual] 만 잔여(크레딧 거절→무료티어/DynamoDB provision/Vercel 배포/EC2 e2e/제출물).
+- **What:** Slack natural-language command → Claude Code Headless on EC2 analyzes AWS/K8s/Terraform/GitHub context → ops automation.
+  MVP = Read-Only analysis + PR creation.
+- **Differentiator:** Not just a bot but a reference for "how to run an agent safely" — security (permissions + injection defense) + observability (OTel).
+- **Behavior:** command routing (ping/logs/diagnose registered) + job queue + permission gate + sanitizer
+  + claude_runner + allowlist (run_for_command single entry point) + logs/diagnose handlers (fetcher
+  inject→isolate→assemble; diagnose is multi-source + per-source failure isolation) + store/ (H0 single-table —
+  Job/Audit/Telemetry each with Sqlite+DynamoDb implementations) + telemetry (record_run_metrics→
+  inject store, OTel is a lazy stub) + worker (polling consumer — claim→run→output-gate/
+  complete + audit/metric write-back) + tf-review (plan-isolated review, no apply path)
+  + pr (2-stage output gate — prepare strips push/PR tool argv + extracts diff, execute runs
+  only after approval) — locally verified. AWS/Slack execution prep is in deploy/. **web/ dashboard (Next.js)**
+  = jobs feed/detail (diff output gate + Approve/Reject)/metrics, DynamoDB Local offline docker (port
+  8930) local e2e verified. DDB_ENDPOINT toggle switches to real DynamoDB (Vercel) (D7). Inference = subscription OAuth (D6).
+  + **agent autonomous proposal (D9)** — mcp_server (propose_job MCP) + agent_monitor (Tier1 simulator/Tier2
+  claude -p): agent proposes to the queue → human approval via the existing output gate. web has a human producer (chat/selectbox)
+  + agent badge/rationale. JobSource.AGENT + Job.rationale. Runbook docs/runbooks/agent-mcp-demo.md.
+  + **conversational producer (D10)** — selectbox→natural-language chat. DynamoDB conversation bus (chat_store, GSI1 overloading)
+  + claude_runner streaming (stream-json) + chat_agent polling consumer + web Chat (polling Markdown render). Agent
+  inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified. (Also includes web result Markdown render, Quarkify, worker entry.)
+- **Verification:** 3-layer gate — `python3 -m pytest tests/ -q` (274 passed, 1 skipped) + ruff + mypy (strict).
+  web/ is `next build` + `docker compose up` e2e green. **`make demo`** runs the full local stack (web+DB+chat_agent+worker) in one shot.
+- **Current focus:** local completion — only [manual] remains (credit rejected→free tier/DynamoDB provision/Vercel deploy/EC2 e2e/submission).
 
-## Guardrails 요약 (상세는 CORE_MANDATES)
-- Socket Mode 전용(인바운드 포트 금지). IAM Instance Profile 만(Access Key 금지).
-- 권한 L0/1 만 활성, L2(Execute) 비활성. Production/배포/IAM/DB 변경 금지.
-- 주입 방어 4계층: Sanitizer / Tool Allowlist / 출력 게이트 / Template Prompt.
-- EC2 는 EventBridge 스케줄 가동(상시 금지).
+## Guardrails summary (details in CORE_MANDATES)
+- Socket Mode only (no inbound port). IAM Instance Profile only (no Access Key).
+- Only permission L0/1 active, L2 (Execute) disabled. No Production/deploy/IAM/DB changes.
+- 4-layer injection defense: Sanitizer / Tool Allowlist / output gate / Template Prompt.
+- EC2 runs on EventBridge schedule (never always-on).
 
-## Slack 명령 (MVP)
-- `/devops ping` — 헬스체크
-- `/devops logs <service>` — CloudWatch 조회 + 분석
-- `/devops diagnose <service>` — CloudWatch + kubectl + git diff 종합 진단
-- `/devops tf-review` — terraform plan 위험/비용/보안 리뷰
-- `/devops pr <설명>` — branch → 수정 → test → PR (사람 확인 게이트)
+## Slack commands (MVP)
+- `/devops ping` — health check
+- `/devops logs <service>` — CloudWatch query + analysis
+- `/devops diagnose <service>` — CloudWatch + kubectl + git diff combined diagnosis
+- `/devops tf-review` — terraform plan risk/cost/security review
+- `/devops pr <description>` — branch → modify → test → PR (human-confirmation gate)
 
-## 슬래시 커맨드 (작업 하네스)
-- `/sync` — 세션 시작/재개 시 Read Path 만 읽고 요약 (읽기만)
-- `/checkpoint` — 작업 묶음 완료 시 PROGRESS_LOG append + 조건부 갱신 (기록만)
-- `/tidy-docs` — 문서 비대 시 archive 분리·압축·통합 (정리만)
+## Slash commands (work harness)
+- `/sync` — at session start/resume, read only the Read Path and summarize (read-only)
+- `/checkpoint` — on work-bundle completion, append PROGRESS_LOG + conditional updates (record-only)
+- `/tidy-docs` — when docs bloat, split/compress/consolidate into archive (tidy-only)

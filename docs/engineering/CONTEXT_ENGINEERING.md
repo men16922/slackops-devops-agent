@@ -1,52 +1,52 @@
-# CONTEXT_ENGINEERING — 컨텍스트 예산·상태 복원·세션 연속성 (바이블)
+# CONTEXT_ENGINEERING — Context Budget, State Restoration, Session Continuity (bible)
 
-> **범용 개념 문서(bible).** 이 repo 적용(read-path·/sync·진입점)은 → [`interp/INTERPRETATION.md`](interp/INTERPRETATION.md).
+> **General concept document (bible).** For this repo's application (read-path, /sync, entry points) → [`interp/INTERPRETATION.md`](interp/INTERPRETATION.md).
 
-## 정의
-에이전트가 **최소 토큰으로 올바른 작업 문맥을 복원**하고, 세션이 끊겨도 다음 세션이 끊김 없이 이어받게
-만드는 엔지니어링. 메모리가 아니라 **디스크가 source of truth**.
+## Definition
+The engineering of letting an agent **restore the correct work context with minimal tokens** and letting the next session seamlessly
+pick up even when a session is cut off. **Disk, not memory, is the source of truth.**
 
 ## 1. Read Path & Context Budget
-세션 시작은 전체 문서를 bulk-read 하지 않고 **진입점만** 읽는다(짧은→상세 순):
-1. 압축 진입점(1분 문맥) → 2. 현재 상태 → 3. 다음 작업(rolling plan) → 4. 최신 증분 로그.
-- 상세(설계/규칙/시나리오/dated plan/archive)는 **on-demand** — 실제로 그걸 바꿀 때만 연다.
-- 진입점 문서에 **라인 예산**을 둔다(예: 진입점 ≤60, 상태/계획 ≤120). 초과분은 정리/archive 로 분리.
-- 핵심: 진입점은 **모든 내용을 품는 매뉴얼이 아니라 지도**다. 상세는 링크로 이동한다.
+Don't bulk-read all docs at session start; read **only the entry points** (short → detailed order):
+1. Compressed entry point (1-minute context) → 2. Current status → 3. Next tasks (rolling plan) → 4. Latest incremental log.
+- Details (design/rules/scenarios/dated plan/archive) are **on-demand** — open them only when actually changing them.
+- Put a **line budget** on entry-point docs (e.g., entry point ≤60, status/plan ≤120). Split overflow into cleanup/archive.
+- Key: the entry point is **a map, not a manual that contains everything**. Details are reached via links.
 
 ## 2. Knowledge Pyramid
-| 층 | 성격 |
+| Layer | Nature |
 | --- | --- |
-| L0 | 세션 시작 시 무조건 읽는 진입점 |
-| L1 | 필요할 때 바로 참조하는 핵심 문서(설계·규칙·계획) |
-| L2 | 작업별 상세(dated plan·design-doc·구조화 작업 목록) |
-| L3 | 생성/참조/대용량 문서(리뷰·리포트·trace·archive) — 기본 컨텍스트에 넣지 않음 |
+| L0 | Entry points always read at session start |
+| L1 | Core docs referenced on demand (design, rules, plan) |
+| L2 | Per-task detail (dated plan, design-doc, structured task list) |
+| L3 | Generated/referenced/large docs (review, report, trace, archive) — not in the default context |
 
-## 3. 3중 상태 저장
-| 층 | 매체 | 답하는 질문 |
+## 3. Triple State Storage
+| Layer | Medium | Question it answers |
 | --- | --- | --- |
-| 변경 이력 | git history | 무엇을 바꿨나 |
-| 구조화 상태 | 머신리더블 ledger(작업/이벤트 원장) | 루프가 어떻게 돌았나 |
-| 자연어 상태 | 현재 상태·진행·핸드오프 문서 | 왜·다음 무엇 |
-셋은 보완재다. 어느 하나로 전부 대체하지 않는다.
+| Change history | git history | What was changed |
+| Structured state | machine-readable ledger (task/event ledger) | How the loop ran |
+| Natural-language state | current status/progress/handoff docs | Why · what next |
+The three are complementary. None fully replaces the others.
 
-## 4. 세션 연속성 (Resume Pointer) — plan-only/미완 핸드오프
-세션이 plan-only 또는 미완으로 끝나고 다음 세션이 이어받아야 하면:
-1. **진입점 최상단에 단일 "다음 세션" 포인터** = in-repo 계획 경로 + 첫 구체 행동.
-2. 그 작업을 **권위 active focus** 로 승격 → 진입점·상태·계획 문서를 **일치**시킨다(서두 노트로만 두지 않는다).
-3. 상태 복원 절차가 이 포인터를 **가장 먼저** 표면화 → 다음 세션이 끊김 없이 이어받는다. 이어받으면 갱신/비움.
-- **금지**: 툴이 만드는 세션 밖 스크래치 경로(랜덤명·머신 로컬)를 권위 포인터로 적지 않는다 — 다음 세션이 못 찾는다.
+## 4. Session Continuity (Resume Pointer) — plan-only/unfinished handoff
+When a session ends plan-only or unfinished and the next session must pick up:
+1. **A single "next session" pointer at the top of the entry point** = in-repo plan path + first concrete action.
+2. Promote that task to **authoritative active focus** → **align** the entry-point/status/plan docs (don't leave it as just a header note).
+3. The state-restoration procedure surfaces this pointer **first** → the next session picks up seamlessly. Update/clear it once picked up.
+- **Forbidden**: don't record a tool-generated out-of-session scratch path (random name, machine-local) as the authoritative pointer — the next session can't find it.
 
-## 5. 진입점 발산 방지
-여러 에이전트 진입점(도구별 instruction 파일)은 **공통 본문 1곳 + 나머지는 링크**로 둔다. 같은 내용을
-복붙하면 곧 서로 어긋난다(divergence). 진입점은 얇은 래퍼로 통일하고 상세는 한 곳에서 소유한다.
+## 5. Preventing Entry-Point Divergence
+Keep multiple agent entry points (per-tool instruction files) as **one shared body + the rest as links**. Copy-pasting the same content
+soon causes them to drift apart (divergence). Unify entry points as thin wrappers and let one place own the detail.
 
-## 6. 구조 인덱스는 조건부
-구조 인덱스(심볼·호출그래프 폴더맵/LSP/ctags 등)는 grep 의 대안이 될 수 있으나 만능이 아니다.
-레버는 쉘 latency 가 아니라 *왕복 수 × 턴토큰*이다. **언제 이득**: 대형 모듈+고빈도 심볼.
-**언제 손해**: 드문 리터럴·소형 파일은 grep 이 더 쌈 — 측정 없이 "인덱스 우선" 처방을 받지 않는다.
-**structure-before-body**: 큰 파일은 통독 말고 인덱스로 멤버부터 좁힌다. **단 인덱스 ≠ 권위** — 본문은 원본에서 확인.
+## 6. Structure Index Is Conditional
+A structure index (symbol/call-graph folder map / LSP / ctags etc.) can substitute for grep but isn't a cure-all.
+The lever isn't shell latency but *round trips × per-turn tokens*. **When it pays**: large module + high-frequency symbol.
+**When it loses**: rare literals / small files — grep is cheaper. Don't accept an "index-first" prescription without measurement.
+**structure-before-body**: for large files, don't read end-to-end; narrow to members via the index first. **But index ≠ authority** — confirm the body in the original.
 
-## 7. 형제 개념 (바이블)
-- 상위 하네스: [`HARNESS_ENGINEERING.md`](HARNESS_ENGINEERING.md) · 루프: [`LOOP_ENGINEERING.md`](LOOP_ENGINEERING.md)
-- 멀티에이전트: [`AGENTIC_ENGINEERING.md`](AGENTIC_ENGINEERING.md) · 프롬프트: [`PROMPT_ENGINEERING.md`](PROMPT_ENGINEERING.md)
-- 이 repo 적용: [`interp/INTERPRETATION.md`](interp/INTERPRETATION.md)
+## 7. Sibling Concepts (bibles)
+- Parent harness: [`HARNESS_ENGINEERING.md`](HARNESS_ENGINEERING.md) · Loop: [`LOOP_ENGINEERING.md`](LOOP_ENGINEERING.md)
+- Multi-agent: [`AGENTIC_ENGINEERING.md`](AGENTIC_ENGINEERING.md) · Prompt: [`PROMPT_ENGINEERING.md`](PROMPT_ENGINEERING.md)
+- This repo's application: [`interp/INTERPRETATION.md`](interp/INTERPRETATION.md)

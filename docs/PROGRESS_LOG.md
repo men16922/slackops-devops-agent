@@ -1,95 +1,95 @@
 # PROGRESS_LOG — slackops-devops-agent
-최종 갱신: 2026-06-19
+Last updated: 2026-06-19
 
-> 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
-> 2026-06-11~12 전반부 항목 원문: docs/archive/progress-2026-06.md
+> Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
+> Original 2026-06-11~12 first-half entries: docs/archive/progress-2026-06.md
 
-## 2026-06-19 — make demo + 대화 orphan 잠금 fix + pretty 렌더링 + 클라우드 systemd 갭
-- Status: 완료. 데모 채팅 막힘(실 버그) 진단·수정 + 출력 가독성 + EC2 풀 루프 갭까지.
-- Changed: **make demo**(scripts/demo.sh) — docker(web+DB+seed)+chat_agent+worker 한 방, Ctrl-C 정리.
-  **fix(web) orphan convId 잠금**: localStorage 옛 convId + in-memory DDB 재시드로 대화 META 소멸 →
-  send 조건 실패가 "응답 중"으로 오인 + "새 대화" 버튼 미표시로 영구 잠금. chat-actions 가
-  gone/busy 구분(GetItem), Chat 이 gone 시 새 대화 재시도 + 폴링 자가복구. **pretty 렌더**:
-  Markdown.tsx GFM 표/수평선/링크(스킴 화이트리스트) + globals.css 스타일, claude_runner 가
-  결과·스트림 청크의 ANSI(CSI) strip(테스트 4건). **deploy**: user-data.sh 에 worker·chat_agent
-  systemd 2개 추가(Restart=always, outbound 폴링→인바운드 0 유지), README 3-서비스. QA_LIST 최신화.
-- Verified: `make check` **274 passed, 1 skipped** · ruff · mypy(strict 27). web `next build` green.
-  **Playwright 실 Claude e2e**: 재시드 후 새로고침→자가복구→전송→표 응답 렌더(콘솔 에러 0).
-  증빙 docs/images/chat-pretty-render-verified.png. bash -n user-data.sh OK.
-- Blockers: 없음.
-- Next: H0 [manual] — AWS provision/배포/제출. (worker 가 seed pending job 을 실 Claude 로 자동 실행 → 토큰 소모 주의.)
+## 2026-06-19 — make demo + chat orphan lock fix + pretty rendering + cloud systemd gap
+- Status: Done. Demo chat stuck (real bug) diagnosed/fixed + output readability + EC2 full-loop gap.
+- Changed: **make demo** (scripts/demo.sh) — docker (web+DB+seed) + chat_agent + worker in one shot, Ctrl-C cleanup.
+  **fix(web) orphan convId lock**: old convId in localStorage + in-memory DDB reseed lost the conversation META →
+  failed send condition mistaken for "responding" + "new conversation" button hidden = permanent lock. chat-actions
+  now distinguishes gone/busy (GetItem), Chat retries a new conversation on gone + polling self-heals. **pretty render**:
+  Markdown.tsx GFM tables/horizontal-rules/links (scheme whitelist) + globals.css styling, claude_runner
+  strips ANSI (CSI) from result/stream chunks (4 tests). **deploy**: added 2 worker/chat_agent
+  systemd units to user-data.sh (Restart=always, outbound polling → inbound stays 0), README 3-service. QA_LIST updated.
+- Verified: `make check` **274 passed, 1 skipped** · ruff · mypy (strict 27). web `next build` green.
+  **Playwright real-Claude e2e**: reseed → refresh → self-heal → send → table response render (0 console errors).
+  Evidence docs/images/chat-pretty-render-verified.png. bash -n user-data.sh OK.
+- Blockers: None.
+- Next: H0 [manual] — AWS provision/deploy/submission. (worker auto-runs seed pending jobs via real Claude → watch token spend.)
 
-## 2026-06-19 — 대화형 producer: web 채팅 → 에이전트 스트리밍 → propose_job (DECISIONS D10)
-- Status: 완료. selectbox producer 를 자연어 채팅으로 대체 — 실 Claude e2e 검증까지.
-- Changed: **store/chat_store.py**(신규) 대화 버스(Conversation/Message/ChatStatus + Sqlite/DynamoDb,
-  단일테이블 PK=CHAT#/META, **GSI1 CHATSTATUS# 오버로딩으로 claim — 새 GSI 0**, 청크 list_append).
-  **claude_runner.run_headless_stream**(신규) stream-json 줄파싱 → on_chunk 콜백 + tokens/cost +
-  propose_job job_id 추출. **chat_agent.py**(신규) 폴링 consumer(claim→sanitizer 격리→스트리밍→
-  finish, allowedTools=propose_job only). **web/**: Chat.tsx(폴링 Markdown 렌더)+chat-actions.ts+
-  api/chat/[conv] 라우트, Markdown.tsx 공유 이전, NewCommand 삭제. mcp_config_json 에 AWS 더미키
-  passthrough(로컬 실 Claude). **reload 영속(convId localStorage + "새 대화" 버튼)**. make chat-agent.
-  USER_GUIDE §2.4-2.5/런북 갱신. (체크포인트 후속: tidy-docs 로 PROGRESS_LOG 193→78줄 archive 분리.)
-- Verified: `make check` green(**270 passed, 1 skipped** · ruff · mypy 27 files) + web `next build` TS strict +
-  Playwright e2e(입력→DynamoDB→chat_agent(mock+**실 Claude**)→폴링 Markdown 렌더+제안 콜아웃→Job Queue).
-  실 Claude: checkout 504 멀티턴 진단 + propose_job 실제 job 적재 확인 + reload 후 대화 복원 확인.
-  증빙 docs/images/chat-producer-e2e.png.
-- Blockers: 없음.
-- Next: H0 [manual] — AWS provision/배포/제출. (선택: Vercel SSE 브리지 = 토큰단위 실시간, docs/plans §6.)
+## 2026-06-19 — conversational producer: web chat → agent streaming → propose_job (DECISIONS D10)
+- Status: Done. Replaced the selectbox producer with natural-language chat — verified through real Claude e2e.
+- Changed: **store/chat_store.py** (new) conversation bus (Conversation/Message/ChatStatus + Sqlite/DynamoDb,
+  single-table PK=CHAT#/META, **GSI1 CHATSTATUS# overloading for claim — 0 new GSI**, chunk list_append).
+  **claude_runner.run_headless_stream** (new) stream-json line parsing → on_chunk callback + tokens/cost +
+  propose_job job_id extraction. **chat_agent.py** (new) polling consumer (claim→sanitizer isolate→stream→
+  finish, allowedTools=propose_job only). **web/**: Chat.tsx (polling Markdown render) + chat-actions.ts +
+  api/chat/[conv] route, Markdown.tsx shared move, NewCommand removed. mcp_config_json AWS dummy-key
+  passthrough (local real Claude). **reload persistence (convId localStorage + "new conversation" button)**. make chat-agent.
+  USER_GUIDE §2.4-2.5/runbook updated. (checkpoint follow-up: tidy-docs split PROGRESS_LOG 193→78 lines to archive.)
+- Verified: `make check` green (**270 passed, 1 skipped** · ruff · mypy 27 files) + web `next build` TS strict +
+  Playwright e2e (input→DynamoDB→chat_agent (mock+**real Claude**)→polling Markdown render + proposal callout→Job Queue).
+  Real Claude: checkout 504 multi-turn diagnosis + propose_job real job load confirmed + conversation restored after reload.
+  Evidence docs/images/chat-producer-e2e.png.
+- Blockers: None.
+- Next: H0 [manual] — AWS provision/deploy/submission. (optional: Vercel SSE bridge = token-level real-time, docs/plans §6.)
 
-## 2026-06-18 — 세션 묶음: Quarkify 포팅 + worker 로컬 엔트리 + web Markdown/정렬 + GUIDE 통합/QA
-- Status: 완료. H0 로컬 데모 품질·검증 정비(별도 [manual] AWS 트랙 무변).
-- Changed: Quarkify 코드 토폴로지 인덱스 포팅(tools/quarkify + 비차단 freshness + 정책문서, 실측 앵커).
-  worker 로컬 CLI 엔트리(`python -m app.worker`, stores_from_env) → 풀 루프 로컬 완결. Makefile
-  DEV_ENV(PYTHONPATH=src + DDB 더미키) — agent-monitor/worker/chat-agent. web 작업결과 Markdown
-  렌더(Markdown.tsx, 중첩 emphasis)+agent source 정렬. END_USER_GUIDE→USER_GUIDE 병합, QA_LIST.md 신설.
-- Verified: `make check` green(250→262 passed 경유) + Playwright 로 §3-A 대시보드 클릭 UX 전수(승인 전이/
-  낙관적 락/Telemetry/producer) + 실 Claude diagnose 풀 루프($0.25/4838tok). 증빙 docs/images/.
-- Blockers: 없음.
-- Next: 대화형 producer(위 2026-06-19) → H0 [manual] 제출 트랙.
+## 2026-06-18 — session bundle: Quarkify port + worker local entry + web Markdown/sorting + GUIDE merge/QA
+- Status: Done. H0 local demo quality/verification cleanup (separate [manual] AWS track unchanged).
+- Changed: Quarkify code-topology index port (tools/quarkify + non-blocking freshness + policy doc, measured anchor).
+  worker local CLI entry (`python -m app.worker`, stores_from_env) → full loop locally complete. Makefile
+  DEV_ENV (PYTHONPATH=src + DDB dummy keys) — agent-monitor/worker/chat-agent. web result Markdown
+  render (Markdown.tsx, nested emphasis) + agent source sorting. END_USER_GUIDE→USER_GUIDE merge, QA_LIST.md created.
+- Verified: `make check` green (via 250→262 passed) + Playwright covering all §3-A dashboard click UX (approval transition/
+  optimistic lock/Telemetry/producer) + real Claude diagnose full loop ($0.25/4838tok). Evidence docs/images/.
+- Blockers: None.
+- Next: conversational producer (2026-06-19 above) → H0 [manual] submission track.
 
-## 2026-06-17 — 에이전트 자율 제안 루프(MCP propose_job) + 사람 web producer (DECISIONS D9)
-- Status: 완료. control plane 을 에이전트까지 확장 — "감지→제안→사람 승인" 루프 구현(로컬 e2e).
-- Changed: **src/app/mcp_server.py**(신규) propose_job/list_pending(FastMCP, server=slackops, 순수
-  로직/SDK 래퍼 분리, permissions default-deny 재사용). **src/app/agent_monitor.py**(신규) Tier1
-  시뮬레이터(detect 규칙기반·토큰불필요)+Tier2 실제 run_monitor_headless(--mcp-config). store/
-  (base/dynamodb/sqlite) 에 `JobSource.AGENT`+`Job.rationale` 전용 필드(extra 미영속이라 필수).
-  claude_runner.build_command(mcp_config)→--mcp-config+--strict-mcp-config. **web/**: 사람 producer
-  (NewCommand 채팅/selectbox + actions.enqueueJob) + agent 뱃지·rationale 콜아웃, seed 에이전트
-  샘플 2건, docker-compose dynamodb-local 8931 노출. pyproject mcp>=1.0(+mypy override). Makefile
-  mcp-server/agent-monitor. END_USER_GUIDE.md, docs/runbooks/agent-mcp-demo.md. 커밋 f1caa80.
-- Verified: `make check` green(**249 passed, 1 skipped** · ruff · mypy strict) + web `tsc` green +
-  docker e2e(seed 28건, 홈/상세 agent 렌더 — 🤖 뱃지/rationale/diff/Approve) + Tier1 라이브
-  (agent_monitor 시뮬레이터→DynamoDB Local 8931→FEED agent 제안 3건 확인).
-- Blockers: 없음. (Tier2 실제 claude -p 는 OAuth 토큰 필요 → env 미설정, 런북 문서화·미실행.)
-- Next: H0 [manual] — DynamoDB provision/Vercel 배포/제출물. (로컬 데모는 worker 미가동→제안 pending 정지.)
+## 2026-06-17 — agent autonomous proposal loop (MCP propose_job) + human web producer (DECISIONS D9)
+- Status: Done. Extended the control plane to agents — "detect→propose→human approve" loop implemented (local e2e).
+- Changed: **src/app/mcp_server.py** (new) propose_job/list_pending (FastMCP, server=slackops, pure
+  logic/SDK wrapper split, permissions default-deny reuse). **src/app/agent_monitor.py** (new) Tier1
+  simulator (rule-based detect, no token needed) + Tier2 real run_monitor_headless (--mcp-config). store/
+  (base/dynamodb/sqlite) gained `JobSource.AGENT` + `Job.rationale` dedicated fields (required since extra isn't persisted).
+  claude_runner.build_command (mcp_config)→--mcp-config + --strict-mcp-config. **web/**: human producer
+  (NewCommand chat/selectbox + actions.enqueueJob) + agent badge/rationale callout, 2 seed agent
+  samples, docker-compose dynamodb-local 8931 exposed. pyproject mcp>=1.0 (+mypy override). Makefile
+  mcp-server/agent-monitor. END_USER_GUIDE.md, docs/runbooks/agent-mcp-demo.md. Commit f1caa80.
+- Verified: `make check` green (**249 passed, 1 skipped** · ruff · mypy strict) + web `tsc` green +
+  docker e2e (28 seeds, home/detail agent render — 🤖 badge/rationale/diff/Approve) + Tier1 live
+  (agent_monitor simulator→DynamoDB Local 8931→FEED 3 agent proposals confirmed).
+- Blockers: None. (Tier2 real claude -p needs OAuth token → env unset, runbook documented but not run.)
+- Next: H0 [manual] — DynamoDB provision/Vercel deploy/submission. (local demo: worker not running → proposals stay pending.)
 
-## 2026-06-17 — overnight-harness 플러그인 수렴 (리포 로컬 하네스 중복 제거)
-- Status: 완료. 자작 플러그인을 단일 소스로 — 스킬/러너/엔지니어링 문서 3계층 중복 제거(DECISIONS D8).
-- Changed: harness-init 스캐폴드(scripts/overnight/* + docs/engineering/* bibles + .claude/harness-config.json
-  + docs/test/bible + Makefile snippet). 리포 로컬 스킬 4종 삭제(.claude/skills/{sync,checkpoint,tidy-docs,
-  overnight-report}) → 플러그인 사용. 러너 bin/overnight → scripts/overnight 이전(PROMPT 에 리포 불변
-  CORE_MANDATES/aws→mock/lazy import/CONTEXT_BRIDGE read path/한국어 포팅, overnight-settings 에 aws deny 보강).
-  docs/LOOP_ENGINEERING.md → docs/engineering/interp/INTERPRETATION.md 흡수 후 삭제. Makefile 신규
-  (check=pytest+ruff+mypy + overnight 타깃). 아카이브 bin/docs/archive → docs/archive 이전.
-  CLAUDE.md/DOCS_POLICY/README/.gitignore 참조 갱신. (보존: harness/ mandates, docs 상태문서, 인터랙티브 settings.)
-- Verified: `make check` green(229 passed, 1 skipped · ruff · mypy). 구조 검증(중복 스킬 0, bin 제거,
-  활성 문서 bin 참조 0, run.sh/status.sh 문법 OK). 라이브 overnight-once 스모크는 커밋 후 진행.
-- Blockers: 없음. (스킬 bare 호출명 `/sync` 해석은 실사용 확인 예정.)
-- Next: H0 [manual] — DynamoDB provision/Vercel 배포/제출물.
+## 2026-06-17 — overnight-harness plugin convergence (remove repo-local harness duplication)
+- Status: Done. Made the homemade plugin the single source — removed 3-layer duplication of skills/runner/engineering docs (DECISIONS D8).
+- Changed: harness-init scaffold (scripts/overnight/* + docs/engineering/* bibles + .claude/harness-config.json
+  + docs/test/bible + Makefile snippet). Deleted 4 repo-local skills (.claude/skills/{sync,checkpoint,tidy-docs,
+  overnight-report}) → use plugin. Moved runner bin/overnight → scripts/overnight (PROMPT ports repo invariants
+  CORE_MANDATES/aws→mock/lazy import/CONTEXT_BRIDGE read path/Korean, overnight-settings reinforced with aws deny).
+  docs/LOOP_ENGINEERING.md → absorbed into docs/engineering/interp/INTERPRETATION.md then deleted. New Makefile
+  (check=pytest+ruff+mypy + overnight targets). Archive bin/docs/archive → moved to docs/archive.
+  Updated CLAUDE.md/DOCS_POLICY/README/.gitignore references. (Preserved: harness/ mandates, docs status docs, interactive settings.)
+- Verified: `make check` green (229 passed, 1 skipped · ruff · mypy). Structure verified (0 duplicate skills, bin removed,
+  0 bin references in active docs, run.sh/status.sh syntax OK). Live overnight-once smoke to proceed after commit.
+- Blockers: None. (Skill bare invocation name `/sync` resolution to be confirmed in real use.)
+- Next: H0 [manual] — DynamoDB provision/Vercel deploy/submission.
 
-## 2026-06-16 — web/ 대시보드(Next.js, 로컬 Docker) + USER_GUIDE.md + Claude 구독 추론 결정
-- Status: 완료. H0 핵심 스택(Vercel 프론트 + DynamoDB)의 프론트 첫 구현 — 로컬 e2e 검증까지.
-- Changed: **web/** 신규 — Next.js 14.2.35 App Router(TS). lib/{types,time,ddb,format}.ts
-  (단일테이블 계약 TS 미러 — GSI2 FEED/AUDIT/METRIC 질의, _util.py utcnow_iso/day_of 동형),
-  app/{page(jobs feed),jobs/[id](상세+diff 출력게이트+Approve/Reject+audit),metrics},
-  actions.ts(승인 server action = _conditional_set ConditionExpression + audit append 미러),
-  scripts/seed.mjs(create-table.sh 스키마로 테이블 생성 + mock 22건). docker-compose(dynamodb-local
-  오프라인 + seed + web, **포트 8930**, 더미 키 — 실 AWS 불필요), Dockerfile, .env.local.example.
-  **USER_GUIDE.md**(루트) — 시크릿 수동 입력 가이드(Slack/Claude→SSM, AWS 키는 Vercel/실DynamoDB
-  읽을 때만 최소권한 IAM, 발급·정책·회전·심사기간 비용절약). deploy/{ec2/user-data.sh,README.md}
-  에 CLAUDE_CODE_OAUTH_TOKEN(SSM) 로드 추가. .gitignore web/ 항목.
-- Verified: `next build` green(TS strict) + **docker compose up e2e**: seed 22건, web 8930 응답,
-  jobs/상세/metrics 렌더 + **승인 전이 동작·중복승인 ConditionalCheckFailed 거부**(낙관적 락) 확인.
-  게이트 3계층: pytest 229 passed/1 skipped · ruff green · mypy green(src 무변경).
-- Blockers: 없음. (잔여 postcss moderate/high 취약점은 Next 16 메이저 필요 — 보류.)
-- Next: [manual] — DynamoDB provision → EC2 e2e 캡처 → Vercel 배포(실 DynamoDB, 읽기키 env) → 제출물.
+## 2026-06-16 — web/ dashboard (Next.js, local Docker) + USER_GUIDE.md + Claude subscription inference decision
+- Status: Done. First front-end implementation of the H0 core stack (Vercel front + DynamoDB) — through local e2e.
+- Changed: **web/** new — Next.js 14.2.35 App Router (TS). lib/{types,time,ddb,format}.ts
+  (single-table contract TS mirror — GSI2 FEED/AUDIT/METRIC queries, isomorphic with _util.py utcnow_iso/day_of),
+  app/{page(jobs feed),jobs/[id](detail + diff output gate + Approve/Reject + audit),metrics},
+  actions.ts (approval server action = _conditional_set ConditionExpression + audit append mirror),
+  scripts/seed.mjs (create table from create-table.sh schema + 22 mocks). docker-compose (dynamodb-local
+  offline + seed + web, **port 8930**, dummy keys — no real AWS needed), Dockerfile, .env.local.example.
+  **USER_GUIDE.md** (root) — secret manual-entry guide (Slack/Claude→SSM, AWS keys only via least-privilege IAM
+  when reading Vercel/real DynamoDB, issuance/policy/rotation/judging-period cost saving). deploy/{ec2/user-data.sh,README.md}
+  add CLAUDE_CODE_OAUTH_TOKEN (SSM) load. .gitignore web/ entry.
+- Verified: `next build` green (TS strict) + **docker compose up e2e**: 22 seeds, web 8930 responds,
+  jobs/detail/metrics render + **approval transition works / duplicate-approval ConditionalCheckFailed rejection** (optimistic lock) confirmed.
+  3-layer gate: pytest 229 passed/1 skipped · ruff green · mypy green (src unchanged).
+- Blockers: None. (remaining postcss moderate/high vuln needs Next 16 major — deferred.)
+- Next: [manual] — DynamoDB provision → EC2 e2e capture → Vercel deploy (real DynamoDB, read-key env) → submission.

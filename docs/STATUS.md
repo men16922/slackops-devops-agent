@@ -1,86 +1,86 @@
 # STATUS — slackops-devops-agent
-최종 갱신: 2026-06-19
+Last updated: 2026-06-19
 
-> 현재 상태/검증/risks (≤120줄). source of truth. 갱신은 /checkpoint.
+> Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
-## 현재 요약
-- Day 1–3 **로컬 구현 완료**: Socket Mode 라우팅 + `/devops ping` + job queue + permission gate
-  + FastAPI health/metrics. deploy/ 산출물(IAM/EC2/EventBridge/ADOT) ready-to-run.
-- AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
+## Current summary
+- Day 1–3 **local implementation complete**: Socket Mode routing + `/devops ping` + job queue + permission gate
+  + FastAPI health/metrics. deploy/ artifacts (IAM/EC2/EventBridge/ADOT) ready-to-run.
+- AWS/Slack **execution not done**: local credentials invalid + Slack App needs manual creation → follow deploy/README.md.
 
-## 검증 Baseline
-- 게이트 3계층: `python3 -m pytest tests/ -q` → **274 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
-  + `ruff check src tests` + `mypy src`(strict) 전부 green.
-- web/: `next build` green(TS strict) + `docker compose up` e2e — seed 22건, 8930 응답, jobs/상세/metrics
-  렌더 + 승인 전이·중복승인 ConditionalCheckFailed 거부 확인(2026-06-16).
-- lazy import 설계 — fastapi/slack_bolt 미설치 환경에서도 전 모듈 import-safe.
-- code-review(high) 후속 10 findings 수정 완료 — route 예외 안전망, sanitizer 미완성태그,
-  kubectl 플래그 주입, CloudWatch 최신 이벤트, run.sh limit 판정, 명령 레지스트리 단일화 등.
-- `/devops ping` e2e 는 미검증(EC2 + Slack App 필요).
+## Verification Baseline
+- 3-layer gate: `python3 -m pytest tests/ -q` → **274 passed, 1 skipped** (fastapi-not-installed local-only skip)
+  + `ruff check src tests` + `mypy src` (strict) all green.
+- web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
+  render + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
+- lazy-import design — all modules import-safe even without fastapi/slack_bolt installed.
+- code-review (high) follow-up: 10 findings fixed — route exception safety net, sanitizer unclosed tag,
+  kubectl flag injection, CloudWatch latest events, run.sh limit decision, command registry unification, etc.
+- `/devops ping` e2e unverified (needs EC2 + Slack App).
 
-## 동작하는 것
-- 명령 라우팅(default deny + 금지 불변 거부), ping 핸들러, SQLite job queue(원자 클레임),
-  permission engine(L0/1 활성·L2 비활성), health/metrics(127.0.0.1 전용),
-  sanitizer(wrap_untrusted 태그 위조 무력화 + build_prompt template 강제),
-  claude_runner(run_headless — 실행기 주입, allowedTools 전달, JSON→RunResult 파싱, timeout),
-  allowlist(명령별 Tool Allowlist 매핑 + run_for_command 단일 진입점 — permissions 게이트 →
-  allowlist → run_headless, 금지 키워드 import-time 검증, default deny),
-  commands/logs(handle_logs — fetcher 주입→sanitizer 격리→run_for_command 조립,
-  service 인자 regex 검증, boto3 lazy 기본 fetcher),
-  commands/diagnose(handle_diagnose — 다중 소스 fetchers 주입(logs/kubectl/git diff),
-  소스별 실패 격리, 섹션 마커 단일 격리 블록, 전 소스 빈 데이터 시 Claude 미호출),
-  라우팅 등록(register_default_commands — ping/logs/diagnose, 호출 시점 모듈 속성 조회),
-  store/(H0 단일테이블 — JobStore 상태머신+claim 원자성, AuditStore append/job·일자 피드,
-  TelemetryStore record/피드 — 각각 Sqlite+DynamoDb 양 구현, moto 동치 검증),
-  telemetry(record_run_metrics — 주입된 TelemetryStore 에 기록, setup_telemetry 는 OTel lazy stub),
-  worker(Worker.process_one — claim→executor→diff 미승인이면 await_approval 출력게이트,
-  아니면 DONE/예외 FAILED + audit/metric write-back, run_forever 주입 sleep 폴링,
-  default_executors ping/logs/diagnose/tf-review/pr, 매핑 외 명령 default deny),
-  commands/tf_review(handle_tf_review — PlanFetcher 주입(기본 argv `terraform plan` 고정,
-  apply 경로 부재 테스트), plan 격리 → 위험/비용/보안 리뷰),
-  commands/pr(handle_pr 2단계 — prepare 는 push/PR 도구를 argv 에서 제거(exclude_tools,
-  좁히기 전용)하고 마커로 diff 추출 → PrResult.diff → worker 게이트, execute(승인 후)만
-  전체 allowlist 로 push+`gh pr create`; 설명은 길이 검증 후 격리 블록으로만 전달),
-  slack 동기 경로에 tf-review 등록(pr 은 게이트가 store 상태를 요구해 worker 경유 전용).
-- telemetry(setup_telemetry 실 구현 — TracerProvider+SimpleSpanProcessor, exporter 주입/OTLP lazy,
-  미설치 None; record_run_metrics tracer 주입 시 devops.run span emit, store 기록 불변),
-  계측 결합(run_for_command on_metrics — 모든 Claude 호출 단일 진입점 계측, 핸들러 4종
-  passthrough, worker 가 실 tokens/cost 를 CommandOutcome/metric/job 에 write-back,
-  Worker tracer 주입 시 OTel span emit). stub 잔여 없음.
-- **web/ 대시보드(Next.js 14.2.35 App Router, TS)** — 로컬 e2e 검증 완료. lib/ddb(단일테이블 계약
-  TS 미러: GSI2 FEED/AUDIT/METRIC 질의), app/{jobs feed, 상세=diff 출력게이트+Approve/Reject+audit,
-  metrics 집계}, actions(승인 server action = ConditionExpression 전이+audit append, 낙관적 락),
-  scripts/seed.mjs(create-table.sh 스키마 + mock 22건). docker-compose(dynamodb-local 오프라인+seed+web,
-  포트 8930, 더미 키=실 AWS 불필요). DDB_ENDPOINT 토글로 로컬↔실 DynamoDB 전환(D7).
-- 운영 배포 준비: user-data.sh/deploy README 에 Claude 구독 OAuth 토큰(SSM) 로드 추가(D6).
-  USER_GUIDE.md(루트) — 운영자 시크릿 수동 입력 가이드.
-- **에이전트 자율 제안 루프(D9)** — control plane 을 사람+에이전트 공유 producer 로 확장.
-  mcp_server(propose_job/list_pending — FastMCP server=slackops, 순수로직/래퍼 분리, permissions
-  default-deny 재사용), agent_monitor(Tier1 시뮬레이터 detect 규칙 + Tier2 실제 claude -p
-  --mcp-config), claude_runner.build_command(mcp_config). 기존 출력 게이트 재사용(신규 store 상태
-  없음): 제안=PENDING/source=agent, L1 은 await_approval 로 사람 승인 대기. store 에 JobSource.AGENT
-  +Job.rationale 추가. web/ 에 사람 producer(NewCommand 채팅/selectbox+enqueueJob) + agent 뱃지·
-  rationale 표시, seed 에이전트 샘플 2건, dynamodb-local 8931 노출. 런북 docs/runbooks/agent-mcp-demo.md.
+## What works
+- command routing (default deny + forbidden-invariant rejection), ping handler, SQLite job queue (atomic claim),
+  permission engine (L0/1 active, L2 disabled), health/metrics (127.0.0.1 only),
+  sanitizer (wrap_untrusted neutralizes forged tags + build_prompt template enforcement),
+  claude_runner (run_headless — runner injection, allowedTools passthrough, JSON→RunResult parsing, timeout),
+  allowlist (per-command Tool Allowlist mapping + run_for_command single entry point — permissions gate →
+  allowlist → run_headless, forbidden keywords validated at import-time, default deny),
+  commands/logs (handle_logs — fetcher inject→sanitizer isolate→run_for_command assemble,
+  service-arg regex validation, boto3 lazy default fetcher),
+  commands/diagnose (handle_diagnose — multi-source fetchers injected (logs/kubectl/git diff),
+  per-source failure isolation, single isolation block per section marker, no Claude call when all sources empty),
+  routing registration (register_default_commands — ping/logs/diagnose, module attribute lookup at call time),
+  store/ (H0 single-table — JobStore state machine + claim atomicity, AuditStore append/job/day feed,
+  TelemetryStore record/feed — each with Sqlite+DynamoDb implementations, moto equivalence verified),
+  telemetry (record_run_metrics — writes to injected TelemetryStore, setup_telemetry is OTel lazy stub),
+  worker (Worker.process_one — claim→executor→await_approval output gate if diff unapproved,
+  else DONE / FAILED on exception + audit/metric write-back, run_forever injected-sleep polling,
+  default_executors ping/logs/diagnose/tf-review/pr, commands outside mapping default deny),
+  commands/tf_review (handle_tf_review — PlanFetcher injected (default argv fixed to `terraform plan`,
+  no-apply-path test), plan isolation → risk/cost/security review),
+  commands/pr (handle_pr 2-stage — prepare removes push/PR tools from argv (exclude_tools,
+  narrowing-only) and extracts diff via marker → PrResult.diff → worker gate, execute (post-approval) only
+  uses full allowlist for push + `gh pr create`; description passed only as isolation block after length validation),
+  tf-review registered on the slack synchronous path (pr is worker-only since its gate requires store state).
+- telemetry (setup_telemetry real implementation — TracerProvider+SimpleSpanProcessor, exporter inject/OTLP lazy,
+  None when not installed; record_run_metrics emits devops.run span when tracer injected, store record invariant),
+  instrumentation coupling (run_for_command on_metrics — single entry point instruments all Claude calls, 4 handlers
+  passthrough, worker writes back real tokens/cost to CommandOutcome/metric/job,
+  Worker emits OTel span when tracer injected). No stubs remaining.
+- **web/ dashboard (Next.js 14.2.35 App Router, TS)** — local e2e verified. lib/ddb (single-table contract
+  TS mirror: GSI2 FEED/AUDIT/METRIC queries), app/{jobs feed, detail = diff output gate + Approve/Reject + audit,
+  metrics aggregation}, actions (approval server action = ConditionExpression transition + audit append, optimistic lock),
+  scripts/seed.mjs (create-table.sh schema + 22 mocks). docker-compose (dynamodb-local offline + seed + web,
+  port 8930, dummy keys = no real AWS needed). DDB_ENDPOINT toggle switches local↔real DynamoDB (D7).
+- ops deploy prep: user-data.sh/deploy README load Claude subscription OAuth token (SSM) added (D6).
+  USER_GUIDE.md (root) — operator secret manual-entry guide.
+- **agent autonomous proposal loop (D9)** — extends the control plane to a shared human+agent producer.
+  mcp_server (propose_job/list_pending — FastMCP server=slackops, pure-logic/wrapper split, permissions
+  default-deny reuse), agent_monitor (Tier1 simulator detect rules + Tier2 real claude -p
+  --mcp-config), claude_runner.build_command (mcp_config). Reuses the existing output gate (no new store state):
+  proposal = PENDING/source=agent, L1 awaits human approval via await_approval. store adds JobSource.AGENT
+  + Job.rationale. web/ has a human producer (NewCommand chat/selectbox + enqueueJob) + agent badge/
+  rationale display, 2 seed agent samples, dynamodb-local 8931 exposed. Runbook docs/runbooks/agent-mcp-demo.md.
 
-- **대화형 producer(D10, 2026-06-19)** — selectbox 를 자연어 채팅으로 대체. DynamoDB 대화 버스
-  (store/chat_store.py, GSI1 오버로딩) + claude_runner.run_headless_stream(stream-json) + chat_agent.py
-  (폴링 consumer, sanitizer 격리, propose_job only) + web Chat.tsx(폴링 Markdown 렌더)+api/chat 라우트.
-  에이전트 인바운드 0(폴링만)→Vercel 동작. **실 Claude e2e 검증**(checkout 504 진단+propose_job 적재).
-  make chat-agent. (web 작업결과 Markdown 렌더 + Quarkify 포팅 + worker 로컬 엔트리도 본 세션.)
+- **conversational producer (D10, 2026-06-19)** — replaces selectbox with natural-language chat. DynamoDB conversation bus
+  (store/chat_store.py, GSI1 overloading) + claude_runner.run_headless_stream (stream-json) + chat_agent.py
+  (polling consumer, sanitizer isolation, propose_job only) + web Chat.tsx (polling Markdown render) + api/chat route.
+  Agent inbound = 0 (poll-only) → works on Vercel. **Real Claude e2e verified** (checkout 504 diagnosis + propose_job load).
+  make chat-agent. (web result Markdown render + Quarkify port + worker local entry also in this session.)
 
-- **데모/품질 정비(2026-06-19 2차)**: `make demo`(scripts/demo.sh) 로컬 풀스택 한 방(web+DB+chat_agent+worker).
-  대화형 producer orphan convId 잠금 fix(재시드 후 자가복구+재시도). 채팅/결과 pretty 렌더
-  (Markdown 표·수평선·링크 + claude_runner ANSI strip). user-data.sh 에 worker·chat_agent systemd 상주
-  (클라우드 풀 루프 갭 닫음). Playwright 실 Claude e2e 로 채팅 동작·표 렌더 검증.
+- **demo/quality cleanup (2026-06-19 round 2)**: `make demo` (scripts/demo.sh) runs the full local stack in one shot (web+DB+chat_agent+worker).
+  Conversational-producer orphan convId lock fix (self-heal after reseed + retry). Chat/result pretty render
+  (Markdown tables/horizontal-rules/links + claude_runner ANSI strip). user-data.sh now keeps worker/chat_agent systemd resident
+  (closes the cloud full-loop gap). Playwright real-Claude e2e verified chat behavior + table render.
 
 ## Active Focus
-- 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 + 대화형 producer + make demo 풀스택). 잔여는 전부 **[manual] AWS/배포/제출**.
-- AWS 크레딧 신청 **거절** → 보유 $63.91 + 무료티어로 진행. 다음: DynamoDB provision →
-  Vercel 배포(실 DynamoDB) → EC2 e2e 캡처 → 제출물. 심사기간(~7/24) EC2 stop(비용 ~$0).
+- Local code complete (backend [auto] + web/ dashboard + conversational producer + make demo full stack). Remaining is all **[manual] AWS/deploy/submission**.
+- AWS credit request **rejected** → proceed with the $63.91 on hand + free tier. Next: DynamoDB provision →
+  Vercel deploy (real DynamoDB) → EC2 e2e capture → submission. During judging (~7/24) EC2 stop (cost ~$0).
 
 ## Open Risks
-- untrusted input(CloudWatch 로그·git diff)이 곧 공격면 — Sanitizer/allowlist 우회 주의.
-- IAM Instance Profile 외 자격증명 절대 금지(.env 는 example 만 커밋).
-- EC2 상시 가동 시 비용 — EventBridge 스케줄 stop/start 확인.
-- 비-목표(범위 밖): HTTPS 공개 엔드포인트, EC2 상시 가동, Level 2(Execute), Production/배포/IAM/DB 변경,
-  SQLite 를 prod 데이터스토어로 호칭.
+- untrusted input (CloudWatch logs / git diff) is the main attack surface — beware Sanitizer/allowlist bypass.
+- Never use credentials other than IAM Instance Profile (.env commits example only).
+- EC2 always-on cost — verify EventBridge schedule stop/start.
+- Non-goals (out of scope): public HTTPS endpoint, EC2 always-on, Level 2 (Execute), Production/deploy/IAM/DB changes,
+  calling SQLite a prod datastore.

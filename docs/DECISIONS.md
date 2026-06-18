@@ -1,95 +1,106 @@
 # DECISIONS — slackops-devops-agent
-최종 갱신: 2026-06-17
+Last updated: 2026-06-17
 
-> 되돌리기 어려운 결정만. 형식: Decision / Reason / Impact. 갱신은 /checkpoint.
+> Hard-to-reverse decisions only. Format: Decision / Reason / Impact. Updated via /checkpoint.
 
-## D1 — Slack 연결은 Socket Mode 전용
-- Decision: 인바운드 HTTP 엔드포인트/공개 HTTPS/ALB/인증서 없이 Bolt Socket Mode 만 사용.
-- Reason: 공격면 축소 + 인프라 단순화. 인바운드 포트 불필요.
-- Impact: 공개 webhook 기반 기능 불가. EC2 아웃바운드만으로 동작.
+## D1 — Slack connection is Socket Mode only
+- Decision: use Bolt Socket Mode only, with no inbound HTTP endpoint / public HTTPS / ALB / certificate.
+- Reason: smaller attack surface + simpler infra. No inbound port needed.
+- Impact: public webhook-based features impossible. Runs on EC2 outbound only.
 
-## D2 — Job queue 는 SQLite (MVP 한정)
-- Decision: MVP job queue 는 SQLite. prod 데이터스토어로 호칭/사용 금지.
-- Reason: MVP 단순성. 운영 규모 데이터스토어는 범위 밖.
-- Impact: 확장 시 교체 필요. 문서에서 "prod store" 표현 금지.
+## D2 — Job queue is SQLite (MVP only)
+- Decision: MVP job queue is SQLite. Never call/use it as a prod datastore.
+- Reason: MVP simplicity. Operational-scale datastore is out of scope.
+- Impact: must replace when scaling. Do not use the term "prod store" in docs.
 
-## D3 — 자격증명은 IAM Instance Profile 전용
-- Decision: Access Key 저장/커밋 절대 금지. EC2 Instance Profile 만.
-- Reason: 최소 권한 + 키 유출 방지(차별화 보안 축).
-- Impact: 로컬/CI 실행 시 별도 자격증명 경로 필요. .env 는 example 만 커밋.
+## D3 — Credentials via IAM Instance Profile only
+- Decision: never store/commit an Access Key. EC2 Instance Profile only.
+- Reason: least privilege + prevent key leakage (the differentiating security axis).
+- Impact: local/CI runs need a separate credential path. Commit only the example .env.
 
-## D4 — 패키지/프로젝트명 = slackops-devops-agent
-- Decision: pyproject `name` 및 식별자는 `slackops-devops-agent`(폴더명 SlackOps 반영).
-- Reason: 현재 작업 폴더명과 정합. BOOTSTRAP 제안값 slack-devops-agent 대신 채택.
-- Impact: 코드/설정 식별자 일관. 문서 본문 표기도 이 이름 기준.
+## D4 — Package/project name = slackops-devops-agent
+- Decision: pyproject `name` and identifiers are `slackops-devops-agent` (reflecting the SlackOps folder name).
+- Reason: aligns with the current work folder name. Adopted instead of the BOOTSTRAP-suggested slack-devops-agent.
+- Impact: consistent code/config identifiers. Doc body also uses this name.
 
-## D5 — H0 해커톤 피벗: DynamoDB 이중 컨트롤플레인 (Vercel + Slack), B2B 트랙
-- Decision: H0 해커톤(마감 2026-06-30) 제출을 위해 "One Agent, Two Control Planes"로 확장.
-  job queue 를 SQLite → **DynamoDB 단일테이블**(jobs·audit·telemetry)로 승격, 사무실용 **Vercel/Next.js
-  대시보드**(server actions↔DynamoDB) + 원격용 Slack 을 같은 DynamoDB 큐로 통합. 명령은 동기 호출에서
-  **비동기 job 모델**로 전환. Track 2(B2B) 제출.
-- Reason: 해커톤 통과 게이트(Vercel 프론트 + AWS DB + 풀스택)를 충족하면서 기존 백엔드(권한·주입방어·
-  claude_runner·allowlist·telemetry)를 재사용. 두 인터페이스 공유 상태는 단일 writer SQLite 로 불가 →
-  DynamoDB 가 설계상 필연. 한 번 빌드로 해커톤+AWSKRUG 발표+PACE+아티클을 커버.
-- Impact: SQLite 는 로컬테스트 구현으로 강등(JobStore 프로토콜 뒤). 인바운드 금지 불변은 Slack 경로 유지,
-  Vercel 은 아웃바운드 AWS SDK 별도 surface. 새 의존성 boto3(런타임)/moto(테스트). 계획: docs/plans/
-  2026-06-12-h0-hackathon.md, 브랜치 hackathon-h0.
+## D5 — H0 hackathon pivot: DynamoDB dual control plane (Vercel + Slack), B2B track
+- Decision: for the H0 hackathon submission (deadline 2026-06-30), expand to "One Agent, Two Control Planes".
+  Promote the job queue from SQLite → a **DynamoDB single table** (jobs·audit·telemetry), and unify an office-facing **Vercel/Next.js
+  dashboard** (server actions↔DynamoDB) + a remote-facing Slack onto the same DynamoDB queue. Move commands from synchronous calls
+  to an **async job model**. Submit to Track 2 (B2B).
+- Reason: meet the hackathon pass gate (Vercel frontend + AWS DB + full stack) while reusing the existing backend (permissions·injection-defense·
+  claude_runner·allowlist·telemetry). Shared state across the two interfaces is impossible with a single-writer SQLite →
+  DynamoDB is a design necessity. One build covers hackathon + AWSKRUG talk + PACE + article.
+- Impact: SQLite is demoted to a local-test implementation (behind the JobStore protocol). The no-inbound invariant stays on the Slack path,
+  while Vercel is a separate outbound AWS SDK surface. New dependencies boto3 (runtime) / moto (test). Plan: docs/plans/
+  2026-06-12-h0-hackathon.md, branch hackathon-h0.
 
-## D6 — Claude 추론은 구독 계정 OAuth 토큰 (Bedrock/API Key 아님)
-- Decision: EC2 의 Claude Code Headless 추론을 **구독 계정 장수명 토큰**(`claude setup-token` →
-  `CLAUDE_CODE_OAUTH_TOKEN`, SSM SecureString `/slackops/CLAUDE_CODE_OAUTH_TOKEN`)으로 한다.
-  EC2 에 `ANTHROPIC_API_KEY` 를 두지 않는다(API 결제 경로 차단). Bedrock 미사용.
-- Reason: AWS 크레딧 $63.91 을 인프라(EC2/DynamoDB) 전용으로 보존 — 추론비를 구독 계정에 귀속시켜
-  분리. (H0 크레딧 신청은 거절됨 — 무료/구독 경로로 진행.)
-- Impact: user-data.sh 가 SSM 에서 OAuth 토큰 로드. 토큰 만료 시 재발급→SSM 갱신→서비스 재시작 필요.
-  개인 구독 토큰의 서버 자동화 사용은 구독 약관 확인 권장.
+## D6 — Claude inference via subscription-account OAuth token (not Bedrock/API Key)
+- Decision: run EC2's Claude Code Headless inference with a **subscription-account long-lived token** (`claude setup-token` →
+  `CLAUDE_CODE_OAUTH_TOKEN`, SSM SecureString `/slackops/CLAUDE_CODE_OAUTH_TOKEN`).
+  Do not put `ANTHROPIC_API_KEY` on EC2 (block the API-billing path). No Bedrock.
+- Reason: preserve the $63.91 AWS credit for infra only (EC2/DynamoDB) — attribute inference cost to the subscription account to
+  keep them separate. (The H0 credit request was rejected — proceed via the free/subscription path.)
+- Impact: user-data.sh loads the OAuth token from SSM. On token expiry: reissue → refresh SSM → restart the service.
+  Recommended to confirm the subscription terms for server-automation use of a personal subscription token.
 
-## D7 — web/ 대시보드: 로컬은 DynamoDB Local(오프라인), 배포는 실 DynamoDB (DDB_ENDPOINT 토글)
-- Decision: 대시보드 데이터 소스를 `DDB_ENDPOINT` env 로 전환 — 설정 시 DynamoDB Local(로컬,
-  더미 키), 미설정 시 실 DynamoDB(Vercel/EC2, AWS SDK 기본 자격증명 체인). 승인 액션은 server
-  action 이 DynamoDB 에 직접 UpdateItem(ConditionExpression)+audit append — Python store 계약 미러.
-- Reason: 로컬 개발/데모를 실 AWS 자격증명 없이(오프라인) 돌려 보안·편의 확보하면서, 동일 코드로
-  Vercel 실배포 전환(env 만 변경). 심사기간 EC2 stop 후에도 Vercel+DynamoDB 만으로 동작.
-- Impact: web/ 는 Python 무관 별도 surface(스키마 단일 진실원은 src/app/store/, TS 는 미러만).
-  실 DynamoDB 읽기는 최소권한 IAM 키 필요(USER_GUIDE.md §5). 포트 8930 기본.
+## D7 — web/ dashboard: local uses DynamoDB Local (offline), deploy uses real DynamoDB (DDB_ENDPOINT toggle)
+- Decision: switch the dashboard data source via the `DDB_ENDPOINT` env — when set, DynamoDB Local (local,
+  dummy keys); when unset, real DynamoDB (Vercel/EC2, AWS SDK default credential chain). The approval action does a direct
+  UpdateItem (ConditionExpression) + audit append to DynamoDB in the server action — mirroring the Python store contract.
+- Reason: run local dev/demo without real AWS credentials (offline) for security/convenience, while the same code switches to a
+  real Vercel deploy (env-only change). Works on Vercel + DynamoDB alone even after EC2 is stopped during judging.
+- Impact: web/ is a separate Python-independent surface (the single source of truth for the schema is src/app/store/, TS only mirrors it).
+  Real DynamoDB reads need a least-privilege IAM key (USER_GUIDE.md §5). Port 8930 default.
 
-## D8 — overnight 하네스: 자작 플러그인(overnight-harness) 단일 소스로 수렴
-- Decision: 리포 home-grown 하네스(`.claude/skills/*`, `bin/overnight/*`, `docs/LOOP_ENGINEERING.md`)를
-  retire 하고 **overnight-harness 플러그인을 단일 소스**로. 러너=`scripts/overnight/`, 리포 특화=
-  `.claude/harness-config.json`(gate=`make check`, docs.*, budgets, archive_dir=docs/archive), 바이블↔리포
-  매핑=`docs/engineering/interp/INTERPRETATION.md`. 보존: `harness/{CORE_MANDATES,CONTEXT_BRIDGE}`,
-  docs 상태문서, 인터랙티브 `.claude/settings.json`.
-- Reason: 같은 개념 2벌 유지 비용/혼동 제거 + 다른 리포 재사용. 플러그인 스킬이 harness-config 로 경로·
-  gate 를 흡수 가능해 수렴이 깔끔(스킬 코드는 플러그인에, 콘텐츠는 리포에).
-- Impact: 스킬 호출은 플러그인 제공(`/sync` 등). 러너 경로 bin→scripts, gate 가 `make check` 로 통일,
-  아카이브 docs/archive. 무인 권한경계는 `scripts/overnight/overnight-settings.json`(--settings 격리).
+## D8 — overnight harness: converge on the in-house plugin (overnight-harness) as the single source
+- Decision: retire the repo's home-grown harness (`.claude/skills/*`, `bin/overnight/*`, `docs/LOOP_ENGINEERING.md`)
+  and make the **overnight-harness plugin the single source**. Runner = `scripts/overnight/`, repo specifics =
+  `.claude/harness-config.json` (gate = `make check`, docs.*, budgets, archive_dir = docs/archive), bible↔repo
+  mapping = `docs/engineering/interp/INTERPRETATION.md`. Preserved: `harness/{CORE_MANDATES,CONTEXT_BRIDGE}`,
+  docs status files, interactive `.claude/settings.json`.
+- Reason: remove the cost/confusion of maintaining two copies of the same concept + enable reuse in other repos. The plugin skills
+  can absorb paths/gate via harness-config, making convergence clean (skill code in the plugin, content in the repo).
+- Impact: skill invocations are provided by the plugin (`/sync` etc.). Runner path bin→scripts, gate unified to `make check`,
+  archive docs/archive. The unattended permission boundary is `scripts/overnight/overnight-settings.json` (--settings isolation).
 
-## D9 — 에이전트 자율 제안: Job Queue 를 MCP 서버로 노출 (사람/에이전트 공유 producer)
-- Decision: control plane 을 사람(slack/web)에서 **에이전트(MCP)**까지 확장. `src/app/mcp_server.py`
-  가 `propose_job`/`list_pending`(FastMCP, server=`slackops`)을 노출 → 운영 에이전트가 큐에 제안.
-  **기존 출력 게이트 재사용**(신규 store 상태 없음): 제안=PENDING/source=agent, L1 쓰기는
-  worker 의 await_approval 에서 awaiting_approval 로 정지→사람 승인. `JobSource.AGENT` +
-  `Job.rationale` 전용 필드 추가(extra 는 store 에 미영속이라 전용 필드 필수). 데모는 Tier1
-  시뮬레이터(규칙기반·토큰불필요)가 기본, Tier2 실제 `claude -p --mcp-config`는 옵션(토큰 필요).
-- Reason: 프로젝트 thesis("에이전트를 안전하게 운영")의 구현 — 에이전트는 L0 관찰은 자유, L1
-  이상은 제안만 하고 처분은 사람. MCP 가 "에이전트에 도구 노출"의 표준이라 propose_job 에 적합.
-  default-deny(permissions 레지스트리)로 자유 텍스트 직결 금지(주입 방어) 유지.
-- Impact: `mcp>=1.0` 코어 의존성(lazy import). claude_runner.build_command(mcp_config) 추가.
-  web 은 agent 뱃지+rationale 표시. dynamodb-local 호스트 8931 노출(호스트 모니터 접근).
-  로컬 데모는 worker 미가동이라 제안이 pending 정지(전체 실행은 claude+worker 필요). 런북
+## D9 — agent autonomous proposals: expose the Job Queue as an MCP server (shared producer for human/agent)
+- Decision: extend the control plane from humans (slack/web) to **agents (MCP)**. `src/app/mcp_server.py`
+  exposes `propose_job`/`list_pending` (FastMCP, server=`slackops`) → an ops agent proposes to the queue.
+  **Reuse the existing output gate** (no new store state): proposal = PENDING/source=agent, an L1 write halts in
+  the worker's await_approval to awaiting_approval → human approval. Add a dedicated `JobSource.AGENT` +
+  `Job.rationale` field (extra is not persisted in the store, so a dedicated field is required). The demo defaults to a Tier1
+  simulator (rule-based, no token needed); Tier2 real `claude -p --mcp-config` is optional (token required).
+- Reason: an implementation of the project thesis ("operate agents safely") — agents are free to do L0 observe, but L1
+  and above are proposals only with disposition by a human. MCP is the standard for "exposing tools to an agent", so it fits propose_job.
+  Keeps default-deny (permissions registry) blocking direct free-text wiring (injection defense).
+- Impact: `mcp>=1.0` core dependency (lazy import). claude_runner.build_command(mcp_config) added.
+  web shows an agent badge + rationale. dynamodb-local exposes host 8931 (host monitor access).
+  The local demo has no worker running, so proposals stay pending (a full run needs claude+worker). Runbook
   `docs/runbooks/agent-mcp-demo.md`.
 
-## D10 — 대화형 producer: DynamoDB 를 web↔에이전트 비동기 메시지 버스로 (스트리밍 ≠ 인바운드)
-- Decision: Job Queue 의 selectbox producer 를 **자연어 채팅**으로 대체. "브라우저에서 Claude 와
-  스트리밍 대화"를 **인바운드 포트 없이** 구현 — web 이 사용자 turn 을 DynamoDB(`CHAT#`)에 쓰고,
-  `chat_agent` 가 폴링(outbound-only)해 Claude 를 `--output-format stream-json` 으로 실행, 응답 청크를
-  DynamoDB 에 append, web 은 ~800ms 폴링해 Markdown 렌더. Claude 가 `propose_job` 하면 기존 출력
-  게이트(승인/거절). 대화 스키마는 **기존 GSI1 을 `CHATSTATUS#` 로 오버로딩**(새 GSI 0).
-- Reason: 대안인 (a) 로컬 claude-in-web 은 Vercel 배포본에서 불가, (b) 에이전트 인바운드 `/chat`
-  엔드포인트는 "Socket Mode/인바운드 0" 보안 차별화(심사 포인트)와 충돌. DynamoDB 버스는 **Vercel
-  에서 동작 + 인바운드 0 유지**하고 "DynamoDB=두 control plane 의 비동기 버스" 스토리(DB축)를 강화.
-  사용자 입력은 sanitizer 격리 + propose_job(read-only)만 → 주입 방어/template 만다린 유지.
-- Impact: store/chat_store.py(ChatStore) + claude_runner.run_headless_stream + chat_agent.py(폴링
-  consumer) + web Chat.tsx/chat-actions/api·route. 스트리밍 충실도는 v1 폴링(~800ms 청크, 토큰단위
-  아님 — 진짜 SSE 는 Vercel 브리지로 후속 가능). 운영(EC2)은 chat-agent systemd 상주. page reload 시
-  채팅 state 초기화(convId 미영속). 설계 docs/plans/2026-06-19-web-chat-producer.md.
+## D10 — conversational producer: DynamoDB as an async message bus between web↔agent (streaming ≠ inbound)
+- Decision: replace the Job Queue's selectbox producer with **natural-language chat**. Implement "streaming chat with Claude
+  in the browser" **with no inbound port** — web writes the user turn to DynamoDB (`CHAT#`), and
+  `chat_agent` polls (outbound-only), runs Claude with `--output-format stream-json`, appends response chunks
+  to DynamoDB, and web polls every ~800ms to render Markdown. When Claude calls `propose_job`, the existing output
+  gate applies (approve/reject). The chat schema **overloads the existing GSI1 as `CHATSTATUS#`** (no new GSI 0).
+- Reason: the alternatives — (a) local claude-in-web is impossible on a Vercel deploy, (b) an agent inbound `/chat`
+  endpoint conflicts with the "Socket Mode / 0 inbound" security differentiator (a judging point). The DynamoDB bus **works on Vercel
+  + keeps 0 inbound** and strengthens the "DynamoDB = async bus for two control planes" story (DB axis).
+  User input is sanitizer-isolated + propose_job (read-only) only → preserves injection defense / template mandate.
+- Impact: store/chat_store.py (ChatStore) + claude_runner.run_headless_stream + chat_agent.py (polling
+  consumer) + web Chat.tsx/chat-actions/api·route. Streaming fidelity is v1 polling (~800ms chunks, not per-token
+  — real SSE can follow via a Vercel bridge). In ops (EC2), chat-agent runs as a resident systemd service. On page reload,
+  chat state resets (convId not persisted). Design: docs/plans/2026-06-19-web-chat-producer.md.
+
+## D11 — agent-only docs in English + doc-budget gate (per-session token cost)
+- Decision: write agent-only/operational docs in **English** (entry docs AGENT_BRIEF/STATUS/NEXT_PLAN/PROGRESS_LOG,
+  CLAUDE.md, harness/*, docs/engineering bibles + interp, DOCS_POLICY/COMPLETED_SUMMARY/DECISIONS, scripts/overnight/PROMPT.md).
+  User-facing/human-run docs stay Korean (USER_GUIDE, QA_LIST, action_item, docs/runbooks/*, README). Add a deterministic
+  `harness/check-doc-budget.sh` enforcing entry-doc line caps (60/120/120/120) wired into `make check`.
+- Reason: those docs load on **every** session/overnight iteration; Korean prose costs ~1.5–2× tokens/char vs English
+  (port doc measured -16.4% on the fixed-cost set). The gate hard-stops entry-doc bloat. Markers/identifiers stay verbatim
+  ([auto]/[manual]/[blocked], status boxes, paths, make targets) — runner greps + skill triggers unaffected.
+- Impact: ~13 docs translated in place (filenames/links/structure unchanged). `make check` now includes `check-doc-budget`.
+  User replies remain Korean. Source: docs/archive/token-optimization-port.md.

@@ -1,47 +1,47 @@
 # CORE_MANDATES — slackops-devops-agent
-최종 갱신: 2026-06-11
+Last updated: 2026-06-11
 
-> 느리게 변하는 불변 표준만. 현재 작업 맥락은 CONTEXT_BRIDGE.md / docs/ 로.
+> Slowly-changing invariant standards only. For current work context use CONTEXT_BRIDGE.md / docs/.
 
 ## 1. Runtime Principles
-- 언어: Python 3.11+. **EC2 상주 단일 서비스**(Lambda/서버리스 아님).
-- Slack: **Bolt Socket Mode**. 인바운드 HTTP 엔드포인트/공개 HTTPS/ALB/인증서 **금지**.
-- LLM 실행: **Claude Code Headless**(subprocess) 호출. 직접 모델 SDK 래퍼(Bedrock/OpenAI) 생성 금지.
-- Job queue: **SQLite (MVP 한정)**. prod 데이터스토어로 호칭 금지.
-- 레이어: slack_handler / permissions / sanitizer / claude_runner / telemetry / commands 분리.
+- Language: Python 3.11+. **Single resident EC2 service** (not Lambda/serverless).
+- Slack: **Bolt Socket Mode**. No inbound HTTP endpoint / public HTTPS / ALB / certificate — **forbidden**.
+- LLM execution: invoke **Claude Code Headless** (subprocess). Don't build a direct model SDK wrapper (Bedrock/OpenAI).
+- Job queue: **SQLite (MVP only)**. Don't refer to it as a prod datastore.
+- Layers: separate slack_handler / permissions / sanitizer / claude_runner / telemetry / commands.
 
-## 2. Security (차별화 — 엄격)
-- **IAM Instance Profile 만.** Access Key 저장/커밋 절대 금지.
-- 최소 권한·읽기 전용 기본: CloudWatch RO, Logs RO, EKS Describe, SSM Read, S3 Read.
-- Permission Engine Level 0/1/2. **MVP 는 0·1 만 활성, 2(Execute) 비활성.**
-- 금지 불변: Production 변경, 배포(apply/deploy), IAM 변경, DB 변경.
-- GitHub: GitHub App 최소 스코프 + branch protection(에이전트 PR 자동 머지 차단).
-- Prompt Injection 4계층: ① Context Sanitizer(`<untrusted_data>` 격리) ② Tool Allowlist(명령별)
-  ③ 출력 게이트(L1 쓰기는 diff Slack 선게시 후 사람 확인) ④ Template Prompt 강제(Slack 입력 직접 전달 금지).
+## 2. Security (differentiator — strict)
+- **IAM Instance Profile only.** Never store/commit an Access Key.
+- Least-privilege, read-only by default: CloudWatch RO, Logs RO, EKS Describe, SSM Read, S3 Read.
+- Permission Engine Level 0/1/2. **MVP enables only 0·1; 2 (Execute) is disabled.**
+- Hard invariants (forbidden): Production changes, deploys (apply/deploy), IAM changes, DB changes.
+- GitHub: GitHub App with minimal scopes + branch protection (block auto-merge of agent PRs).
+- Prompt Injection — 4 layers: ① Context Sanitizer (`<untrusted_data>` isolation) ② Tool Allowlist (per command)
+  ③ output gate (L1 writes post the diff to Slack first, then require human confirmation) ④ enforced template prompt (never pass Slack input directly).
 
 ## 3. Observability
-- OTel SDK → ADOT Collector → CloudWatch. 실행 1건당 step latency / 토큰 / 비용(USD) /
-  tool call 횟수·종류·실패율 / E2E p50·p95 계측.
+- OTel SDK → ADOT Collector → CloudWatch. Per run, instrument step latency / tokens / cost (USD) /
+  tool call count·type·failure rate / E2E p50·p95.
 
 ## 4. Cost / Ops
-- EC2 는 EventBridge 스케줄 stop/start. 상시 가동 금지.
+- Stop/start EC2 on an EventBridge schedule. No always-on operation.
 
 ## 5. Code & Test Discipline
-- 타입 힌트 필수, `from __future__ import annotations`, `X | None`.
-- 로깅 structlog(또는 OTel 연동 logger). `print` 금지. bare `except`/`except: pass` 금지.
-- 멀티파일 변경 후 `pytest` 전체 실행, pass/fail 보고. 통과 전 "완료" 선언 금지.
-- 새 의존성은 `pyproject.toml` 먼저 확인.
+- Type hints required, `from __future__ import annotations`, `X | None`.
+- Logging via structlog (or an OTel-integrated logger). No `print`. No bare `except` / `except: pass`.
+- After multi-file changes, run the full `pytest` and report pass/fail. Don't declare "done" before it passes.
+- Check `pyproject.toml` first for any new dependency.
 
 ## 6. Documentation & Handoff
-- Read Path: CONTEXT_BRIDGE → AGENT_BRIEF → STATUS → NEXT_PLAN → (필요 시) PROGRESS_LOG.
-- docs/ bulk-read 금지. current doc 갱신은 /checkpoint, 읽기는 /sync, 정리는 /tidy-docs.
-- 새 글로벌(불변) 규칙은 이 파일에. 추측 금지(없으면 "문서에 없음").
-- 한국어 본문 + 영어 식별자/명령/경로.
+- Read Path: CONTEXT_BRIDGE → AGENT_BRIEF → STATUS → NEXT_PLAN → (if needed) PROGRESS_LOG.
+- No bulk-read of docs/. Update current docs via /checkpoint, read via /sync, tidy via /tidy-docs.
+- New global (invariant) rules go in this file. No guessing (if it's not documented, say "not in the docs").
+- Korean body + English identifiers/commands/paths.
 
-## 7. Navigation tooling discipline (선택적 가속 — Quarkify)
-- 코드 탐색은 **측정된 조건부 정책**을 따른다 — 대형 패키지·고빈도 심볼(넓은 탐색)은 `.quarkify/src`
-  인덱스(필요시 `make quarkify` 재생성, 멱등 ~수초) 우선, 드문 리터럴·소형 파일은 grep.
-  *(본 repo 는 ~3.6K LOC 소형 — 일상 탐색은 grep 우선이 기본, 인덱스는 넓은 심볼 탐색에서만.)*
-- 인덱스는 **위치용일 뿐 최종 확인은 원본 파일**(quark 리프는 빈 폴더, 라인 번호 없음)을 읽는다.
-- 선택적 로컬 가속기이므로 **게이트화하지 않는다**(`make check` 미포함 — 부재 산출물의 빌드의존화 금지).
-- 상세: 진입점 CLAUDE.md "## Quarkify" 섹션.
+## 7. Navigation tooling discipline (optional accelerator — Quarkify)
+- Code exploration follows a **measured conditional policy** — for large packages / high-frequency symbols (broad searches), prefer the `.quarkify/src`
+  index (regenerate with `make quarkify` when needed, idempotent ~seconds); for rare literals / small files, use grep.
+  *(This repo is small (~3.6K LOC) — grep-first is the default for everyday exploration; use the index only for broad symbol searches.)*
+- The index is **for locating only; final confirmation is the original file** (quark leaves are empty folders, no line numbers).
+- It's an optional local accelerator, so **don't gate on it** (not part of `make check` — don't make the build depend on an absent artifact).
+- Details: entry point CLAUDE.md "## Quarkify" section.
