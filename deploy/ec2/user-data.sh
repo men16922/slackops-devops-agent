@@ -54,7 +54,7 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
 } > /etc/slackops-devops-agent.env
 chmod 600 /etc/slackops-devops-agent.env
 
-# --- systemd unit ---
+# --- systemd unit: Slack Socket Mode 앱(app.main) ---
 cat > /etc/systemd/system/slackops-devops-agent.service <<'UNIT'
 [Unit]
 Description=slackops-devops-agent (Slack Socket Mode DevOps agent)
@@ -72,5 +72,47 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
 
+# --- systemd unit: 공유 큐 worker(승인된 job 실행 poller) ---
+# DynamoDB 를 outbound 폴링만 한다(인바운드 0 불변 유지). DDB_ENDPOINT 미설정 → 실 DynamoDB,
+# 자격증명은 Instance Profile, DDB_TABLE 은 코드 기본값 slackops-agent. 무한 루프 → Restart=always.
+cat > /etc/systemd/system/slackops-devops-agent-worker.service <<'UNIT'
+[Unit]
+Description=slackops-devops-agent worker (승인 job 실행 poller)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=devopsagent
+EnvironmentFile=/etc/slackops-devops-agent.env
+ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.worker
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# --- systemd unit: 대화 버스 chat_agent(웹 대화형 producer 응답 poller) ---
+# 웹 채팅(awaiting_agent)을 claim → Claude 스트리밍 응답. 부재 시 채팅이 "응답 중"에 멈춘다.
+cat > /etc/systemd/system/slackops-devops-agent-chat-agent.service <<'UNIT'
+[Unit]
+Description=slackops-devops-agent chat-agent (대화형 producer 응답 poller)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=devopsagent
+EnvironmentFile=/etc/slackops-devops-agent.env
+ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.chat_agent
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 systemctl daemon-reload
-systemctl enable --now slackops-devops-agent.service
+systemctl enable --now \
+  slackops-devops-agent.service \
+  slackops-devops-agent-worker.service \
+  slackops-devops-agent-chat-agent.service
