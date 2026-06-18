@@ -16,14 +16,17 @@ smoke-local: ## 빠른 스모크(overnight-seed 용) — pytest 전체(현재 ~2
 
 # ===== 운영 에이전트 (MCP 제안 루프) =====
 # DDB_ENDPOINT 로 DynamoDB Local 연결(docker compose 의 dynamodb-local 8931). 런북: docs/runbooks/agent-mcp-demo.md
+# 공통 로컬 env: src 를 import 경로에(루트에서 `python -m app.*` 가능) + DynamoDB Local 더미 자격증명.
+DEV_ENV := PYTHONPATH=src DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} \
+	AWS_REGION=$${AWS_REGION:-us-east-1} \
+	AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-local} AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-local}
+
 mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config 가 자동 기동(수동 점검용)
-	DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} python3 -m app.mcp_server
-agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `python3 -m app.agent_monitor --real`
-	DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} python3 -m app.agent_monitor
+	$(DEV_ENV) python3 -m app.mcp_server
+agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `make agent-monitor ARGS=--real`
+	$(DEV_ENV) python3 -m app.agent_monitor $(ARGS)
 worker:        ## 공유 큐 폴링 worker(승인된 job 실행 — 실 Claude). 1건만: `make worker ARGS=--once`
-	DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} AWS_REGION=$${AWS_REGION:-us-east-1} \
-	AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-local} AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-local} \
-	python3 -m app.worker $(ARGS)
+	$(DEV_ENV) python3 -m app.worker $(ARGS)
 
 # ===== Quarkify (선택적 탐색 가속 — gitignore 생성물, 게이트 아님) =====
 # 코드 심볼·호출그래프 인덱스. make check 에 절대 미포함(부재 산출물의 빌드의존화 금지).
