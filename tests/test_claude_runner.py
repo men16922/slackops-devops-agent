@@ -13,7 +13,9 @@ from app.claude_runner import (
     ClaudeTimeoutError,
     RunResult,
     build_command,
+    build_stream_command,
     run_headless,
+    run_headless_stream,
 )
 from tests._helpers import RecordingRunner
 
@@ -170,3 +172,98 @@ def test_timeout_raises_claude_timeout_error() -> None:
 
 def test_timeout_error_is_runner_error_subclass() -> None:
     assert issubclass(ClaudeTimeoutError, ClaudeRunnerError)
+
+
+# ── 스트리밍(run_headless_stream) ─────────────────────────────────────────
+
+
+def _stream_lines(lines: list[str]) -> object:
+    """주어진 JSONL 줄을 그대로 yield 하는 스트리밍 실행기(실 claude 미호출)."""
+
+    def runner(cmd: list[str], timeout_s: int) -> object:
+        yield from lines
+
+    return runner
+
+
+def test_build_stream_command_has_stream_json_and_mcp() -> None:
+    cmd = build_stream_command("p", ["mcp__slackops__propose_job"], mcp_config="{}")
+    assert cmd[:2] == [CLAUDE_BIN, "-p"]
+    assert "--output-format" in cmd and "stream-json" in cmd
+    assert "--mcp-config" in cmd and "--strict-mcp-config" in cmd
+    assert "--allowedTools" in cmd
+
+
+def test_stream_assistant_text_chunks_and_metrics() -> None:
+    lines = [
+        json.dumps({"type": "system", "subtype": "init"}),
+        json.dumps(
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "## 진단\n"}]}}
+        ),
+        json.dumps(
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "원인은 토큰."}]}}
+        ),
+        json.dumps(
+            {
+                "type": "result",
+                "result": "done",
+                "usage": {"input_tokens": 100, "output_tokens": 40},
+                "total_cost_usd": 0.02,
+            }
+        ),
+    ]
+    chunks: list[str] = []
+    res = run_headless_stream(
+        "p", [], on_chunk=chunks.append, runner=_stream_lines(lines)
+    )
+    assert chunks == ["## 진단\n", "원인은 토큰."]
+    assert res.output == "## 진단\n원인은 토큰."
+    assert res.tokens == 140
+    assert res.cost_usd == 0.02
+
+
+def test_stream_partial_deltas() -> None:
+    lines = [
+        json.dumps({"type": "content_block_delta", "delta": {"text": "He"}}),
+        json.dumps({"type": "content_block_delta", "delta": {"text": "llo"}}),
+    ]
+    chunks: list[str] = []
+    res = run_headless_stream("p", [], on_chunk=chunks.append, runner=_stream_lines(lines))
+    assert chunks == ["He", "llo"]
+    assert res.output == "Hello"
+
+
+def test_stream_captures_propose_job_id_and_tool_use() -> None:
+    lines = [
+        json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "mcp__slackops__propose_job",
+                            "input": {"command": "diagnose"},
+                        }
+                    ]
+                },
+            }
+        ),
+        json.dumps(
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": '{"ok": true, "job_id": "job-777"}',
+                        }
+                    ]
+                },
+            }
+        ),
+        json.dumps({"type": "result", "result": "제안 완료"}),
+    ]
+    res = run_headless_stream("p", [], on_chunk=lambda _t: None, runner=_stream_lines(lines))
+    assert res.proposed_job_id == "job-777"
+    assert res.tool_uses == ["mcp__slackops__propose_job"]

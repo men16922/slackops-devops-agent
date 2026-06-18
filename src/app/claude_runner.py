@@ -10,8 +10,10 @@ subprocess 실행기는 주입 가능(`runner` 인자) — 단위 테스트는 m
 from __future__ import annotations
 
 import json
+import re
 import subprocess
-from dataclasses import dataclass
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import Callable
 
 # claude 바이너리 이름(EC2 user-data 가 PATH 에 설치).
@@ -122,6 +124,172 @@ def _parse_result(exit_code: int, stdout: str, stderr: str) -> RunResult:
         )
     output = stdout if stdout.strip() else stderr
     return RunResult(output=output, exit_code=exit_code)
+
+
+# ── 스트리밍(대화 producer 용) ─────────────────────────────────────────────
+# 스트리밍 실행기: (cmd, timeout_s) → stdout 줄(JSONL) 이터레이터. 줄이 도착하는 대로 yield.
+StreamRunner = Callable[[list[str], int], Iterator[str]]
+
+# tool_result 본문에서 propose_job 이 돌려준 job_id 추출용(MCP 결과 = {"ok":true,"job_id":...}).
+_JOB_ID_RE = re.compile(r'"job_id"\s*:\s*"([^"]+)"')
+
+
+@dataclass
+class StreamResult:
+    """스트리밍 실행 1회의 누적 결과.
+
+    Attributes:
+        output: 누적된 assistant 텍스트.
+        tokens / cost_usd: 최종 result 이벤트의 계측(없으면 None).
+        proposed_job_id: 대화 중 propose_job MCP 가 적재한 job id(없으면 None).
+        tool_uses: 호출된 도구 이름 목록(계측/디버그).
+    """
+
+    output: str = ""
+    tokens: int | None = None
+    cost_usd: float | None = None
+    proposed_job_id: str | None = None
+    tool_uses: list[str] = field(default_factory=list)
+
+
+def build_stream_command(
+    prompt: str,
+    allowed_tools: list[str],
+    mcp_config: str | None = None,
+) -> list[str]:
+    """`claude -p --output-format stream-json` 인자 리스트(JSONL 스트리밍)."""
+    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "stream-json", "--verbose"]
+    if mcp_config:
+        cmd.extend(["--mcp-config", mcp_config, "--strict-mcp-config"])
+    if allowed_tools:
+        cmd.extend(["--allowedTools", *allowed_tools])
+    return cmd
+
+
+def _default_stream_runner(cmd: list[str], timeout_s: int) -> Iterator[str]:
+    """기본 스트리밍 실행기 — Popen 으로 stdout 을 줄단위로 흘린다(테스트는 mock 주입)."""
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+    )
+    assert proc.stdout is not None
+    try:
+        yield from proc.stdout
+    finally:
+        proc.stdout.close()
+        try:
+            proc.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise ClaudeTimeoutError(f"claude stream timed out after {timeout_s}s")
+
+
+def _scan_job_id(value: object) -> str | None:
+    """파싱된 이벤트(중첩 dict/list)의 문자열 값에서 propose_job job_id 추출(없으면 None).
+
+    tool_result content 가 JSON 문자열로 박혀 와도(이중 이스케이프) 파싱된 str 값에는
+    실제 따옴표가 있으므로 그 위에서 매칭한다.
+    """
+    if isinstance(value, str):
+        match = _JOB_ID_RE.search(value)
+        return match.group(1) if match else None
+    if isinstance(value, dict):
+        for sub in value.values():
+            found = _scan_job_id(sub)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for sub in value:
+            found = _scan_job_id(sub)
+            if found:
+                return found
+    return None
+
+
+def _handle_stream_event(
+    event: dict[str, object],
+    on_chunk: Callable[[str], None],
+    result: StreamResult,
+    parts: list[str],
+) -> None:
+    """stream-json 이벤트 1건을 해석해 청크 콜백 + result 누적(버전 차 방어적 파싱)."""
+    etype = event.get("type")
+    # 부분 델타(--include-partial-messages 지원 버전).
+    if etype in ("content_block_delta", "stream_event"):
+        delta = event.get("delta")
+        if isinstance(delta, dict) and isinstance(delta.get("text"), str):
+            text = delta["text"]
+            parts.append(text)
+            on_chunk(text)
+        return
+    # 메시지 단위(assistant 턴) — text 블록은 청크로, tool_use 는 기록.
+    if etype == "assistant":
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "text" and isinstance(block.get("text"), str):
+                    parts.append(block["text"])
+                    on_chunk(block["text"])
+                elif block.get("type") == "tool_use" and isinstance(
+                    block.get("name"), str
+                ):
+                    result.tool_uses.append(block["name"])
+        return
+    # tool_result(user 이벤트) — propose_job 결과의 job_id 추출.
+    if etype == "user" and result.proposed_job_id is None:
+        result.proposed_job_id = _scan_job_id(event)
+        return
+    # 최종 result — 계측.
+    if etype == "result":
+        result.tokens = _parse_tokens(event)
+        result.cost_usd = _parse_cost(event)
+        final_text = event.get("result")
+        if not parts and isinstance(final_text, str):
+            parts.append(final_text)
+        if result.proposed_job_id is None:
+            result.proposed_job_id = _scan_job_id(event)
+
+
+def run_headless_stream(
+    prompt: str,
+    allowed_tools: list[str],
+    *,
+    on_chunk: Callable[[str], None],
+    timeout_s: int = DEFAULT_TIMEOUT_S,
+    runner: StreamRunner | None = None,
+    mcp_config: str | None = None,
+) -> StreamResult:
+    """Claude Code Headless 를 스트리밍 실행 — 텍스트 청크를 on_chunk 로 흘린다.
+
+    JSONL 이벤트를 줄단위로 파싱해 assistant 텍스트는 on_chunk 콜백으로, 최종 result 의
+    tokens/cost, propose_job 이 적재한 job_id 를 StreamResult 로 모은다. on_chunk 예외는
+    호출자(에이전트)가 책임진다.
+
+    Args:
+        prompt: sanitizer.build_prompt 로 생성된 검증 프롬프트.
+        allowed_tools: Tool Allowlist(대화 producer 는 propose_job 만).
+        on_chunk: 텍스트 델타 1건마다 호출(예: 대화 store 에 청크 append).
+        runner: 스트리밍 실행기(테스트 주입). None 이면 실 Popen.
+        mcp_config: propose_job MCP 등록(인라인 JSON/경로).
+    """
+    active: StreamRunner = runner if runner is not None else _default_stream_runner
+    cmd = build_stream_command(prompt, allowed_tools, mcp_config)
+    result = StreamResult()
+    parts: list[str] = []
+    for line in active(cmd, timeout_s):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(event, dict):
+            _handle_stream_event(event, on_chunk, result, parts)
+    result.output = "".join(parts)
+    return result
 
 
 def run_headless(
