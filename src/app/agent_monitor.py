@@ -120,9 +120,20 @@ def build_monitor_prompt(signals: str) -> str:
 
 
 def mcp_config_json() -> str:
-    """propose_job MCP 서버(stdio) 등록용 인라인 JSON — DDB 연결 env 를 전달한다."""
+    """propose_job MCP 서버(stdio) 등록용 인라인 JSON — DDB 연결 env 를 전달한다.
+
+    DynamoDB Local(로컬 데모)에는 더미 AWS 자격증명도 넘긴다 — 없으면 MCP 서브프로세스가
+    DynamoDB 쓰기에서 자격증명을 못 찾는다. 실 DynamoDB(EC2)는 자격증명 env 가 없고 IAM
+    Instance Profile 로 해석되므로(env 부재 = 그대로 통과), 양쪽 모두 안전하다.
+    """
     env: dict[str, str] = {}
-    for key in ("DDB_ENDPOINT", "DDB_TABLE", "AWS_REGION"):
+    for key in (
+        "DDB_ENDPOINT",
+        "DDB_TABLE",
+        "AWS_REGION",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+    ):
         value = os.environ.get(key)
         if value:
             env[key] = value
