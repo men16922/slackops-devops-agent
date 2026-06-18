@@ -9,7 +9,7 @@
 - AWS/Slack **실행분 미수행**: 로컬 자격증명 무효 + Slack App 수동 생성 필요 → deploy/README.md 순서대로.
 
 ## 검증 Baseline
-- 게이트 3계층: `python3 -m pytest tests/ -q` → **249 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
+- 게이트 3계층: `python3 -m pytest tests/ -q` → **274 passed, 1 skipped**(fastapi 미설치 로컬 한정 skip)
   + `ruff check src tests` + `mypy src`(strict) 전부 green.
 - web/: `next build` green(TS strict) + `docker compose up` e2e — seed 22건, 8930 응답, jobs/상세/metrics
   렌더 + 승인 전이·중복승인 ConditionalCheckFailed 거부 확인(2026-06-16).
@@ -68,8 +68,13 @@
   에이전트 인바운드 0(폴링만)→Vercel 동작. **실 Claude e2e 검증**(checkout 504 진단+propose_job 적재).
   make chat-agent. (web 작업결과 Markdown 렌더 + Quarkify 포팅 + worker 로컬 엔트리도 본 세션.)
 
+- **데모/품질 정비(2026-06-19 2차)**: `make demo`(scripts/demo.sh) 로컬 풀스택 한 방(web+DB+chat_agent+worker).
+  대화형 producer orphan convId 잠금 fix(재시드 후 자가복구+재시도). 채팅/결과 pretty 렌더
+  (Markdown 표·수평선·링크 + claude_runner ANSI strip). user-data.sh 에 worker·chat_agent systemd 상주
+  (클라우드 풀 루프 갭 닫음). Playwright 실 Claude e2e 로 채팅 동작·표 렌더 검증.
+
 ## Active Focus
-- 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 + 대화형 producer). 잔여는 전부 **[manual] AWS/배포/제출**.
+- 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 + 대화형 producer + make demo 풀스택). 잔여는 전부 **[manual] AWS/배포/제출**.
 - AWS 크레딧 신청 **거절** → 보유 $63.91 + 무료티어로 진행. 다음: DynamoDB provision →
   Vercel 배포(실 DynamoDB) → EC2 e2e 캡처 → 제출물. 심사기간(~7/24) EC2 stop(비용 ~$0).
 

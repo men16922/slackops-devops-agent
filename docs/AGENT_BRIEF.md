@@ -27,8 +27,8 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   + **대화형 producer(D10)** — selectbox→자연어 채팅. DynamoDB 대화 버스(chat_store, GSI1 오버로딩)
   +claude_runner 스트리밍(stream-json)+chat_agent 폴링 consumer+web Chat(폴링 Markdown 렌더). 에이전트
   인바운드 0(폴링만)→Vercel 동작. 실 Claude e2e 검증. (web 결과 Markdown 렌더, Quarkify, worker 엔트리도 동봉.)
-- **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(249 passed, 1 skipped) + ruff + mypy(strict).
-  web/ 는 `next build` + `docker compose up` e2e green.
+- **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(274 passed, 1 skipped) + ruff + mypy(strict).
+  web/ 는 `next build` + `docker compose up` e2e green. **`make demo`** 로 로컬 풀스택(web+DB+chat_agent+worker) 한 방.
 - **현재 초점:** 로컬 완성 — [manual] 만 잔여(크레딧 거절→무료티어/DynamoDB provision/Vercel 배포/EC2 e2e/제출물).
 
 ## Guardrails 요약 (상세는 CORE_MANDATES)

@@ -22,7 +22,8 @@
 - [ ] `[manual]` `deploy/ec2/launch-instance.sh` 실행 + user-data REPO_URL `CHANGE_ME` 교체.
 - [ ] `[manual]` `deploy/eventbridge/create-schedules.sh <instance-id>` 실행.
 - [ ] `[manual]` `/devops ping` end-to-end 확인(Slack → EC2 → pong).
-- [ ] `[manual]` EC2 에 **worker + chat_agent** 상주 폴링(systemd) 추가 — 승인분 실행 + 대화형 producer(D10) 라이브.
+- [ ] `[manual]` EC2 에 **worker + chat_agent** 상주 라이브 확인 — systemd 유닛은 user-data.sh 에 배선 완료
+      (서비스 3개 자동 등록); 실 부팅 후 `systemctl status` 3개 active + 웹 채팅 응답만 확인하면 됨.
 
 ## Day 6–7 — tf-review + pr 잔여
 - [ ] `[manual]` GitHub App 최소 스코프 + branch protection(자동 머지 차단) 설정.

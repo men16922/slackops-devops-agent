@@ -4,6 +4,21 @@
 > 최신 3–5개 증분 (≤120줄, 최신이 위). 넘치면 docs/archive/progress-YYYY-MM.md 분리. append 는 /checkpoint.
 > 2026-06-11~12 전반부 항목 원문: docs/archive/progress-2026-06.md
 
+## 2026-06-19 — make demo + 대화 orphan 잠금 fix + pretty 렌더링 + 클라우드 systemd 갭
+- Status: 완료. 데모 채팅 막힘(실 버그) 진단·수정 + 출력 가독성 + EC2 풀 루프 갭까지.
+- Changed: **make demo**(scripts/demo.sh) — docker(web+DB+seed)+chat_agent+worker 한 방, Ctrl-C 정리.
+  **fix(web) orphan convId 잠금**: localStorage 옛 convId + in-memory DDB 재시드로 대화 META 소멸 →
+  send 조건 실패가 "응답 중"으로 오인 + "새 대화" 버튼 미표시로 영구 잠금. chat-actions 가
+  gone/busy 구분(GetItem), Chat 이 gone 시 새 대화 재시도 + 폴링 자가복구. **pretty 렌더**:
+  Markdown.tsx GFM 표/수평선/링크(스킴 화이트리스트) + globals.css 스타일, claude_runner 가
+  결과·스트림 청크의 ANSI(CSI) strip(테스트 4건). **deploy**: user-data.sh 에 worker·chat_agent
+  systemd 2개 추가(Restart=always, outbound 폴링→인바운드 0 유지), README 3-서비스. QA_LIST 최신화.
+- Verified: `make check` **274 passed, 1 skipped** · ruff · mypy(strict 27). web `next build` green.
+  **Playwright 실 Claude e2e**: 재시드 후 새로고침→자가복구→전송→표 응답 렌더(콘솔 에러 0).
+  증빙 docs/images/chat-pretty-render-verified.png. bash -n user-data.sh OK.
+- Blockers: 없음.
+- Next: H0 [manual] — AWS provision/배포/제출. (worker 가 seed pending job 을 실 Claude 로 자동 실행 → 토큰 소모 주의.)
+
 ## 2026-06-19 — 대화형 producer: web 채팅 → 에이전트 스트리밍 → propose_job (DECISIONS D10)
 - Status: 완료. selectbox producer 를 자연어 채팅으로 대체 — 실 Claude e2e 검증까지.
 - Changed: **store/chat_store.py**(신규) 대화 버스(Conversation/Message/ChatStatus + Sqlite/DynamoDb,
