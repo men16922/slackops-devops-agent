@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-최종 갱신: 2026-06-17
+최종 갱신: 2026-06-19
 
 > 현재 상태/검증/risks (≤120줄). source of truth. 갱신은 /checkpoint.
 
@@ -62,8 +62,14 @@
   +Job.rationale 추가. web/ 에 사람 producer(NewCommand 채팅/selectbox+enqueueJob) + agent 뱃지·
   rationale 표시, seed 에이전트 샘플 2건, dynamodb-local 8931 노출. 런북 docs/runbooks/agent-mcp-demo.md.
 
+- **대화형 producer(D10, 2026-06-19)** — selectbox 를 자연어 채팅으로 대체. DynamoDB 대화 버스
+  (store/chat_store.py, GSI1 오버로딩) + claude_runner.run_headless_stream(stream-json) + chat_agent.py
+  (폴링 consumer, sanitizer 격리, propose_job only) + web Chat.tsx(폴링 Markdown 렌더)+api/chat 라우트.
+  에이전트 인바운드 0(폴링만)→Vercel 동작. **실 Claude e2e 검증**(checkout 504 진단+propose_job 적재).
+  make chat-agent. (web 작업결과 Markdown 렌더 + Quarkify 포팅 + worker 로컬 엔트리도 본 세션.)
+
 ## Active Focus
-- 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 로컬). 잔여는 전부 **[manual] AWS/배포/제출**.
+- 로컬 코드 완성(백엔드 [auto] + web/ 대시보드 + 대화형 producer). 잔여는 전부 **[manual] AWS/배포/제출**.
 - AWS 크레딧 신청 **거절** → 보유 $63.91 + 무료티어로 진행. 다음: DynamoDB provision →
   Vercel 배포(실 DynamoDB) → EC2 e2e 캡처 → 제출물. 심사기간(~7/24) EC2 stop(비용 ~$0).
 

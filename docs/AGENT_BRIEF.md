@@ -1,5 +1,5 @@
 # AGENT_BRIEF — slackops-devops-agent
-최종 갱신: 2026-06-17
+최종 갱신: 2026-06-19
 
 > 1분 압축 진입점 (≤60줄). 표준은 harness/CORE_MANDATES.md, 작업 권위는 NEXT_PLAN.md > docs/plans/.
 
@@ -24,6 +24,9 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   + **에이전트 자율 제안(D9)** — mcp_server(propose_job MCP)+agent_monitor(Tier1 시뮬레이터/Tier2
   claude -p)로 에이전트가 큐에 제안→기존 출력게이트로 사람 승인. web 에 사람 producer(채팅/selectbox)
   +agent 뱃지·rationale. JobSource.AGENT+Job.rationale. 런북 docs/runbooks/agent-mcp-demo.md.
+  + **대화형 producer(D10)** — selectbox→자연어 채팅. DynamoDB 대화 버스(chat_store, GSI1 오버로딩)
+  +claude_runner 스트리밍(stream-json)+chat_agent 폴링 consumer+web Chat(폴링 Markdown 렌더). 에이전트
+  인바운드 0(폴링만)→Vercel 동작. 실 Claude e2e 검증. (web 결과 Markdown 렌더, Quarkify, worker 엔트리도 동봉.)
 - **검증:** 게이트 3계층 — `python3 -m pytest tests/ -q`(249 passed, 1 skipped) + ruff + mypy(strict).
   web/ 는 `next build` + `docker compose up` e2e green.
 - **현재 초점:** 로컬 완성 — [manual] 만 잔여(크레딧 거절→무료티어/DynamoDB provision/Vercel 배포/EC2 e2e/제출물).

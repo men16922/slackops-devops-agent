@@ -78,3 +78,18 @@
   web 은 agent 뱃지+rationale 표시. dynamodb-local 호스트 8931 노출(호스트 모니터 접근).
   로컬 데모는 worker 미가동이라 제안이 pending 정지(전체 실행은 claude+worker 필요). 런북
   `docs/runbooks/agent-mcp-demo.md`.
+
+## D10 — 대화형 producer: DynamoDB 를 web↔에이전트 비동기 메시지 버스로 (스트리밍 ≠ 인바운드)
+- Decision: Job Queue 의 selectbox producer 를 **자연어 채팅**으로 대체. "브라우저에서 Claude 와
+  스트리밍 대화"를 **인바운드 포트 없이** 구현 — web 이 사용자 turn 을 DynamoDB(`CHAT#`)에 쓰고,
+  `chat_agent` 가 폴링(outbound-only)해 Claude 를 `--output-format stream-json` 으로 실행, 응답 청크를
+  DynamoDB 에 append, web 은 ~800ms 폴링해 Markdown 렌더. Claude 가 `propose_job` 하면 기존 출력
+  게이트(승인/거절). 대화 스키마는 **기존 GSI1 을 `CHATSTATUS#` 로 오버로딩**(새 GSI 0).
+- Reason: 대안인 (a) 로컬 claude-in-web 은 Vercel 배포본에서 불가, (b) 에이전트 인바운드 `/chat`
+  엔드포인트는 "Socket Mode/인바운드 0" 보안 차별화(심사 포인트)와 충돌. DynamoDB 버스는 **Vercel
+  에서 동작 + 인바운드 0 유지**하고 "DynamoDB=두 control plane 의 비동기 버스" 스토리(DB축)를 강화.
+  사용자 입력은 sanitizer 격리 + propose_job(read-only)만 → 주입 방어/template 만다린 유지.
+- Impact: store/chat_store.py(ChatStore) + claude_runner.run_headless_stream + chat_agent.py(폴링
+  consumer) + web Chat.tsx/chat-actions/api·route. 스트리밍 충실도는 v1 폴링(~800ms 청크, 토큰단위
+  아님 — 진짜 SSE 는 Vercel 브리지로 후속 가능). 운영(EC2)은 chat-agent systemd 상주. page reload 시
+  채팅 state 초기화(convId 미영속). 설계 docs/plans/2026-06-19-web-chat-producer.md.
