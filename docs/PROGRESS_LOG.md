@@ -12,12 +12,14 @@
   propose_job job_id 추출. **chat_agent.py**(신규) 폴링 consumer(claim→sanitizer 격리→스트리밍→
   finish, allowedTools=propose_job only). **web/**: Chat.tsx(폴링 Markdown 렌더)+chat-actions.ts+
   api/chat/[conv] 라우트, Markdown.tsx 공유 이전, NewCommand 삭제. mcp_config_json 에 AWS 더미키
-  passthrough(로컬 실 Claude). make chat-agent. USER_GUIDE §2.4-2.5/런북 갱신.
+  passthrough(로컬 실 Claude). **reload 영속(convId localStorage + "새 대화" 버튼)**. make chat-agent.
+  USER_GUIDE §2.4-2.5/런북 갱신. (체크포인트 후속: tidy-docs 로 PROGRESS_LOG 193→78줄 archive 분리.)
 - Verified: `make check` green(**270 passed, 1 skipped** · ruff · mypy 27 files) + web `next build` TS strict +
   Playwright e2e(입력→DynamoDB→chat_agent(mock+**실 Claude**)→폴링 Markdown 렌더+제안 콜아웃→Job Queue).
-  실 Claude: checkout 504 멀티턴 진단 + propose_job 실제 job 적재 확인. 증빙 docs/images/chat-producer-e2e.png.
-- Blockers: 없음. (page reload 시 채팅 state 초기화 — convId 미영속, 데모 한정.)
-- Next: H0 [manual] — AWS provision/배포/제출. (선택: reload localStorage 영속, Vercel SSE 브리지.)
+  실 Claude: checkout 504 멀티턴 진단 + propose_job 실제 job 적재 확인 + reload 후 대화 복원 확인.
+  증빙 docs/images/chat-producer-e2e.png.
+- Blockers: 없음.
+- Next: H0 [manual] — AWS provision/배포/제출. (선택: Vercel SSE 브리지 = 토큰단위 실시간, docs/plans §6.)
 
 ## 2026-06-18 — 세션 묶음: Quarkify 포팅 + worker 로컬 엔트리 + web Markdown/정렬 + GUIDE 통합/QA
 - Status: 완료. H0 로컬 데모 품질·검증 정비(별도 [manual] AWS 트랙 무변).
