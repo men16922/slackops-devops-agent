@@ -37,3 +37,11 @@
 - docs/ bulk-read 금지. current doc 갱신은 /checkpoint, 읽기는 /sync, 정리는 /tidy-docs.
 - 새 글로벌(불변) 규칙은 이 파일에. 추측 금지(없으면 "문서에 없음").
 - 한국어 본문 + 영어 식별자/명령/경로.
+
+## 7. Navigation tooling discipline (선택적 가속 — Quarkify)
+- 코드 탐색은 **측정된 조건부 정책**을 따른다 — 대형 패키지·고빈도 심볼(넓은 탐색)은 `.quarkify/src`
+  인덱스(필요시 `make quarkify` 재생성, 멱등 ~수초) 우선, 드문 리터럴·소형 파일은 grep.
+  *(본 repo 는 ~3.6K LOC 소형 — 일상 탐색은 grep 우선이 기본, 인덱스는 넓은 심볼 탐색에서만.)*
+- 인덱스는 **위치용일 뿐 최종 확인은 원본 파일**(quark 리프는 빈 폴더, 라인 번호 없음)을 읽는다.
+- 선택적 로컬 가속기이므로 **게이트화하지 않는다**(`make check` 미포함 — 부재 산출물의 빌드의존화 금지).
+- 상세: 진입점 CLAUDE.md "## Quarkify" 섹션.

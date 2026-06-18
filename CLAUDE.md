@@ -69,3 +69,12 @@ EC2 DevOps Agent (c7i.large, EventBridge 스케줄 가동)
 - **Shell & 검증:** 절대경로 사용·`cd` 후 상태 의존 금지. **복합 bash(`&&`/`;` 다단계)는 단계 분리**
   (권한 거부·디버그난 회피). 커밋 전 `git status`로 기대 파일이 실제 반영됐는지 확인(write 유실/중단 방어).
 - **보고 간결:** 상태 보고는 짧게/불릿(과대 출력 회피).
+
+## Quarkify (선택적 탐색 가속)
+`.quarkify/src/`는 `make quarkify`로 생성하는 코드 심볼·호출그래프 인덱스다(gitignore 생성물, 제로 의존).
+- **언제 써라**: 대형 패키지에서 흔한 심볼·넓은 탐색일 때 grep 보다 먼저 —
+  `find .quarkify/src/quark -type d -iname '*<symbol>*'` / `ls .quarkify/src/_mirror/by_role/<role>`.
+- **언제 쓰지 마라**: 드문 리터럴·단일 후보는 grep 이 더 싸다. **본 repo 는 ~3.6K LOC 소형 — 일상 탐색은 grep 우선**,
+  인덱스는 넓은 심볼 탐색에서만(measured adoption — harness/CORE_MANDATES.md §7).
+- **권위는 항상 원본**: 리프는 빈 폴더(위치만, 라인 번호 없음) → 위치를 짚은 뒤 본문은 원본 파일을 읽는다.
+- 없거나 stale 면 `make quarkify`(최초 `make quarkify-setup`). 신선도 점검 `make quarkify-check`(비차단, `make check` 미포함).

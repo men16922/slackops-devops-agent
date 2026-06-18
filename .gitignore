@@ -19,6 +19,9 @@ venv/
 # SQLite job queue (MVP)
 *.db
 
+# Quarkify 코드 토폴로지 인덱스 (선택적 탐색 가속 — 로컬 빌드 생성물)
+.quarkify/
+
 # web/ 대시보드 (Next.js)
 web/node_modules/
 web/.next/

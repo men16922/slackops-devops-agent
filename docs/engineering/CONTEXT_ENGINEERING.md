@@ -40,7 +40,13 @@
 여러 에이전트 진입점(도구별 instruction 파일)은 **공통 본문 1곳 + 나머지는 링크**로 둔다. 같은 내용을
 복붙하면 곧 서로 어긋난다(divergence). 진입점은 얇은 래퍼로 통일하고 상세는 한 곳에서 소유한다.
 
-## 6. 형제 개념 (바이블)
+## 6. 구조 인덱스는 조건부
+구조 인덱스(심볼·호출그래프 폴더맵/LSP/ctags 등)는 grep 의 대안이 될 수 있으나 만능이 아니다.
+레버는 쉘 latency 가 아니라 *왕복 수 × 턴토큰*이다. **언제 이득**: 대형 모듈+고빈도 심볼.
+**언제 손해**: 드문 리터럴·소형 파일은 grep 이 더 쌈 — 측정 없이 "인덱스 우선" 처방을 받지 않는다.
+**structure-before-body**: 큰 파일은 통독 말고 인덱스로 멤버부터 좁힌다. **단 인덱스 ≠ 권위** — 본문은 원본에서 확인.
+
+## 7. 형제 개념 (바이블)
 - 상위 하네스: [`HARNESS_ENGINEERING.md`](HARNESS_ENGINEERING.md) · 루프: [`LOOP_ENGINEERING.md`](LOOP_ENGINEERING.md)
 - 멀티에이전트: [`AGENTIC_ENGINEERING.md`](AGENTIC_ENGINEERING.md) · 프롬프트: [`PROMPT_ENGINEERING.md`](PROMPT_ENGINEERING.md)
 - 이 repo 적용: [`interp/INTERPRETATION.md`](interp/INTERPRETATION.md)
