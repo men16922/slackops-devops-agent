@@ -60,24 +60,27 @@
 > 준비물: **Docker 데몬** + **Claude 구독 토큰**(`claude setup-token`). AWS 자격증명 **불필요**(DynamoDB Local).
 > 상세 절차: [docs/runbooks/agent-mcp-demo.md](docs/runbooks/agent-mcp-demo.md) "전체 실행 루프".
 
-### 3-A. 대시보드 기동 + 화면 (토큰 불필요)
+### 3-A. 대시보드 기동 + 화면 (토큰 불필요) — ✅ Playwright 검증 완료(2026-06-18)
 ```bash
 cd web && docker compose up -d --build      # 8930=대시보드, 8931=DynamoDB Local
 ```
-- [ ] http://localhost:8930 접속 → Job Queue에 **시드 작업 목록**이 보인다.
-- [ ] 🤖 **agent 뱃지 + rationale(제안 근거)** 가 붙은 작업이 보인다(에이전트 제안 샘플).
-- [ ] 🟡 `awaiting_approval` 작업 클릭 → **diff 미리보기 + Approve/Reject** 버튼이 보인다.
-- [ ] **Approve** → 상태 `approved` 전이 + Audit 타임라인에 "누가 언제 승인" 기록.
-- [ ] 새로고침 후 **같은 작업 재승인 시도** → "이미 처리된 작업" 거부(= **낙관적 락** 동작).
-- [ ] **Telemetry** 탭 → 실행 횟수/총비용/토큰/성공률 카드 + 명령별 집계.
-- [ ] 첫 화면 상단 **명령 입력칸**(드롭다운+인자) → `diagnose`+`api` Send → 목록 맨 위 `pending` 등장(웹 producer).
+- [x] http://localhost:8930 접속 → Job Queue에 **작업 목록**이 보인다(시드 28 + 라이브 제안, 상태 혼재).
+- [x] 🤖 **agent 뱃지 + rationale(제안 근거)** 가 붙은 작업이 보인다(상세에 "🤖 에이전트 자율 제안" + 근거).
+- [x] 🟡 `awaiting_approval` 작업 클릭 → **diff 미리보기 + Approve/Reject** 버튼 + Output Gate("승인 필요").
+- [x] **Approve** → 상태 `approved` 전이 + "Approved by: web-operator" + Audit "approved · via web dashboard".
+- [x] **같은 작업 재승인 시도(두 탭 레이스)** → **"이미 처리된 작업입니다(승인 대기 상태가 아님)"** = **낙관적 락**.
+- [x] **Metrics(Telemetry)** 탭 → Runs/Total cost/Tokens/Tool calls/Success rate 카드 + By command·Recent runs 표.
+- [x] 첫 화면 상단 **명령 입력칸** → `diagnose`+`api` Send → "큐에 추가됨" + 맨 위 `pending`(source=web) 등장.
 
-### 3-B. 에이전트 자율 제안 (토큰 불필요 — Tier1 시뮬)
+> 검증 방법: Playwright MCP 로 클릭 경로 전수 실행(스크린샷 `docs/images/p1-job-queue-verified.png`).
+> 데이터·렌더·승인 전이·낙관적 락·웹 producer 모두 라이브 DynamoDB Local 대상으로 확인.
+
+### 3-B. 에이전트 자율 제안 (토큰 불필요 — Tier1 시뮬) — ✅ 검증 완료(2026-06-18)
 ```bash
 make agent-monitor                          # 기본 데모 신호(504 spike)로 제안 1건 적재
 ```
-- [ ] 로그에 `monitor.sim.proposed` + command/rationale 출력.
-- [ ] 대시보드 피드 최상단에 🤖 agent 제안(diagnose)이 `pending`으로 뜬다.
+- [x] 로그에 `monitor.sim.proposed` + command(diagnose)/rationale 출력.
+- [x] 제안이 DynamoDB Local 에 적재(pending/source=agent) → 대시보드 피드 최상단 🤖 agent 로 렌더.
 
 ### 3-C. 승인 → 실제 실행 풀 루프 (★ 토큰 필요 — 실 Claude)
 ```bash
