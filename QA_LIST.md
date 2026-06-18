@@ -3,7 +3,7 @@
 최종 갱신: 2026-06-19
 
 > **사람(운영자/제출자)이 직접 눈으로 확인해야 하는 것**을 모은 문서.
-> 자동 게이트(pytest/ruff/mypy)가 검증하는 코드 정합은 여기 없다 — 그건 `make check`(270 passed).
+> 자동 게이트(pytest/ruff/mypy)가 검증하는 코드 정합은 여기 없다 — 그건 `make check`(274 passed).
 > 여기는 **사람만 판단 가능한 것**(실제 동작·UX·실측치·심사 충족)만 다룬다.
 > 실행 방법 상세는 [USER_GUIDE.md](USER_GUIDE.md), 에이전트 루프는 [docs/runbooks/agent-mcp-demo.md](docs/runbooks/agent-mcp-demo.md).
 
@@ -21,6 +21,8 @@
 - **전체 OTel 계측** — 실행 1건당 latency/토큰/비용(USD)/tool-call.
 - **에이전트 자율 제안 루프(D9)** — 에이전트가 신호 감지 → MCP `propose_job`로 큐에 제안 → 사람이 웹에서 승인.
 - **풀 루프 로컬 완결** — `agent_monitor`(감지) → 웹 Approve → `worker`(실행) 까지 로컬에서 닫힘.
+- **대화형 producer(D10)** — 웹 자연어 채팅 → `chat_agent` 스트리밍 응답 → 필요 시 `propose_job`. 출력은 Markdown(표·리스트·링크) pretty 렌더.
+- **한 방 실행** — `make demo` 가 web+DynamoDB Local+`chat_agent`+`worker` 를 함께 띄운다(Ctrl-C 정리, 토큰 필요).
 
 **목표(MVP 범위):** Read-Only 분석 + PR 생성까지. **차별화 축 = 보안(최소권한 + 주입방어) + 계측(OTel).**
 "단순 봇"이 아니라 **"에이전트를 안전하게 운영하는 법"의 레퍼런스**.
@@ -58,6 +60,8 @@
 ## 3. 로컬 풀 e2e (P1) — ✅ 전부 검증 완료 (사람 재확인 불필요)
 
 > 준비물(재현 시): **Docker 데몬** + **Claude 구독 토큰**(`claude setup-token`). AWS 자격증명 **불필요**(DynamoDB Local).
+> **한 방 실행:** `export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"` 후 `make demo`
+> (web+DB+`chat_agent`+`worker` 동시 기동, http://localhost:8930, Ctrl-C 정리).
 > 상세 절차: [docs/runbooks/agent-mcp-demo.md](docs/runbooks/agent-mcp-demo.md) "전체 실행 루프".
 
 > **✅ §3-A 대시보드 클릭 UX(7종) + §3-B 에이전트 자율 제안 — 2026-06-18 라이브 검증 완료.**
@@ -83,6 +87,13 @@ make worker ARGS=--once                                  # pending diagnose clai
 > **git diff 소스**로 Claude가 진단한다 — "다중소스 + 소스별 실패격리 + 실 Claude 호출" 확인엔 충분.
 > L1(pr)의 execute는 실 push 라 GitHub 인증 환경(=AWS/EC2)에서만 검증한다.
 
+### 3-D. 대화형 producer(웹 채팅) — ✅ 2026-06-19 검증 완료 (실 Claude, Playwright)
+> 웹 채팅 → `chat_agent` claim → 실 Claude 스트리밍 → Markdown pretty 렌더. `make demo` 로 재현.
+- [x] 채팅 전송 → assistant 응답 적재(`awaiting_agent`→`open`) + **Markdown 표가 HTML 표로 렌더**(raw 파이프 아님).
+- [x] in-memory DDB 재시드 후 새로고침 → **스테일 convId 자가복구**(폴링) + 전송 시 새 대화 재시도 → 무중단.
+- [x] 결과/응답 텍스트의 **ANSI(CSI) 이스케이프 제거**(job RESULT `[1m` 등 깨짐 해소).
+> 증빙: `docs/images/chat-pretty-render-verified.png`(능력표 → 테두리/헤더/코드 셀 렌더).
+
 ---
 
 ## 4. ★ 내가 직접 수행/검증할 것 — AWS 배포 후 (유일한 잔여 트랙)
@@ -103,8 +114,9 @@ make worker ARGS=--once                                  # pending diagnose clai
 
 ## 5. 알려진 한계 / 주의 (제출 설명에 정직히)
 
-- DynamoDB Local은 **in-memory** — `docker compose down` 시 데이터 소멸, `up` 시 시드 재주입.
-- `tool_calls` 계측은 현재 `None`(stream-json 파싱 도입 전 — 의도된 결정).
+- DynamoDB Local은 **in-memory** — `docker compose down`/재기동 시 데이터 소멸, `up` 시 시드 재주입.
+  웹 채팅은 localStorage convId 를 쓰므로 재시드 시 대화가 사라지지만, **폴링 자가복구+재시도로 새 대화로 무중단**(2026-06-19 fix).
+- `tool_calls` 계측: 스트리밍 경로(`chat_agent`)는 `tool_uses` 수집. worker(비스트림 `run_headless`) metric 의 `tool_calls` 는 아직 `None`.
 - L2(Execute)/prod/IAM/DB 변경은 **비활성**(금지 불변) — MVP 범위 밖.
 - 로컬 worker의 pr execute는 실 push라 GitHub 인증 환경(=AWS/EC2)에서만 검증.
 - SQLite는 **MVP/테스트 한정** — prod 데이터스토어로 호칭하지 않는다(운영 = DynamoDB).
