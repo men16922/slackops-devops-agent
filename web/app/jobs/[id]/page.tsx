@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getJob, listAuditForJob } from "../../../lib/ddb";
 import { fmtCost, fmtNum, fmtTime } from "../../../lib/format";
 import { ApprovalButtons } from "./ApprovalButtons";
+import { Markdown } from "./Markdown";
 
 export const dynamic = "force-dynamic";
 
@@ -62,12 +63,6 @@ export default async function JobDetailPage({
               </dd>
             </>
           )}
-          {job.result && (
-            <>
-              <dt>Result</dt>
-              <dd>{job.result}</dd>
-            </>
-          )}
           {job.error && (
             <>
               <dt>Error</dt>
@@ -76,6 +71,15 @@ export default async function JobDetailPage({
           )}
         </dl>
       </div>
+
+      {job.result && (
+        <>
+          <h2>Result</h2>
+          <div className="panel">
+            <Markdown text={job.result} />
+          </div>
+        </>
+      )}
 
       {job.status === "awaiting_approval" && (
         <>

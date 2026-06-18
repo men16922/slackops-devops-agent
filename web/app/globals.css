@@ -298,12 +298,13 @@ button.btn.reject {
   line-height: 1.5;
 }
 .src-agent {
-  display: inline-block;
-  font-size: 12px;
-  padding: 2px 8px;
-  border: 1px solid var(--green);
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.2;
   color: var(--green);
+  white-space: nowrap;
 }
 
 /* 웹 producer composer (명령 선택 + 인자칸) */
@@ -346,4 +347,74 @@ button.btn.reject {
   font-size: 13px;
   display: inline-block;
   margin-bottom: 14px;
+}
+
+/* 경량 Markdown 렌더(작업 결과) */
+.md {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md .md-h {
+  margin: 18px 0 8px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.md h3.md-h {
+  font-size: 16px;
+}
+.md h4.md-h,
+.md h5.md-h,
+.md h6.md-h {
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.md .md-p {
+  margin: 10px 0;
+}
+.md .md-list {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+.md .md-list li {
+  margin: 4px 0;
+}
+.md .md-quote {
+  margin: 12px 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
+  border-radius: 0 6px 6px 0;
+  color: var(--muted);
+}
+.md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  padding: 1px 5px;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.md .md-pre {
+  margin: 12px 0;
+  padding: 14px;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.md .md-pre code {
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 12.5px;
+  line-height: 1.55;
 }
