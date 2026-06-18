@@ -1,7 +1,7 @@
 # slackops-devops-agent — Makefile
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
-.PHONY: check test lint typecheck smoke-local mcp-server agent-monitor worker chat-agent quarkify-setup quarkify quarkify-check
+.PHONY: check test lint typecheck smoke-local demo mcp-server agent-monitor worker chat-agent quarkify-setup quarkify quarkify-check
 
 check: test lint typecheck   ## 커밋 게이트 3계층 (pytest + ruff + mypy)
 
@@ -21,6 +21,8 @@ DEV_ENV := PYTHONPATH=src DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} \
 	AWS_REGION=$${AWS_REGION:-us-east-1} \
 	AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-local} AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-local}
 
+demo:          ## 로컬 데모 풀스택 한 번에 — web+DB(docker) + chat_agent/worker poller (Ctrl-C 정리). 토큰 필요.
+	@bash scripts/demo.sh
 mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config 가 자동 기동(수동 점검용)
 	$(DEV_ENV) python3 -m app.mcp_server
 agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `make agent-monitor ARGS=--real`
