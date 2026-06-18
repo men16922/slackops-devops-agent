@@ -54,6 +54,13 @@ export function Chat() {
           messages: ChatMessage[];
         };
         if (stop) return;
+        // orphan 자가복구: convId 는 있는데 서버에 대화가 없으면(예: in-memory DynamoDB
+        // 재시드로 소멸) 스테일 → 정리해 빈 상태로 되돌린다(다음 전송이 새 대화를 만든다).
+        if (data.conversation === null && (data.messages?.length ?? 0) === 0) {
+          window.localStorage.removeItem(STORAGE_KEY);
+          setConvId(null);
+          return;
+        }
         setMessages(data.messages ?? []);
         setConv(data.conversation ?? null);
       } catch {
@@ -85,7 +92,16 @@ export function Chat() {
         id = (await createConversation()).convId;
         setConvId(id);
       }
-      const res = await sendUserMessage(id, text);
+      let res = await sendUserMessage(id, text);
+      // 스테일 convId(소멸된 대화) → 새 대화를 만들어 1회 재시도(스트리밍 중 "busy" 는 재시도 안 함).
+      if (!res.ok && res.code === "gone") {
+        window.localStorage.removeItem(STORAGE_KEY);
+        const fresh = (await createConversation()).convId;
+        setConvId(fresh);
+        setMessages([]);
+        setConv(null);
+        res = await sendUserMessage(fresh, text);
+      }
       if (!res.ok) setErr(res.message ?? "전송 실패");
       else setInput("");
     } catch {
