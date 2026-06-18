@@ -60,41 +60,29 @@
 > 준비물: **Docker 데몬** + **Claude 구독 토큰**(`claude setup-token`). AWS 자격증명 **불필요**(DynamoDB Local).
 > 상세 절차: [docs/runbooks/agent-mcp-demo.md](docs/runbooks/agent-mcp-demo.md) "전체 실행 루프".
 
-### 3-A. 대시보드 기동 + 화면 (토큰 불필요) — ✅ Playwright 검증 완료(2026-06-18)
-```bash
-cd web && docker compose up -d --build      # 8930=대시보드, 8931=DynamoDB Local
-```
-- [x] http://localhost:8930 접속 → Job Queue에 **작업 목록**이 보인다(시드 28 + 라이브 제안, 상태 혼재).
-- [x] 🤖 **agent 뱃지 + rationale(제안 근거)** 가 붙은 작업이 보인다(상세에 "🤖 에이전트 자율 제안" + 근거).
-- [x] 🟡 `awaiting_approval` 작업 클릭 → **diff 미리보기 + Approve/Reject** 버튼 + Output Gate("승인 필요").
-- [x] **Approve** → 상태 `approved` 전이 + "Approved by: web-operator" + Audit "approved · via web dashboard".
-- [x] **같은 작업 재승인 시도(두 탭 레이스)** → **"이미 처리된 작업입니다(승인 대기 상태가 아님)"** = **낙관적 락**.
-- [x] **Metrics(Telemetry)** 탭 → Runs/Total cost/Tokens/Tool calls/Success rate 카드 + By command·Recent runs 표.
-- [x] 첫 화면 상단 **명령 입력칸** → `diagnose`+`api` Send → "큐에 추가됨" + 맨 위 `pending`(source=web) 등장.
+> **✅ §3-A 대시보드 클릭 UX(7종) + §3-B 에이전트 자율 제안 — 2026-06-18 라이브 검증 완료, 사람 재확인 불필요.**
+> 목록·🤖 agent 뱃지/rationale·diff 출력게이트·Approve 전이·낙관적 락(두 탭 레이스→"이미 처리된 작업" 거부)·
+> Metrics 카드·웹 producer Send·agent-monitor 제안 적재 — 전부 라이브 DynamoDB Local 대상으로 통과.
+> 증빙: `docs/images/p1-job-queue-verified.png`.
 
-> 검증 방법: Playwright MCP 로 클릭 경로 전수 실행(스크린샷 `docs/images/p1-job-queue-verified.png`).
-> 데이터·렌더·승인 전이·낙관적 락·웹 producer 모두 라이브 DynamoDB Local 대상으로 확인.
-
-### 3-B. 에이전트 자율 제안 (토큰 불필요 — Tier1 시뮬) — ✅ 검증 완료(2026-06-18)
+### 3-C. 승인 → 실제 실행 풀 루프 (★ 남은 1건 — 토큰 필요, 실 Claude)
+> ⚠️ 검증 중 pr 2건이 `approved`로 남아 있다 — worker 는 `APPROVED` 를 먼저 claim 해 **실제 `git push`+`gh pr create`** 를
+> 시도한다. 깔끔한 **L0(diagnose)** 풀 루프를 보려면 **스택을 리셋**해 approved pr 을 비우고 pending diagnose 만 남긴다.
 ```bash
-make agent-monitor                          # 기본 데모 신호(504 spike)로 제안 1건 적재
-```
-- [x] 로그에 `monitor.sim.proposed` + command(diagnose)/rationale 출력.
-- [x] 제안이 DynamoDB Local 에 적재(pending/source=agent) → 대시보드 피드 최상단 🤖 agent 로 렌더.
-
-### 3-C. 승인 → 실제 실행 풀 루프 (★ 토큰 필요 — 실 Claude)
-```bash
+cd web && docker compose down && docker compose up -d   # 시드 리셋(approved pr 제거)
+cd ..
+make agent-monitor                                       # diagnose 제안(pending) 새로 생성
 export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
-make worker ARGS=--once                      # 승인/대기 job 1건 실제 실행 (실 Claude)
+make worker ARGS=--once                                  # pending diagnose claim → 실 Claude → done
 ```
-- [ ] `diagnose` 작업이 `pending`/`approved` → `running` → **`done`** 으로 전이.
-- [ ] 결과에 **실제 Claude 진단 텍스트**가 채워짐(로컬에선 git diff 소스가 주재료 — 아래 주의).
+- [ ] `diagnose` 작업이 `pending` → `running` → **`done`** 으로 전이.
+- [ ] 결과에 **실제 Claude 진단 텍스트**가 채워짐(로컬에선 git diff 소스가 주재료).
 - [ ] 대시보드 상세에 **비용/토큰 실측치** + Audit `claimed`/`done` 기록.
-- [ ] Telemetry에 실행 1건 반영(실 토큰/비용).
+- [ ] Metrics(Telemetry)에 실행 1건 반영(실 토큰/비용).
 
 > **주의(예상 동작):** 로컬 diagnose는 CloudWatch·kubectl 소스가 자격증명/클러스터 부재로 **실패 격리**되고
-> **git diff 소스**로 Claude가 진단한다 — "다중소스 + 소스별 실패격리 + 실 Claude 호출"을 확인하기엔 충분.
-> **L1(pr)의 execute는 실제 `git push`+`gh pr create`** 를 시도하므로 로컬 데모는 **L0(diagnose)** 로 한다.
+> **git diff 소스**로 Claude가 진단한다 — "다중소스 + 소스별 실패격리 + 실 Claude 호출" 확인엔 충분.
+> L1(pr)의 execute는 실 push 라 GitHub 인증 환경(=AWS/EC2)에서만 검증한다.
 
 ---
 
