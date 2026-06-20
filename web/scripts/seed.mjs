@@ -347,8 +347,9 @@ async function seedData() {
     mode,
     updated_at: isoAt(0),
   });
+  // 기본 ON 은 IAM Access Analyzer(무료)만 — Config 는 recorder 활성화 시 과금이라 기본 OFF.
   items.push(detItem("iam", true, "scheduled"));
-  items.push(detItem("config", true, "on-demand"));
+  items.push(detItem("config", false, "on-demand"));
   items.push(detItem("ssm", false));
   items.push(detItem("incident", false));
 

@@ -21,19 +21,20 @@ export const DETECTION_CATALOG: DetectionCatalogItem[] = [
     category: "config",
     group: "Security & Compliance",
     label: "AWS Config",
-    description: "Non-compliant resources by rule.",
+    description:
+      "Non-compliant resources by rule. ⚠️ needs the AWS Config recorder enabled (paid) — read is free.",
   },
   {
     category: "incident",
     group: "Operations",
     label: "CloudWatch Alarms",
-    description: "Active alarms → suggest a diagnose.",
+    description: "Active alarms → suggest a diagnose. Read-only (free).",
   },
   {
     category: "ssm",
     group: "Operations",
     label: "SSM Patch Compliance",
-    description: "Instances with missing / failed patches.",
+    description: "Instances with missing / failed patches. Read-only (free).",
   },
   // ── roadmap (disabled) — 비전만 노출, 과대주장 금지 ──
   {
