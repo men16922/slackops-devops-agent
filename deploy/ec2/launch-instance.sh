@@ -3,7 +3,9 @@
 set -euo pipefail
 
 PROFILE_NAME="${PROFILE_NAME:-slackops-devops-agent-profile}"
-INSTANCE_TYPE="${INSTANCE_TYPE:-c7i.large}"
+# Claude Code headless 는 로컬 LLM 을 돌리지 않는다(추론은 원격 API) — EC2 는 오케스트레이터.
+# bursty I/O 워크로드라 burstable t3.medium(2vCPU/4GB)이 적합·c7i.large 대비 ~53% 저렴.
+INSTANCE_TYPE="${INSTANCE_TYPE:-t3.medium}"
 TAG_NAME="${TAG_NAME:-slackops-devops-agent}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 

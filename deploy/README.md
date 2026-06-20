@@ -28,7 +28,7 @@
 3. **DynamoDB 단일테이블 provision**: `dynamodb/create-table.sh`
    - **온디맨드(PAY_PER_REQUEST)** — bursty·저빈도 워크로드라 용량계획 불필요·idle 시 ~0원, GSI 도 자동 상속.
    - `slackops-agent` (PK/SK + GSI1 status 질의 + GSI2 일자 feed). Job/Audit/Telemetry 공유.
-   - 멱등(이미 있으면 생략). 기본 region `ap-northeast-2`(`AWS_REGION` 으로 변경) — EC2 기동 전 선행.
+   - 멱등(이미 있으면 생략). 기본 region `us-east-1`(코드 기본값과 일치, `AWS_REGION` 으로 변경) — EC2 기동 전 선행.
 4. **EC2 기동**: `ec2/launch-instance.sh`
    - c7i.large, AL2023, IMDSv2 강제, **인바운드 규칙 없는 SG**(Socket Mode 아웃바운드 전용).
    - `user-data.sh` 가 도구 체인(kubectl/terraform/gh/helm/jq/Claude Code) 설치 + systemd 서비스 **3개** 등록:

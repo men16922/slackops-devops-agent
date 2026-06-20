@@ -104,3 +104,30 @@ Last updated: 2026-06-17
   ([auto]/[manual]/[blocked], status boxes, paths, make targets) — runner greps + skill triggers unaffected.
 - Impact: ~13 docs translated in place (filenames/links/structure unchanged). `make check` now includes `check-doc-budget`.
   User replies remain Korean. Source: docs/archive/token-optimization-port.md.
+
+## D12 — code navigation is LSP-first; Quarkify index retired
+- Decision: use Claude Code LSP (pyright) as the navigation tool (workspaceSymbol / findReferences / incoming·outgoingCalls);
+  reserve grep for string literals, non-Python files, whole-tree text. **Retire Quarkify** entirely — delete the `.quarkify/`
+  artifact, `tools/quarkify/`, `harness/check-quarkify.sh`, the three Makefile targets, the `.gitignore` entry, and the
+  CLAUDE.md `## Quarkify` / CORE_MANDATES §7 guidance (replaced with LSP-first).
+- Reason: measured 2026-06-19 on this repo — LSP strictly dominates Quarkify on definition (line+kind direct vs empty-folder
+  re-read tax), call graph (caller fn + exact `line:col` vs structural path only), and references (type-aware 13 vs grep
+  substring 36). Quarkify's one edge (broad symbol search) is also beaten by `workspaceSymbol` (line+scope). Net removal of
+  ~340 lines + per-session entry-doc tokens, no capability lost.
+- Impact: no `make quarkify*` targets; navigation guidance lives in CLAUDE.md "## Code navigation (LSP)". History preserved in
+  docs/archive/quarkify-port.md and PROGRESS_LOG (the port still happened — only the tool is retired).
+
+## D13 — diagnose/logs CloudWatch access is agentic via AWS API MCP (not boto3 pre-fetch)
+- Decision: `/devops diagnose` and `/devops logs` no longer pre-fetch CloudWatch via boto3. The Claude Code subprocess calls the
+  **awslabs AWS API MCP server** (`uvx awslabs.aws-api-mcp-server@1.3.45`, tools `call_aws`/`suggest_aws_commands`) itself,
+  with **`READ_OPERATIONS_ONLY=true`** forced. New `src/app/mcp_config.py:aws_mcp_config_json()`; `run_for_command` threads
+  `mcp_config` → `run_headless`; allowlist `logs`/`diagnose` swapped `Bash(aws logs:*)` → `mcp__awsapi__*`. boto3
+  `fetch_cloudwatch_logs` kept as a fallback (handlers run agentic on `fetcher=None`, legacy pre-fetch on injected fetcher).
+  kubectl/git stay pre-fetched + `<untrusted_data>`-isolated.
+- Reason: AWS MCP is purpose-built for agents; the security boundary is the read-only IAM role + server read-only mode + strict
+  allowlist, not boto3 vs MCP. Aligns with the project already using MCP for the propose_job control plane (D9). Verified locally
+  (real CloudWatch via MCP; write `create-log-group` → "denied by security policy").
+- Impact: **prompt-injection model shifts** — CloudWatch tool_result enters Claude's context directly, bypassing the
+  `<untrusted_data>` isolation that pre-fetched logs had. Accepted trade-off; the hard boundary is now IAM read-only +
+  `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + read-only-tool allowlist (documented in the module docstrings). EC2 needs
+  `uv`/`uvx` (user-data installs + pre-warms). Submission narrative wording: "least-privilege at the IAM + tool-allowlist boundary".

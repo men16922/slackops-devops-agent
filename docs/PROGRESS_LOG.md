@@ -1,8 +1,36 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Original 2026-06-11~12 first-half entries: docs/archive/progress-2026-06.md
+
+## 2026-06-20 — cloud deploy A–C verified + diagnose/logs → agentic AWS API MCP (DECISIONS D13)
+- Status: Done. Full cloud deploy proven end-to-end, then migrated CloudWatch access from boto3 to AWS MCP, verified local.
+- Changed: **deploy** — single ops runbook `docs/runbooks/deploy-checklist.md`; region default `ap-northeast-2`→`us-east-1`
+  (matches code), EC2 `c7i.large`→`t3.medium` (Claude headless = remote inference, bursty I/O), `.claude/settings.json` allows
+  `aws`. Region bug fix: botocore reads `AWS_DEFAULT_REGION` not `AWS_REGION` → user-data emits both.
+  **migration (D13)** — new `src/app/mcp_config.py` (`aws_mcp_config_json`, AWS API MCP @1.3.45, `READ_OPERATIONS_ONLY=true`);
+  `run_for_command` threads `mcp_config`; allowlist logs/diagnose → `mcp__awsapi__*`; handlers dual-mode (agentic on
+  `fetcher=None`, legacy pre-fetch on injected); boto3 `fetch_cloudwatch_logs` kept as fallback; user-data installs/pre-warms
+  `uv`/`uvx`. Injection-model shift documented in module docstrings.
+- Verified: full A→C cloud e2e on real EC2 (`/devops ping` → pong from `ip-172-31-…ec2.internal`, SSM-driven). After migration:
+  **`make check` 278 passed · ruff · mypy 28 · doc-budget**. Local real e2e — `handle_logs`/`handle_diagnose('checkout-service')`
+  via real claude+AWS MCP (real CloudWatch streams/trace-ids quoted). Read-only proof: write `create-log-group` →
+  "denied by security policy". EC2 then **terminated** (cost ~$0).
+- Blockers: None.
+- Next: Phase 3-deploy — relaunch EC2 (t3.medium, user-data installs uvx) + Slack cloud e2e of MCP path. Then H0 [manual] Vercel/submission.
+
+## 2026-06-19 — Quarkify retired → LSP-first code navigation
+- Status: Done. Measured LSP vs Quarkify on this repo; Quarkify removed (decision D12).
+- Changed: navigation guidance is now LSP-first. CLAUDE.md `## Quarkify` → `## Code navigation (LSP)`;
+  CORE_MANDATES §7 rewritten (workspaceSymbol/findReferences/incoming·outgoingCalls; grep for literals/non-py/text).
+  Removed Makefile targets (quarkify/-setup/-check) + .PHONY, harness/check-quarkify.sh, tools/quarkify/*, .quarkify/,
+  .gitignore entry. DECISIONS D12 added. History (archive/quarkify-port.md, STATUS/AGENT_BRIEF mentions) preserved.
+- Verified: measured 3 tasks same symbols — def: LSP `base.py:91`+kind vs Quarkify empty-folder re-read;
+  callgraph: `incomingCalls` main@318 callsite 349:47 vs structural path only; refs: `findReferences` 13 type-aware
+  vs grep 36 substring. `make check-doc-budget` OK (AGENT_BRIEF 50/60 etc). Full `make check` not re-run this entry.
+- Blockers: None.
+- Next: H0 [manual] — AWS provision/deploy/submission (unchanged).
 
 ## 2026-06-19 — make demo + chat orphan lock fix + pretty rendering + cloud systemd gap
 - Status: Done. Demo chat stuck (real bug) diagnosed/fixed + output readability + EC2 full-loop gap.
@@ -76,20 +104,3 @@ Last updated: 2026-06-19
   0 bin references in active docs, run.sh/status.sh syntax OK). Live overnight-once smoke to proceed after commit.
 - Blockers: None. (Skill bare invocation name `/sync` resolution to be confirmed in real use.)
 - Next: H0 [manual] — DynamoDB provision/Vercel deploy/submission.
-
-## 2026-06-16 — web/ dashboard (Next.js, local Docker) + USER_GUIDE.md + Claude subscription inference decision
-- Status: Done. First front-end implementation of the H0 core stack (Vercel front + DynamoDB) — through local e2e.
-- Changed: **web/** new — Next.js 14.2.35 App Router (TS). lib/{types,time,ddb,format}.ts
-  (single-table contract TS mirror — GSI2 FEED/AUDIT/METRIC queries, isomorphic with _util.py utcnow_iso/day_of),
-  app/{page(jobs feed),jobs/[id](detail + diff output gate + Approve/Reject + audit),metrics},
-  actions.ts (approval server action = _conditional_set ConditionExpression + audit append mirror),
-  scripts/seed.mjs (create table from create-table.sh schema + 22 mocks). docker-compose (dynamodb-local
-  offline + seed + web, **port 8930**, dummy keys — no real AWS needed), Dockerfile, .env.local.example.
-  **USER_GUIDE.md** (root) — secret manual-entry guide (Slack/Claude→SSM, AWS keys only via least-privilege IAM
-  when reading Vercel/real DynamoDB, issuance/policy/rotation/judging-period cost saving). deploy/{ec2/user-data.sh,README.md}
-  add CLAUDE_CODE_OAUTH_TOKEN (SSM) load. .gitignore web/ entry.
-- Verified: `next build` green (TS strict) + **docker compose up e2e**: 22 seeds, web 8930 responds,
-  jobs/detail/metrics render + **approval transition works / duplicate-approval ConditionalCheckFailed rejection** (optimistic lock) confirmed.
-  3-layer gate: pytest 229 passed/1 skipped · ruff green · mypy green (src unchanged).
-- Blockers: None. (remaining postcss moderate/high vuln needs Next 16 major — deferred.)
-- Next: [manual] — DynamoDB provision → EC2 e2e capture → Vercel deploy (real DynamoDB, read-key env) → submission.

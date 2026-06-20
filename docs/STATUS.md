@@ -1,22 +1,25 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
 ## Current summary
 - Day 1–3 **local implementation complete**: Socket Mode routing + `/devops ping` + job queue + permission gate
   + FastAPI health/metrics. deploy/ artifacts (IAM/EC2/EventBridge/ADOT) ready-to-run.
-- AWS/Slack **execution not done**: local credentials invalid + Slack App needs manual creation → follow deploy/README.md.
+- AWS/Slack **cloud deploy A–C verified once** (2026-06-20): Slack App + SSM tokens + IAM + DynamoDB(us-east-1) + EC2 →
+  `/devops ping` pong from `ip-…ec2.internal`. EC2 then terminated (cost ~$0). Runbook docs/runbooks/deploy-checklist.md.
 
 ## Verification Baseline
-- 3-layer gate: `python3 -m pytest tests/ -q` → **274 passed, 1 skipped** (fastapi-not-installed local-only skip)
+- 3-layer gate: `python3 -m pytest tests/ -q` → **278 passed, 1 skipped** (fastapi-not-installed local-only skip)
   + `ruff check src tests` + `mypy src` (strict) all green.
+- diagnose/logs **agentic AWS API MCP** (D13) local real e2e: `handle_logs`/`handle_diagnose('checkout-service')` via real
+  claude + `uvx awslabs.aws-api-mcp-server@1.3.45` → real CloudWatch (streams/trace-ids quoted); write op → "denied by security policy".
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
   render + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
 - lazy-import design — all modules import-safe even without fastapi/slack_bolt installed.
 - code-review (high) follow-up: 10 findings fixed — route exception safety net, sanitizer unclosed tag,
   kubectl flag injection, CloudWatch latest events, run.sh limit decision, command registry unification, etc.
-- `/devops ping` e2e unverified (needs EC2 + Slack App).
+- `/devops ping` cloud e2e **verified** (2026-06-20, real EC2→Slack). MCP-path diagnose/logs verified locally; cloud redeploy pending.
 
 ## What works
 - command routing (default deny + forbidden-invariant rejection), ping handler, SQLite job queue (atomic claim),
@@ -74,12 +77,14 @@ Last updated: 2026-06-19
   (closes the cloud full-loop gap). Playwright real-Claude e2e verified chat behavior + table render.
 
 ## Active Focus
-- Local code complete (backend [auto] + web/ dashboard + conversational producer + make demo full stack). Remaining is all **[manual] AWS/deploy/submission**.
-- AWS credit request **rejected** → proceed with the $63.91 on hand + free tier. Next: DynamoDB provision →
-  Vercel deploy (real DynamoDB) → EC2 e2e capture → submission. During judging (~7/24) EC2 stop (cost ~$0).
+- Cloud deploy A–C verified (provisioned IAM/DynamoDB/EC2 in us-east-1, then terminated EC2). diagnose/logs migrated to
+  agentic AWS API MCP (D13), verified locally. **Next: Phase 3-deploy** — relaunch EC2 (t3.medium, user-data now installs uvx)
+  + Slack cloud e2e of the MCP path; then H0 [manual] Vercel deploy + submission.
+- AWS credit request **rejected** → $63.91 on hand + free tier (live: DynamoDB `slackops-agent` us-east-1, IAM role/profile, SSM tokens).
 
 ## Open Risks
-- untrusted input (CloudWatch logs / git diff) is the main attack surface — beware Sanitizer/allowlist bypass.
+- untrusted input (git diff / kubectl) isolated in `<untrusted_data>`; **CloudWatch now enters via AWS MCP tool_result (D13) —
+  bypasses that isolation**. Boundary = IAM read-only + `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + read-only-tool allowlist.
 - Never use credentials other than IAM Instance Profile (.env commits example only).
 - EC2 always-on cost — verify EventBridge schedule stop/start.
 - Non-goals (out of scope): public HTTPS endpoint, EC2 always-on, Level 2 (Execute), Production/deploy/IAM/DB changes,

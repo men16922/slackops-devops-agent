@@ -29,6 +29,11 @@ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 |
 dnf install -y nodejs20
 npm install -g @anthropic-ai/claude-code
 
+# --- uv / uvx — AWS API MCP 서버 런처(diagnose/logs 의 agentic CloudWatch 접근) ---
+# claude 가 mcp_config 의 `uvx awslabs.aws-api-mcp-server@<ver>`(read-only 모드)를 띄운다.
+# /usr/local/bin 에 설치(systemd PATH 에 포함). 버전은 src/app/mcp_config.py 의 pin 과 일치.
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
 # --- 서비스 사용자 + 앱 배치 ---
 useradd --system --create-home --shell /sbin/nologin devopsagent || true
 APP_DIR=/opt/slackops-devops-agent
@@ -38,6 +43,14 @@ git clone "$REPO_URL" "$APP_DIR" || true
 python3.11 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR"
 chown -R devopsagent:devopsagent "$APP_DIR"
+
+# AWS API MCP 서버 캐시(devopsagent 쓰기 가능) + 패키지 pre-warm(첫 호출 콜드스타트 방지).
+# stdin=/dev/null → stdio 서버가 즉시 EOF 종료, timeout 으로 상한. 효과=uvx 가 패키지 캐시.
+UV_CACHE_DIR=/opt/slackops-devops-agent/.uv-cache
+mkdir -p "$UV_CACHE_DIR"
+chown -R devopsagent:devopsagent "$UV_CACHE_DIR"
+sudo -u devopsagent env UV_CACHE_DIR="$UV_CACHE_DIR" PATH=/usr/local/bin:/usr/bin:/bin \
+  timeout 240 uvx awslabs.aws-api-mcp-server@1.3.45 </dev/null >/dev/null 2>&1 || true
 
 # --- Slack 토큰: SSM SecureString → 환경 파일 (디스크 평문 최소화, root 600) ---
 IMDS_TOKEN="$(curl -fsSL -X PUT http://169.254.169.254/latest/api/token \
@@ -50,6 +63,11 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   # Claude Code Headless 추론 인증 — 구독 계정 장수명 토큰(`claude setup-token` 산출물).
   echo "CLAUDE_CODE_OAUTH_TOKEN=$(aws ssm get-parameter --region "$REGION" --name /slackops/CLAUDE_CODE_OAUTH_TOKEN --with-decryption --query Parameter.Value --output text)"
   echo "AWS_REGION=$REGION"
+  # botocore 는 region 을 AWS_DEFAULT_REGION 에서 읽는다(AWS_REGION 만으로는 NoRegionError) — boto3 fallback + MCP 서버용.
+  echo "AWS_DEFAULT_REGION=$REGION"
+  # claude→uvx(AWS API MCP) 가 PATH 에서 uvx 를 찾고 캐시를 쓸 수 있게.
+  echo "PATH=/usr/local/bin:/usr/bin:/bin"
+  echo "UV_CACHE_DIR=/opt/slackops-devops-agent/.uv-cache"
   echo "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317"
   echo "OTEL_SERVICE_NAME=slackops-devops-agent"
 } > /etc/slackops-devops-agent.env

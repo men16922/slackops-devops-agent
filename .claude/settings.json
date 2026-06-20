@@ -21,10 +21,10 @@
       "Bash(wc:*)",
       "Bash(touch:*)",
       "Bash(bash -n:*)",
-      "Bash(chmod +x:*)"
+      "Bash(chmod +x:*)",
+      "Bash(aws:*)"
     ],
     "deny": [
-      "Bash(aws:*)",
       "Bash(git push:*)",
       "Bash(curl:*)",
       "Bash(wget:*)",

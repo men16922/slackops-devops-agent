@@ -7,7 +7,7 @@
 set -euo pipefail
 
 TABLE_NAME="${TABLE_NAME:-slackops-agent}"
-REGION="${AWS_REGION:-ap-northeast-2}"
+REGION="${AWS_REGION:-us-east-1}"
 
 # 멱등: 이미 있으면 생성 생략(ACTIVE 대기만).
 if aws dynamodb describe-table --table-name "$TABLE_NAME" --region "$REGION" >/dev/null 2>&1; then

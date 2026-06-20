@@ -22,6 +22,7 @@ from app.claude_runner import (
     SubprocessRunner,
     run_headless,
 )
+from app.mcp_config import AWS_MCP_TOOLS
 from app.telemetry import RunMetrics, RunMetricsHook
 
 
@@ -32,10 +33,12 @@ class AllowlistDenied(Exception):
 # 명령 → 허용 도구. 읽기 전용(L0)은 조회 명령만, L1(pr)은 branch→수정→test→PR 경로만.
 # 금지 불변(apply/deploy/rollout/iam/db/production)에 해당하는 도구는 어떤 명령에도 없다 —
 # 모듈 로드 시 validate_mapping 으로 강제한다.
+# logs/diagnose 의 CloudWatch 접근은 AWS API MCP read 도구(mcp__awsapi__*)로 — 에이전트가
+# 직접 조회(agentic). 서버 read-only 모드 + IAM read-only 가 hard boundary(mcp_config.py).
 _COMMAND_TOOLS: dict[str, tuple[str, ...]] = {
-    "logs": ("Bash(aws logs:*)",),
+    "logs": AWS_MCP_TOOLS,
     "diagnose": (
-        "Bash(aws logs:*)",
+        *AWS_MCP_TOOLS,
         "Bash(kubectl get:*)",
         "Bash(kubectl describe:*)",
         "Bash(git diff:*)",
@@ -149,6 +152,7 @@ def run_for_command(
     *,
     exclude_tools: frozenset[str] = frozenset(),
     on_metrics: RunMetricsHook | None = None,
+    mcp_config: str | None = None,
 ) -> RunResult:
     """명령의 allowlist 를 강제해 Claude Code Headless 를 실행하는 단일 진입점.
 
@@ -166,6 +170,8 @@ def run_for_command(
             argv 수준에서 제거할 때 쓴다.
         on_metrics: 호출 1건의 RunMetrics 수신 hook(테스트/worker/슬랙 경로 주입점).
             None 이면 계측 생략. 실행기 예외 시에도 success=False 로 emit 후 재전파.
+        mcp_config: AWS API MCP 등 서버 등록 인라인 JSON(claude_runner 로 전달 →
+            `--mcp-config`/`--strict-mcp-config`). None 이면 미사용(tf-review/pr 경로).
 
     Raises:
         permissions.PermissionDenied: 권한 레벨 초과/미정의/금지 불변.
@@ -178,7 +184,9 @@ def run_for_command(
     tools = [t for t in allowed_tools(command) if t not in exclude_tools]
     started = time.monotonic()
     try:
-        result = run_headless(prompt, tools, timeout_s=timeout_s, runner=runner)
+        result = run_headless(
+            prompt, tools, timeout_s=timeout_s, runner=runner, mcp_config=mcp_config
+        )
     except Exception as exc:
         if on_metrics is not None:
             on_metrics(

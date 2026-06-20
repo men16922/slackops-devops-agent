@@ -1,7 +1,24 @@
 # PROGRESS_LOG archive — 2026-06 (전반부)
-최종 갱신: 2026-06-19
+최종 갱신: 2026-06-20
 
 > docs/PROGRESS_LOG.md 예산(≤120줄) 초과로 분리된 원문 (최신이 위). 현재 증분은 docs/PROGRESS_LOG.md.
+
+## 2026-06-16 — web/ dashboard (Next.js, local Docker) + USER_GUIDE.md + Claude subscription inference decision
+- Status: Done. First front-end implementation of the H0 core stack (Vercel front + DynamoDB) — through local e2e.
+- Changed: **web/** new — Next.js 14.2.35 App Router (TS). lib/{types,time,ddb,format}.ts
+  (single-table contract TS mirror — GSI2 FEED/AUDIT/METRIC queries, isomorphic with _util.py utcnow_iso/day_of),
+  app/{page(jobs feed),jobs/[id](detail + diff output gate + Approve/Reject + audit),metrics},
+  actions.ts (approval server action = _conditional_set ConditionExpression + audit append mirror),
+  scripts/seed.mjs (create table from create-table.sh schema + 22 mocks). docker-compose (dynamodb-local
+  offline + seed + web, **port 8930**, dummy keys — no real AWS needed), Dockerfile, .env.local.example.
+  **USER_GUIDE.md** (root) — secret manual-entry guide (Slack/Claude→SSM, AWS keys only via least-privilege IAM
+  when reading Vercel/real DynamoDB, issuance/policy/rotation/judging-period cost saving). deploy/{ec2/user-data.sh,README.md}
+  add CLAUDE_CODE_OAUTH_TOKEN (SSM) load. .gitignore web/ entry.
+- Verified: `next build` green (TS strict) + **docker compose up e2e**: 22 seeds, web 8930 responds,
+  jobs/detail/metrics render + **approval transition works / duplicate-approval ConditionalCheckFailed rejection** (optimistic lock) confirmed.
+  3-layer gate: pytest 229 passed/1 skipped · ruff green · mypy green (src unchanged).
+- Blockers: None. (remaining postcss moderate/high vuln needs Next 16 major — deferred.)
+- Next: [manual] — DynamoDB provision → EC2 e2e capture → Vercel deploy (real DynamoDB, read-key env) → submission.
 
 ## 2026-06-13 — 리뷰 findings 환류: store 유틸 통합 + stale 주석 (로컬 [auto] 소진)
 - Status: 완료. **NEXT_PLAN [auto] 전부 소진** — 잔여는 [manual] 트랙만.

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import pytest
 
+from app.allowlist import allowed_tools
 from app.claude_runner import build_command
 from app.commands.logs import (
     InvalidServiceName,
     build_logs_prompt,
     handle_logs,
 )
+from app.mcp_config import AWS_MCP_TOOLS, aws_mcp_config_json
 from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
 from tests._helpers import RecordingFetcher, RecordingRunner, result_json as _result_json
 
@@ -30,7 +32,23 @@ def test_handle_logs_assembles_fetch_sanitize_run() -> None:
     prompt = cmd[2]  # claude -p <prompt> ...
     assert "ERROR boom at line 3" in prompt
     assert UNTRUSTED_OPEN in prompt and UNTRUSTED_CLOSE in prompt
-    assert cmd == build_command(prompt, ["Bash(aws logs:*)"])
+    # legacy(fetcher 주입) 경로 — allowlist 는 MCP read 도구, mcp_config 미사용.
+    assert cmd == build_command(prompt, list(AWS_MCP_TOOLS))
+    assert "--mcp-config" not in cmd
+
+
+def test_handle_logs_agentic_default_queries_via_mcp() -> None:
+    # fetcher 미주입(기본) → agentic: 선수집 없음, MCP 조회 지시 + mcp_config 전달.
+    runner = RecordingRunner(stdout=_result_json("root cause: boom"))
+    reply = handle_logs("payments-api", runner=runner, timeout_s=42)
+
+    assert reply == "root cause: boom"
+    cmd, _ = runner.calls[0]
+    prompt = cmd[2]
+    assert "payments-api" in prompt and "call_aws" in prompt
+    assert UNTRUSTED_OPEN not in prompt  # 선수집 없음 → untrusted 블록 없음
+    assert cmd == build_command(prompt, list(allowed_tools("logs")), aws_mcp_config_json())
+    assert "--mcp-config" in cmd and "--strict-mcp-config" in cmd
 
 
 def test_handle_logs_wraps_logs_inside_untrusted_tags() -> None:
