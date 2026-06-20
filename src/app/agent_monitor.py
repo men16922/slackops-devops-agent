@@ -76,26 +76,26 @@ def detect(signals: str) -> tuple[str, str, str] | None:
         return (
             "diagnose",
             svc,
-            f"'{svc}' 에서 오류율 급증/5xx 신호 감지 — 다중 소스 종합 진단을 제안합니다.",
+            f"Detected error-rate spike / 5xx signals on '{svc}' — proposing a multi-source diagnosis.",
         )
     if "oomkilled" in text or "crashloopbackoff" in text or "restart" in text:
         return (
             "diagnose",
             svc,
-            f"'{svc}' 파드 재시작/OOM 신호 감지 — 원인 진단을 제안합니다.",
+            f"Detected pod restart / OOM signals on '{svc}' — proposing a root-cause diagnosis.",
         )
     if "timeout" in text:
         # 5xx 규칙이 먼저라 504 자체는 위에서 diagnose 로 잡힌다 — 여기는 순수 timeout 신호.
         return (
             "pr",
-            f"{svc} upstream timeout 상향 검토",
-            f"'{svc}' 게이트웨이 timeout 신호 — 설정 조정 PR 준비를 제안합니다(승인 필요).",
+            f"review raising {svc} upstream timeout",
+            f"Gateway timeout signal on '{svc}' — proposing a config-tuning PR (approval required).",
         )
     if "terraform" in text or "plan changed" in text or ".tf" in text:
         return (
             "tf-review",
             "",
-            "terraform 변경 신호 감지 — plan 위험/비용/보안 리뷰를 제안합니다.",
+            "Detected terraform change signal — proposing a plan risk/cost/security review.",
         )
     return None
 
