@@ -46,7 +46,7 @@ def test_prepare_returns_diff_for_output_gate() -> None:
 
     assert result.diff == DIFF
     assert "변경 준비 완료" in result.summary
-    assert "승인" in result.summary
+    assert "approval" in result.summary
     assert len(runner.calls) == 1
 
 
@@ -84,7 +84,7 @@ def test_prepare_without_diff_markers_does_not_gate() -> None:
     runner = RecordingRunner(stdout=result_json("변경할 것이 없습니다"))
     result = handle_pr("fix typo", runner=runner)
     assert result.diff is None
-    assert "진행하지 않습니다" in result.summary
+    assert "not proceeding" in result.summary
 
 
 def test_prepare_exec_failure_returns_warning() -> None:

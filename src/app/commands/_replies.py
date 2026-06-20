@@ -14,8 +14,8 @@ def invalid_service_reply(usage_hint: str) -> str:
         usage_hint: 명령별 사용법 한 줄(예: ``사용법: `/devops logs <service>` ``).
     """
     return (
-        ":no_entry: 서비스 이름이 올바르지 않습니다 — "
-        "허용 문자: 영숫자와 `_ . / # -` (맨 앞 `-` 불가). " + usage_hint
+        ":no_entry: Invalid service name — "
+        "allowed: alphanumerics and `_ . / # -` (no leading `-`). " + usage_hint
     )
 
 
@@ -24,9 +24,9 @@ def no_data_reply(service: str, what: str) -> str:
 
     Args:
         service: 검증된 서비스 이름.
-        what: 무엇을 못 찾았는지(예: "최근 로그 이벤트를").
+        what: 무엇을 못 찾았는지(영문 명사구, 예: "recent log events").
     """
-    return f":mag: `{service}` 에서 {what} 찾지 못했습니다."
+    return f":mag: No {what} found for `{service}`."
 
 
 def exec_failed_reply(service: str, what: str, exit_code: int, output: str) -> str:
@@ -34,8 +34,8 @@ def exec_failed_reply(service: str, what: str, exit_code: int, output: str) -> s
 
     Args:
         service: 검증된 서비스 이름.
-        what: 실행 종류(예: "로그 분석", "진단").
+        what: 실행 종류(영문 명사구, 예: "Log analysis", "Diagnosis").
         exit_code: claude headless 종료 코드.
         output: claude 출력(또는 stderr).
     """
-    return f":warning: `{service}` {what} 실행이 실패했습니다 (exit {exit_code}).\n{output}"
+    return f":warning: {what} for `{service}` failed (exit {exit_code}).\n{output}"

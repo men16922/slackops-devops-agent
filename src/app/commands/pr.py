@@ -24,7 +24,7 @@ from app.commands._replies import exec_failed_reply
 from app.sanitizer import build_prompt
 from app.telemetry import RunMetricsHook
 
-_USAGE_HINT = "사용법: `/devops pr <설명>`"
+_USAGE_HINT = "Usage: `/devops pr <description>`"
 
 # 설명 길이 상한 — Slack 원문이 프롬프트를 비대화/오염시키는 것을 막는다.
 MAX_DESCRIPTION_CHARS = 2000
@@ -59,7 +59,7 @@ marker lines (and nothing else between them):
 
 {untrusted_data}
 
-Reply in Korean before the markers, concise, formatted for Slack."""
+Reply in English before the markers, concise, formatted for Slack."""
 
 # 신뢰 template(execute) — 승인된 diff + 설명이 격리 블록으로 삽입된다.
 PR_EXECUTE_PROMPT_TEMPLATE = """\
@@ -75,7 +75,7 @@ diff, push the prepared branch, and create the pull request with
 
 {untrusted_data}
 
-Reply in Korean with the PR link, concise, formatted for Slack."""
+Reply in English with the PR link, concise, formatted for Slack."""
 
 
 class InvalidPrDescription(Exception):
@@ -181,22 +181,22 @@ def _prepare(
     if result.exit_code != 0:
         return PrResult(
             summary=exec_failed_reply(
-                _TARGET_LABEL, "PR 준비", result.exit_code, result.output
+                _TARGET_LABEL, "PR preparation", result.exit_code, result.output
             )
         )
     diff = extract_diff(result.output)
     if diff is None:
         return PrResult(
             summary=(
-                ":mag: 변경 diff 가 생성되지 않아 PR 을 진행하지 않습니다.\n"
+                ":mag: No change diff was produced, so the PR is not proceeding.\n"
                 + result.output
             )
         )
     summary = result.output.split(DIFF_BEGIN_MARKER, 1)[0].strip()
     if not summary:
-        summary = "변경 diff 가 준비됐습니다."
+        summary = "A change diff is ready."
     return PrResult(
-        summary=summary + "\n:lock: diff 승인 대기 — 승인 후 PR 이 생성됩니다.",
+        summary=summary + "\n:lock: Awaiting diff approval — the PR is created once approved.",
         diff=diff,
     )
 
@@ -219,7 +219,7 @@ def _execute(
     if result.exit_code != 0:
         return PrResult(
             summary=exec_failed_reply(
-                _TARGET_LABEL, "PR 생성", result.exit_code, result.output
+                _TARGET_LABEL, "PR creation", result.exit_code, result.output
             )
         )
     return PrResult(summary=result.output)

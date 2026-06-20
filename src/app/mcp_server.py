@@ -55,8 +55,8 @@ def propose_job_impl(
         return {
             "ok": False,
             "error": (
-                f"허용되지 않은 명령(default deny): {name!r}. "
-                f"가능: {sorted(permissions.known_commands())}"
+                f"command not allowed (default deny): {name!r}. "
+                f"allowed: {sorted(permissions.known_commands())}"
             ),
         }
     job = store.enqueue(
@@ -126,10 +126,10 @@ def build_server(store: JobStore) -> Any:
 
     @mcp.tool()
     def propose_job(command: str, args: str = "", rationale: str = "") -> dict[str, object]:
-        """운영 작업을 큐에 제안한다(사람 승인 대기). 직접 실행하지 않는다.
+        """Propose an operational job to the queue (awaiting human approval). Never execute directly.
 
-        command 는 ping/logs/diagnose/tf-review/pr 중 하나여야 한다(그 외 거부).
-        rationale 에는 이 작업을 제안하는 근거를 한국어로 간결히 적는다.
+        command must be one of: ping/logs/diagnose/tf-review/pr (others are rejected).
+        In rationale, write a concise English reason for proposing this job.
         """
         return propose_job_impl(store, command, args, rationale)
 

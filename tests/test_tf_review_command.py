@@ -120,7 +120,7 @@ def test_default_fetcher_reports_failure_as_data(
 def test_empty_plan_skips_claude() -> None:
     runner = RecordingRunner(stdout=result_json("ok"))
     reply = handle_tf_review(fetcher=RecordingPlanFetcher("   \n"), runner=runner)
-    assert "찾지 못했습니다" in reply
+    assert "No plan output" in reply
     assert runner.calls == []
 
 

@@ -98,7 +98,7 @@ def test_process_one_runner_error_reopens_conversation() -> None:
     refreshed = store.get_conversation(conv.id)
     assert refreshed is not None and refreshed.status is ChatStatus.OPEN
     # 오류 메모가 assistant 메시지에 남고 done 처리됨.
-    assert "에이전트 오류" in store.list_messages(conv.id)[1].content
+    assert "agent error" in store.list_messages(conv.id)[1].content
 
 
 def test_build_chat_prompt_isolates_user_input() -> None:

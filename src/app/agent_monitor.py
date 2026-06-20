@@ -38,7 +38,7 @@ Below are recent system signals. If (and only if) they indicate an operational
 issue that warrants a follow-up action, call the `propose_job` tool to add a
 proposal to the human-approval queue — never act directly.
 
-Choose command from: logs, diagnose, tf-review, pr. Put a concise Korean
+Choose command from: logs, diagnose, tf-review, pr. Put a concise English
 rationale (why you propose this) in the `rationale` argument. If nothing
 warrants action, do nothing.
 

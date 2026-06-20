@@ -39,19 +39,19 @@ def test_empty_text_returns_usage(handler: SlackHandler) -> None:
 
 def test_unknown_command_denied(handler: SlackHandler) -> None:
     response = handler.route("rm-rf /")
-    assert "허용되지 않은" in response
+    assert "not an allowed command" in response
 
 
 def test_forbidden_invariant_denied(handler: SlackHandler) -> None:
     """금지 불변(apply/deploy 등)은 라우팅에서 즉시 거부."""
-    assert "허용되지 않은" in handler.route("apply now")
-    assert "허용되지 않은" in handler.route("deploy prod")
+    assert "not an allowed command" in handler.route("apply now")
+    assert "not an allowed command" in handler.route("deploy prod")
 
 
 def test_allowed_but_unregistered_command(handler: SlackHandler) -> None:
     """pr 은 동기 경로 미등록(출력 게이트는 job queue 경유) — '구현 예정' 응답."""
     response = handler.route("pr fix typo")
-    assert "구현되지 않았습니다" in response
+    assert "not implemented" in response
 
 
 def test_tf_review_routes_to_handler(
@@ -90,11 +90,11 @@ def test_diagnose_routes_to_diagnose_handler(
 
 def test_logs_empty_args_rejected_before_execution(handler: SlackHandler) -> None:
     """인자 없는 logs 는 service 검증에서 거부 — fetcher/Claude 호출 전에 끝난다."""
-    assert "서비스 이름" in handler.route("logs")
+    assert "service name" in handler.route("logs")
 
 
 def test_diagnose_empty_args_rejected_before_execution(handler: SlackHandler) -> None:
-    assert "서비스 이름" in handler.route("diagnose")
+    assert "service name" in handler.route("diagnose")
 
 
 def test_subcommand_case_insensitive(handler: SlackHandler) -> None:
@@ -121,21 +121,21 @@ def test_register_disallowed_command_rejected() -> None:
 
 def test_route_maps_timeout_to_slack_message() -> None:
     reply = _handler_raising(ClaudeTimeoutError("timed out")).route("logs svc")
-    assert "시간 초과" in reply
+    assert "timed out" in reply
 
 
 def test_route_maps_permission_denied_to_slack_message() -> None:
     reply = _handler_raising(PermissionDenied("nope")).route("logs svc")
-    assert "권한" in reply
+    assert "permission" in reply
 
 
 def test_route_maps_allowlist_denied_to_slack_message() -> None:
     reply = _handler_raising(AllowlistDenied("no tools")).route("logs svc")
-    assert "거부" in reply
+    assert "denied" in reply
 
 
 def test_route_never_raises_on_unexpected_handler_error() -> None:
     """boto3 등 예상 못한 예외도 메시지로 변환 — ack 후 respond 가 반드시 불린다."""
     reply = _handler_raising(RuntimeError("boto3 ResourceNotFound")).route("logs svc")
-    assert "예기치 못한" in reply
+    assert "unexpected error" in reply
     assert "RuntimeError" in reply
