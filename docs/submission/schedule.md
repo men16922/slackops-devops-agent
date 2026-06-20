@@ -1,5 +1,9 @@
 # 제출 · 심사 기간 계획 (비용/운영)
 
+> **현재(2026-06-20): EC2 terminated · 데모 alarm 삭제 → 비용 ≈ $0.** DynamoDB/Vercel/Lambda/EventBridge 유지(idle ~$0).
+> **타깃: 6/27~28 최종 작업 1세션** — EC2 재기동(`make cloud-up`, 최신 코드) → 영상 캡처 → 즉시 stop → Devpost 제출(마감 6/30 09:00).
+> 재기동 후 이벤트 경로 점검: 이미 배포된 Lambda/rule 그대로 → `make cloud-alarm` 만 다시 돌리면 됨(alarm 재생성 포함).
+
 | Period | Begins (GMT+9) | Ends (GMT+9) |
 | --- | --- | --- |
 | **Submissions** | May 28 04:00 | **Jun 30 09:00** |
