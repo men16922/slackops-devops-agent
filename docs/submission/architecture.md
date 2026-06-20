@@ -1,8 +1,9 @@
 # Architecture diagram (source)
 
 > Submission diagram source. Render the Mermaid block to PNG at [mermaid.live](https://mermaid.live)
-> (or `mmdc -i architecture.md -o architecture.png`) → save as `docs/images/architecture.png`.
-> ASCII fallback below. Reflects the safe-autonomy loop (F1–F5) on one DynamoDB single-table.
+> (or `mmdc -i architecture.md -o architecture.png`) → save as `docs/submission/architecture.png`.
+> ASCII fallback below. **Three producers** (human Slack/Web · resident agent · event-driven Lambda)
+> share **one** DynamoDB single-table queue; one worker (Claude) consumes. Safe-autonomy loop (F1–F5).
 
 ## Mermaid
 
@@ -19,6 +20,12 @@ flowchart TB
     CFG["CONFIG#detections (toggles)"]
   end
 
+  subgraph EVT["⚡ Event-driven producer (serverless — fires even when EC2 is off)"]
+    ALM["🔔 CloudWatch Alarm<br/>state → ALARM"]
+    EB["EventBridge rule<br/>'Alarm State Change'"]
+    LAM["λ Lambda — alarm_producer<br/>detect() → propose (L0 write only)"]
+  end
+
   subgraph EC2["⚙️ EC2 agent — IAM Instance Profile (no stored keys) · systemd"]
     MON["agent_monitor (resident --loop)"]
     NOTIF["proposal notifier (thread in slack app)"]
@@ -33,6 +40,7 @@ flowchart TB
   CFG -->|enabled+scheduled| MON
   MON -->|detect signal / scan → propose| Q
   CA -->|chat → propose| Q
+  ALM -->|state change| EB --> LAM -->|propose| Q
   Q -->|new agent proposal| NOTIF -->|ping| SL
   Q -->|claim pending/approved| WK --> CC
   CC -->|read-only| AWS["☁️ AWS: CloudWatch · Config · Access Analyzer · SSM"]
@@ -64,6 +72,9 @@ flowchart TB
         │ 🤖 Claude Code Headless + AWS API MCP (read-only) ─────┼──► ☁️ CloudWatch/Config/
         │ worker ─ L1 pr: diff→approve→push ─► 🐙 GitHub PR      │     AccessAnalyzer/SSM
         └──────────────────────────────────────────────────────┘
+
+   ⚡ Event-driven producer (serverless — fires even when EC2 is off):
+   🔔 CloudWatch Alarm (→ALARM) ─► EventBridge rule ─► λ Lambda: detect()→propose ─► [DynamoDB queue]
 ```
 
 ## Safety invariants (annotate on the diagram)
@@ -74,4 +85,9 @@ flowchart TB
 - **Injection defense (4-layer)**: untrusted-data isolation · tool allowlist · output gate · template prompt.
 
 ## The loop (highlight in the deck)
-`monitor/chat detect → propose (queue) → 🔔 Slack ping + dashboard bell → human reads rationale → approval gate → worker executes → telemetry` — all over **one** DynamoDB table.
+`CloudWatch alarm / monitor / chat / human → propose (queue) → 🔔 Slack ping + dashboard bell → human reads rationale → approval gate → worker executes (Claude) → telemetry` — all over **one** DynamoDB table.
+
+**Event-driven autonomy (this is the differentiator):** a real CloudWatch alarm fires an EventBridge rule
+→ Lambda runs the deterministic `detect()` and writes a PENDING proposal (L0, no execution) → the existing
+worker + human approval gate take over. The agent reacts to incidents in real time, not on a timer — and the
+producer is serverless, so detection survives even when the EC2 worker is stopped.

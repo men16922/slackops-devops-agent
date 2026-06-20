@@ -1,7 +1,7 @@
 # 데모 스크립트 (한글 가이드)
 
 > **샷 리스트 정본은 영어** — [../en/DEMO_SCRIPT.md](../en/DEMO_SCRIPT.md)(화면 자막 영어). 이 문서는 한글 진행 가이드.
-> 전략·로컬/클라우드 분리 = `docs/ppt/PRESENTATION.md` Appendix C.
+> 전략·로컬/클라우드 분리 = `docs/submission/PRESENTATION.md` Appendix C.
 
 ## 준비
 ```sh

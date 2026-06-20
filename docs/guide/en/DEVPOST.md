@@ -1,7 +1,7 @@
 # DEVPOST — SlackOps DevOps Agent (H0 submission draft)
 
 > Draft submission copy (English = submission language). Edit into your own voice before posting.
-> Companion: deck = `docs/ppt/PRESENTATION.md`, demo shots = `DEMO_SCRIPT.md`, verification = `QA_TEST.md`.
+> Companion: deck = `docs/submission/PRESENTATION.md`, demo shots = `DEMO_SCRIPT.md`, verification = `QA_TEST.md`.
 > **AWS Database used: DynamoDB.**
 
 ## Inspiration

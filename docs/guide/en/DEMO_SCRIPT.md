@@ -2,7 +2,7 @@
 
 > One continuous take where possible. On-screen captions in **English**. Record the loop locally
 > (`make demo`), capture the 4 cloud-only proofs on a 1-run EC2, then edit together.
-> Deck: `docs/ppt/PRESENTATION.md` (Appendix C = local/cloud split). Don't read the README aloud.
+> Deck: `docs/submission/PRESENTATION.md` (Appendix C = local/cloud split). Don't read the README aloud.
 
 ## Setup (before recording)
 ```sh

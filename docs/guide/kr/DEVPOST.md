@@ -1,7 +1,7 @@
 # DEVPOST 제출 설명 (한글 가이드)
 
 > **제출 본문은 영어**가 정본 — [../en/DEVPOST.md](../en/DEVPOST.md) 를 본인 목소리로 편집해 사용.
-> 이 문서는 한글 체크포인트. 데크 = `docs/ppt/PRESENTATION.md`, 데모 = [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
+> 이 문서는 한글 체크포인트. 데크 = `docs/submission/PRESENTATION.md`, 데모 = [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
 ## 반드시 포함(심사 필수)
 - **"AWS Database used: DynamoDB"** 명시.
