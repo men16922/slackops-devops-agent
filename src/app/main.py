@@ -61,26 +61,32 @@ def _serve_proposal_notifier(handler: Any) -> None:
     """
     import os
 
-    channel = os.environ.get("SLACK_NOTIFY_CHANNEL")
-    if not channel:
-        return
-
     import structlog
 
-    from app.mcp_server import store_from_env
-    from app.proposal_notifier import make_post_fn, run_forever
-
     log = structlog.get_logger()
+    channel = os.environ.get("SLACK_NOTIFY_CHANNEL")
+    if not channel:
+        log.info("proposal_notifier.disabled", reason="SLACK_NOTIFY_CHANNEL unset")
+        return
+
+    from app.mcp_server import store_from_env
+    from app.proposal_notifier import run_forever
+
+    def post(text: str) -> None:
+        try:
+            handler.app.client.chat_postMessage(channel=channel, text=text)
+        except Exception as exc:  # noqa: BLE001 — 게시 실패를 로그로 노출(채널 미초대 등).
+            log.warning("proposal_notifier.post_failed", channel=channel, error=str(exc))
+            raise  # notify_job_events 가 seen 미갱신 → 다음 주기 재시도
 
     def _loop() -> None:
         try:
-            store = store_from_env()
-            post_fn = make_post_fn(handler.app.client, channel)
-            run_forever(store, post_fn)
+            run_forever(store_from_env(), post)
         except Exception as exc:  # noqa: BLE001 — 알림 스레드는 Slack 앱을 죽이면 안 된다.
             log.warning("proposal_notifier.crashed", error=str(exc))
 
     threading.Thread(target=_loop, daemon=True, name="proposal-notifier").start()
+    log.info("proposal_notifier.started", channel=channel)
 
 
 def _serve_health_api() -> None:

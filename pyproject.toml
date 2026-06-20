@@ -56,3 +56,9 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["app.main", "app.mcp_server"]
 disallow_untyped_decorators = false  # fastapi/FastMCP 데코레이터가 Any 로 풀림
+
+[[tool.mypy.overrides]]
+module = ["app.slack_handler"]
+# slack_bolt(스텁 없음) 설치 시 App()/SocketModeHandler.start() 등이 untyped 로 풀린다 —
+# 미설치(ignore_missing_imports)면 Any 라 무해, 설치 시 no-untyped-call 이 떠 게이트가 환경의존이 된다.
+disallow_untyped_calls = false
