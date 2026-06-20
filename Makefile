@@ -3,6 +3,7 @@
 
 .PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent
 .PHONY: cloud-whoami cloud-iam cloud-ddb cloud-up cloud-deploy cloud-status cloud-console cloud-ssm cloud-schedule cloud-start cloud-stop cloud-down
+.PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean
 
 check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
 
@@ -39,9 +40,13 @@ demo-incident: ## (로컬) mock 장애 신호 주입 → Tier1 규칙이 제안 
 	@echo "$${SIGNAL:-service=checkout-service ALB 504 error rate 23%, upstream gateway timeout, OOMKilled x2}" > /tmp/slackops-incident.txt
 	@echo "demo-incident: 신호 주입 → $$(cat /tmp/slackops-incident.txt)"
 	$(DEV_ENV) python3 -m app.agent_monitor --signals-file /tmp/slackops-incident.txt $(ARGS)
-cloud-alarm:   ## (클라우드) 실 CloudWatch alarm 강제 발화 → 에이전트 diagnose 제안(실 DynamoDB). 실 AWS 자격 필요. ARGS=--real 가능.
-	@bash scripts/cloud-alarm.sh $(ARGS)
-cloud-alarm-clean: ## (클라우드) 데모 alarm 삭제(비용 정리).
+cloud-lambda-deploy: ## (클라우드) 이벤트 구동 producer 배포 — EventBridge rule + Lambda(CloudWatch ALARM→큐 제안). cloud-alarm 선행.
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/lambda/deploy.sh
+cloud-lambda-clean:  ## (클라우드) 이벤트 구동 producer 정리 — rule/Lambda/role 삭제.
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/lambda/clean.sh
+cloud-alarm:   ## (클라우드) 실 CloudWatch alarm 강제 ALARM → **EventBridge→Lambda** 실시간 제안(실 DynamoDB). cloud-lambda-deploy 선행.
+	@bash scripts/cloud-alarm.sh
+cloud-alarm-clean: ## (클라우드) 데모 alarm 삭제(비용 정리). 이벤트 경로는 cloud-lambda-clean.
 	aws cloudwatch delete-alarms --alarm-names "$${ALARM_NAME:-slackops-demo-checkout-5xx}"
 
 # ===== cloud 배포 라이프사이클 (실 AWS) — deploy/*.sh 래퍼. 실 자격증명 필요(aws sts get-caller-identity) =====
