@@ -2,7 +2,23 @@
 Last updated: 2026-06-20
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
-> Original 2026-06-11~12 first-half entries: docs/archive/progress-2026-06.md
+> Earlier entries (~2026-06-19): docs/archive/progress-2026-06.md
+
+## 2026-06-20 — local e2e verified + Slack/detect/notifications + cloud-alarm + local DX
+- Status: Done. F1–F5 로컬 e2e 라이브 검증 + Slack 라이브 + cloud-alarm 시나리오. 다음 = 클라우드.
+- Changed: Slack `/devops detect` 동기 경로 등록(usage 갱신); 알림을 **작업 생명주기 이벤트**로 일반화
+  (new/awaiting/done/failed, source 라벨 — web/agent/slack 활동·완료를 채널 인지) + notifier 로그(started/
+  disabled/post_failed); **UI fix** 이모지 단축코드(:mag:→🔍) 렌더 + `AutoRefresh`(작업 피드 4s 자동갱신) +
+  프롬프트 Markdown(## 헤딩/**bold**); **비용 안전** Config 기본 OFF + paid 플래그(roadmap 미배선=호출불가);
+  **로컬 DX** `make install`/`.env` 자동로드/`make demo-all`·`slack`/`make demo-incident`; **`make cloud-alarm`**
+  (+clean) 실 alarm 강제→agent diagnose 제안(EventBridge 자동=roadmap, 이 타깃이 다리); mypy override
+  app.slack_handler(slack_bolt 스텁부재 환경의존 제거). Docs: features/DEVPOST/DEMO_SCRIPT/PRESENTATION/
+  architecture; QA→클라우드-only 체크리스트.
+- Verified: `make check` **310 passed** · ruff · mypy(31) · doc-budget / web `next build`. **Playwright UI e2e**
+  (벨·Detections·Scan-now·승인). **실 Claude L0**(diagnose done $0.14). **Slack 라이브**(`/devops ping` + 생명주기
+  알림 incl. 스케줄러 iam 스캔). cloud-alarm/cloud DX = `bash -n` OK(실 AWS 미실행).
+- Blockers: None.
+- Next: 클라우드(EC2) — diagnose/scan findings · write-denied · DynamoDB screenshot · `make cloud-alarm` · Vercel(링크/Team ID).
 
 ## 2026-06-20 — safe-autonomy loop visible + governance Detections menu (F1–F5)
 - Status: Done (local-complete + gated). Cloud captures pending (manual).
@@ -50,47 +66,3 @@ Last updated: 2026-06-20
   "denied by security policy". EC2 then **terminated** (cost ~$0).
 - Blockers: None.
 - Next: Phase 3-deploy — relaunch EC2 (t3.medium, user-data installs uvx) + Slack cloud e2e of MCP path. Then H0 [manual] Vercel/submission.
-
-## 2026-06-19 — Quarkify retired → LSP-first code navigation
-- Status: Done. Measured LSP vs Quarkify on this repo; Quarkify removed (decision D12).
-- Changed: navigation guidance is now LSP-first. CLAUDE.md `## Quarkify` → `## Code navigation (LSP)`;
-  CORE_MANDATES §7 rewritten (workspaceSymbol/findReferences/incoming·outgoingCalls; grep for literals/non-py/text).
-  Removed Makefile targets (quarkify/-setup/-check) + .PHONY, harness/check-quarkify.sh, tools/quarkify/*, .quarkify/,
-  .gitignore entry. DECISIONS D12 added. History (archive/quarkify-port.md, STATUS/AGENT_BRIEF mentions) preserved.
-- Verified: measured 3 tasks same symbols — def: LSP `base.py:91`+kind vs Quarkify empty-folder re-read;
-  callgraph: `incomingCalls` main@318 callsite 349:47 vs structural path only; refs: `findReferences` 13 type-aware
-  vs grep 36 substring. `make check-doc-budget` OK (AGENT_BRIEF 50/60 etc). Full `make check` not re-run this entry.
-- Blockers: None.
-- Next: H0 [manual] — AWS provision/deploy/submission (unchanged).
-
-## 2026-06-19 — make demo + chat orphan lock fix + pretty rendering + cloud systemd gap
-- Status: Done. Demo chat stuck (real bug) diagnosed/fixed + output readability + EC2 full-loop gap.
-- Changed: **make demo** (scripts/demo.sh) — docker (web+DB+seed) + chat_agent + worker in one shot, Ctrl-C cleanup.
-  **fix(web) orphan convId lock**: old convId in localStorage + in-memory DDB reseed lost the conversation META →
-  failed send condition mistaken for "responding" + "new conversation" button hidden = permanent lock. chat-actions
-  now distinguishes gone/busy (GetItem), Chat retries a new conversation on gone + polling self-heals. **pretty render**:
-  Markdown.tsx GFM tables/horizontal-rules/links (scheme whitelist) + globals.css styling, claude_runner
-  strips ANSI (CSI) from result/stream chunks (4 tests). **deploy**: added 2 worker/chat_agent
-  systemd units to user-data.sh (Restart=always, outbound polling → inbound stays 0), README 3-service. QA_LIST updated.
-- Verified: `make check` **274 passed, 1 skipped** · ruff · mypy (strict 27). web `next build` green.
-  **Playwright real-Claude e2e**: reseed → refresh → self-heal → send → table response render (0 console errors).
-  Evidence docs/images/chat-pretty-render-verified.png. bash -n user-data.sh OK.
-- Blockers: None.
-- Next: H0 [manual] — AWS provision/deploy/submission. (worker auto-runs seed pending jobs via real Claude → watch token spend.)
-
-## 2026-06-19 — conversational producer: web chat → agent streaming → propose_job (DECISIONS D10)
-- Status: Done. Replaced the selectbox producer with natural-language chat — verified through real Claude e2e.
-- Changed: **store/chat_store.py** (new) conversation bus (Conversation/Message/ChatStatus + Sqlite/DynamoDb,
-  single-table PK=CHAT#/META, **GSI1 CHATSTATUS# overloading for claim — 0 new GSI**, chunk list_append).
-  **claude_runner.run_headless_stream** (new) stream-json line parsing → on_chunk callback + tokens/cost +
-  propose_job job_id extraction. **chat_agent.py** (new) polling consumer (claim→sanitizer isolate→stream→
-  finish, allowedTools=propose_job only). **web/**: Chat.tsx (polling Markdown render) + chat-actions.ts +
-  api/chat/[conv] route, Markdown.tsx shared move, NewCommand removed. mcp_config_json AWS dummy-key
-  passthrough (local real Claude). **reload persistence (convId localStorage + "new conversation" button)**. make chat-agent.
-  USER_GUIDE §2.4-2.5/runbook updated. (checkpoint follow-up: tidy-docs split PROGRESS_LOG 193→78 lines to archive.)
-- Verified: `make check` green (**270 passed, 1 skipped** · ruff · mypy 27 files) + web `next build` TS strict +
-  Playwright e2e (input→DynamoDB→chat_agent (mock+**real Claude**)→polling Markdown render + proposal callout→Job Queue).
-  Real Claude: checkout 504 multi-turn diagnosis + propose_job real job load confirmed + conversation restored after reload.
-  Evidence docs/images/chat-producer-e2e.png.
-- Blockers: None.
-- Next: H0 [manual] — AWS provision/deploy/submission. (optional: Vercel SSE bridge = token-level real-time, docs/plans §6.)

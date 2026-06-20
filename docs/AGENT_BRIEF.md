@@ -1,6 +1,8 @@
 # AGENT_BRIEF — slackops-devops-agent
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
+> ▶ NEXT SESSION: **클라우드 캡처(EC2)** — 체크리스트 `docs/test/0620-qa-test.md`(diagnose/scan findings·write-denied·
+>   DynamoDB screenshot·`make cloud-alarm`·**Vercel 링크/Team ID**). 로컬 e2e(F1–F5+Slack+cloud-alarm)는 전부 검증 완료.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)

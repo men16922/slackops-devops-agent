@@ -10,7 +10,7 @@ Last updated: 2026-06-20
   `/devops ping` pong from `ip-…ec2.internal`. EC2 then terminated (cost ~$0). Runbook docs/runbooks/deploy-checklist.md.
 
 ## Verification Baseline
-- 3-layer gate: `python3 -m pytest tests/ -q` → **307 passed, 1 skipped** (fastapi-not-installed local-only skip)
+- 3-layer gate: `python3 -m pytest tests/ -q` → **310 passed, 1 skipped** (fastapi-not-installed local-only skip)
   + `ruff check src tests` + `mypy src` (strict) all green.
 - diagnose/logs **agentic AWS API MCP** (D13) e2e: local (`handle_logs`/`handle_diagnose('checkout-service')` via real claude +
   `uvx awslabs.aws-api-mcp-server@1.3.45`) AND **cloud via Slack on real EC2 using Instance Profile (zero stored keys)** — real
@@ -81,13 +81,14 @@ Last updated: 2026-06-20
 - **safe-autonomy loop + governance Detections (F1–F5, 2026-06-20)** — monitor resident (systemd `--loop`,
   dedupe guard) + Slack proposal notify (`proposal_notifier` thread in main) + dashboard 🔔 bell
   (`/api/jobs/agent-pending`) + governance `detect` scan-as-job (agentic AWS MCP read-only; iam/config/ssm/incident,
-  L0) + Detections menu (`/detections` ON/OFF + Scan now, toggles in `CONFIG#detections`). All gated (307 passed,
+  L0) + Detections menu (`/detections` ON/OFF + Scan now, toggles in `CONFIG#detections`). All gated (310 passed,
   next build green). Real scan findings = cloud-only (EC2+IAM). Reframe: triage/safe-response layer over existing signals.
 
 ## Active Focus
-- F1–F5 local-complete + gated. **Next: local make-demo e2e walk-through**, then H0 [manual] submission —
-  Vercel deploy (link/Team ID) + EC2 1-run **cloud captures** (real CloudWatch diagnose / scan findings / write-denied) →
-  artifacts (architecture diagram / DynamoDB screenshot / 3-min English demo / text — drafts in docs/guide/{en,kr}/DEVPOST·DEMO_SCRIPT). Deadline 2026-06-29.
+- **F1–F5 + Slack(`/devops detect` + 작업 생명주기 알림) + `make cloud-alarm` 로컬 e2e 라이브 검증 완료** (Playwright UI · 실 Claude L0
+  done $0.14 · Slack ping+알림 incl. 스케줄러 iam 스캔). UI fix(이모지/AutoRefresh) + 로컬 DX(`make install`/`.env` 자동로드/`demo-all`).
+  **★ NEXT SESSION = 클라우드 캡처(EC2)** — 체크리스트 `docs/test/0620-qa-test.md`: diagnose/scan findings · write-denied ·
+  DynamoDB screenshot · `make cloud-alarm` · **Vercel(링크/Team ID)** → 제출물(다이어그램/영상/텍스트 — 초안 docs/guide/{en,kr}/DEVPOST·DEMO_SCRIPT). 마감 2026-06-29.
 - AWS credit request **rejected** → $63.91 on hand + free tier (live: DynamoDB `slackops-agent` us-east-1, IAM role/profile, SSM tokens).
 
 ## Open Risks
