@@ -13,10 +13,10 @@ Last updated: 2026-06-20
 - [x] DynamoDB table provisioned (`slackops-agent`, us-east-1, PAY_PER_REQUEST, GSI1/2) 2026-06-20.
 - [ ] **Phase 3-deploy** — relaunch EC2 (`deploy/ec2/launch-instance.sh`, t3.medium; user-data installs uvx + pre-warms AWS MCP)
       → Slack cloud e2e of the MCP path (`/devops diagnose checkout-service` via `mcp__awsapi__*`). EC2 currently terminated.
-- [ ] `[manual]` Vercel deploy: web/ → connect real DynamoDB (`DDB_ENDPOINT` unset + read-key env, USER_GUIDE §5) → obtain Team ID/link.
+- [ ] `[manual]` Vercel deploy: web/ → connect real DynamoDB (`DDB_ENDPOINT` unset + read-key env, DASHBOARD_GUIDE §7) → obtain Team ID/link.
 - [ ] `[manual]` Capture numbers (diagnose N sec/$0.0X/M tool calls) + real DynamoDB data (on redeploy).
 - [ ] `[manual]` Submission: architecture diagram, DynamoDB screenshot, 3-min demo video, text description, Vercel link/Team ID, (bonus) article.
-- [ ] `[manual]` After submission (6/29) EC2 stop, keep DynamoDB/Vercel (judging-period cost ~$0 — USER_GUIDE §7).
+- [ ] `[manual]` After submission (6/29) EC2 stop, keep DynamoDB/Vercel (judging-period cost ~$0 — SLACK_GUIDE §5).
 
 ## Day 1–3 — AWS/Slack execution (deploy/README.md order) — A–C DONE 2026-06-20
 - [x] Slack App (Socket Mode) created + SSM SecureString tokens (bot/app/CLAUDE_CODE_OAUTH_TOKEN) stored.

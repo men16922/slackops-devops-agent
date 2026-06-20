@@ -58,7 +58,7 @@ Last updated: 2026-06-20
   scripts/seed.mjs (create-table.sh schema + 22 mocks). docker-compose (dynamodb-local offline + seed + web,
   port 8930, dummy keys = no real AWS needed). DDB_ENDPOINT toggle switches local↔real DynamoDB (D7).
 - ops deploy prep: user-data.sh/deploy README load Claude subscription OAuth token (SSM) added (D6).
-  USER_GUIDE.md (root) — operator secret manual-entry guide.
+  SLACK_GUIDE.md / DASHBOARD_GUIDE.md (root) — operator secret + deploy + dashboard guides.
 - **agent autonomous proposal loop (D9)** — extends the control plane to a shared human+agent producer.
   mcp_server (propose_job/list_pending — FastMCP server=slackops, pure-logic/wrapper split, permissions
   default-deny reuse), agent_monitor (Tier1 simulator detect rules + Tier2 real claude -p

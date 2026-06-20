@@ -6,7 +6,7 @@
 > **목적:** 로컬 코드는 완성·검증됨(`pytest` 274 passed · ruff · mypy strict · web `next build` green).
 > 남은 건 전부 **운영자 수동 단계**(유효 AWS 자격증명 + Slack/Vercel 계정 필요). 이 문서는
 > NEXT_PLAN 의 `[manual]` 항목을 **위→아래 실행 순서**로 한 번에 풀어 쓴 단일 체크리스트다.
-> 권위 순서(충돌 시): `deploy/README.md` + 각 스크립트 원문 > 이 문서 > `action_item.md`(상세 보조).
+> 권위 순서(충돌 시): `deploy/README.md` + 각 스크립트 원문 > 이 문서. 운영자 가이드: 루트 `SLACK_GUIDE.md`(에이전트)·`DASHBOARD_GUIDE.md`(대시보드).
 > 비용: AWS 크레딧 신청 **거절** → 보유 **$63.91 + 무료티어**로 진행. 심사기간 EC2 stop 시 ~$0.
 
 ---
@@ -33,7 +33,7 @@
 `[D]` Vercel 은 `[B]`-DynamoDB 만 있으면 `[C]` 와 무관하게 병렬 가능.
 
 **검증 전략(중요):** 기능 검증은 **로컬에서 전부 가능** — Slack(Socket Mode)→EC2→DynamoDB→worker 풀루프 +
-로컬 web 대시보드(USER_GUIDE §2, `make demo`/docker compose). **Vercel 은 검증용이 아니라 제출물**
+로컬 web 대시보드(DASHBOARD_GUIDE §1~§6, `make demo`/docker compose). **Vercel 은 검증용이 아니라 제출물**
 (공개 링크+Team ID 가 H0 필수) → **로컬 검증을 다 끝낸 뒤 제출 직전에 1회 배포**한다.
 비용: Vercel **Hobby 무료**(100GB/월·비상업 — 추가 비용 0). AWS 비용 추정 = 부록 2.
 
@@ -169,7 +169,7 @@ EC2 stop/start(상시 가동 금지 불변). 기본 평일 09:00 start / 19:00 s
 > 비용: **Hobby 무료 플랜으로 충분**(bandwidth 100GB/월·서버리스 포함·비상업 = 해커톤 OK). 카드 불필요.
 > 구조: 브라우저 → Vercel(Next.js 서버) → **AWS SDK + 읽기전용 키** → DynamoDB 읽기. (EC2 아님 → Instance Profile 불가라 여기서만 Access Key 사용 = 읽기전용·테이블 스코프.)
 
-### D-1. Vercel 전용 읽기전용 IAM 사용자 키 (USER_GUIDE §5)
+### D-1. Vercel 전용 읽기전용 IAM 사용자 키 (DASHBOARD_GUIDE §7)
 IAM → Users → Create user(콘솔 OFF, 프로그래매틱 전용) → 인라인 정책:
 ```json
 { "Version": "2012-10-17", "Statement": [{

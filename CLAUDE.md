@@ -9,7 +9,7 @@ Last updated: 2026-06-17
 > No bulk-read of all of docs/. Operating rules in docs/DOCS_POLICY.md. gate = `make check` (pytest+ruff+mypy+doc-budget).
 
 - Communicate with the user in Korean; keep identifiers/commands/paths/code in English.
-- Doc language: agent-only docs (entry docs, CLAUDE.md, harness/*, bibles, scripts/overnight/PROMPT.md) are in **English** (per-session token cost); user-facing/human-run docs (USER_GUIDE, QA_LIST, action_item, docs/runbooks/*, README) stay Korean. Entry-doc line caps enforced by `make check-doc-budget` (see DECISIONS D11).
+- Doc language: agent-only docs (entry docs, CLAUDE.md, harness/*, bibles, scripts/overnight/PROMPT.md) are in **English** (per-session token cost); user-facing/human-run docs (SLACK_GUIDE, DASHBOARD_GUIDE, QA_TEST, docs/runbooks/*, README) stay Korean. Entry-doc line caps enforced by `make check-doc-budget` (see DECISIONS D11).
 
 ---
 

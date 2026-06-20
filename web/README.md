@@ -18,6 +18,6 @@ docker compose up --build
 
 ## 데이터 소스 전환
 - `DDB_ENDPOINT` 설정 → DynamoDB Local(로컬).
-- `DDB_ENDPOINT` 미설정 → 실 DynamoDB(Vercel/EC2). 자격증명·배포는 루트 **USER_GUIDE.md** 참조.
+- `DDB_ENDPOINT` 미설정 → 실 DynamoDB(Vercel/EC2). 자격증명·배포는 루트 **DASHBOARD_GUIDE.md** 참조.
 
 스키마/전이 계약의 단일 진실원은 `src/app/store/`(Python). 이 앱은 그 계약을 미러링만 한다.
