@@ -12,6 +12,21 @@ import type { ReactNode } from "react";
 const INLINE =
   /(\*\*([\s\S]+?)\*\*|\*([^*\n]+?)\*|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\))/;
 
+// Slack 이모지 단축코드(:mag: 등) → Unicode. Claude 가 "for Slack" 습관으로 내뱉는 :code: 를
+// 대시보드에서 보이게 한다. 미매핑 단축코드는 원문 유지(예: 12:00: 같은 우연한 매칭 안전).
+const EMOJI: Record<string, string> = {
+  mag: "🔍", mag_right: "🔎", no_entry: "⛔", no_entry_sign: "🚫", x: "❌",
+  warning: "⚠️", rotating_light: "🚨", fire: "🔥", bulb: "💡", lock: "🔒",
+  white_check_mark: "✅", heavy_check_mark: "✔️", check: "✅",
+  red_circle: "🔴", large_blue_circle: "🔵", green_circle: "🟢",
+  yellow_circle: "🟡", orange_circle: "🟠", robot_face: "🤖", rocket: "🚀",
+  chart_with_upwards_trend: "📈", bar_chart: "📊", clipboard: "📋",
+  hourglass: "⏳", stopwatch: "⏱️", heavy_exclamation_mark: "❗", point_right: "👉",
+};
+function emojify(s: string): string {
+  return s.replace(/:([a-z0-9_+-]+):/g, (m, name) => EMOJI[name] ?? m);
+}
+
 // 안전한 링크 스킴만 통과(그 외는 링크화하지 않고 리터럴 텍스트로 둔다).
 function safeUrl(url: string): string | null {
   const u = url.trim();
@@ -72,7 +87,7 @@ function isTableStart(lines: string[], i: number): boolean {
 }
 
 export function Markdown({ text }: { text: string }) {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = emojify(text).replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let i = 0;
   let k = 0;

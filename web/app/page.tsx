@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listRecentJobs } from "../lib/ddb";
 import { fmtCost, fmtTime } from "../lib/format";
+import { AutoRefresh } from "./AutoRefresh";
 import { Chat } from "./Chat";
 
 // 요청 시점에 DynamoDB 조회 — 정적 캐시 금지.
@@ -11,6 +12,7 @@ export default async function JobsPage() {
 
   return (
     <>
+      <AutoRefresh />
       <h1>Job Queue</h1>
       <p className="page-sub">
         Chat with the agent to get job proposals (below); approve them to run on the shared Slack/Web queue (GSI2{" "}

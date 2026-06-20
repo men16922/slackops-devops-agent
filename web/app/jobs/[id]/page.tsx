@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getJob, listAuditForJob } from "../../../lib/ddb";
 import { fmtCost, fmtNum, fmtTime } from "../../../lib/format";
 import { ApprovalButtons } from "./ApprovalButtons";
+import { AutoRefresh } from "../../AutoRefresh";
 import { Markdown } from "../../Markdown";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function JobDetailPage({
 
   return (
     <>
+      <AutoRefresh />
       <Link href="/" className="back">
         ← Jobs
       </Link>
