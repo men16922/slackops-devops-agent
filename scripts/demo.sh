@@ -36,6 +36,8 @@ export DDB_ENDPOINT="${DDB_ENDPOINT:-http://localhost:8931}"
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-local}"
 export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-local}"
+# Slack 알림 deep-link 가 로컬 대시보드를 가리키게(미설정 시).
+export DASHBOARD_URL="${DASHBOARD_URL:-http://localhost:8930}"
 
 pids=()
 cleanup() {
@@ -52,6 +54,16 @@ echo "demo: docker compose up — web + dynamodb-local + seed…"
 echo "demo: 호스트 poller 기동 — chat_agent(대화 응답) + worker(승인 job 실행)…"
 python3 -m app.chat_agent & pids+=($!)
 python3 -m app.worker      & pids+=($!)
+
+# WITH_SLACK=1(=`make demo-all`) 이고 Slack 토큰이 있으면 Slack 앱(app.main)도 함께.
+if [ "${WITH_SLACK:-0}" = "1" ]; then
+  if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_APP_TOKEN:-}" ]; then
+    echo "demo: Slack 앱(app.main) 기동 — Socket Mode + 작업 알림…"
+    python3 -m app.main & pids+=($!)
+  else
+    echo "demo: WITH_SLACK=1 이나 SLACK_BOT_TOKEN/SLACK_APP_TOKEN 미설정 → Slack 앱 생략(.env 확인)." >&2
+  fi
+fi
 
 echo "demo: ready → http://localhost:8930   (Ctrl-C 로 전체 종료)"
 wait

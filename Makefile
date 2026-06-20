@@ -26,6 +26,8 @@ DEV_ENV := PYTHONPATH=src DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} \
 
 demo:          ## 로컬 데모 풀스택 한 번에 — web+DB(docker) + chat_agent/worker poller (Ctrl-C 정리). 토큰 필요.
 	@bash scripts/demo.sh
+demo-all:      ## demo + Slack 앱(app.main) 함께 — .env 의 SLACK 토큰 필요(Ctrl-C 전체 종료).
+	@WITH_SLACK=1 bash scripts/demo.sh
 mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config 가 자동 기동(수동 점검용)
 	$(DEV_ENV) python3 -m app.mcp_server
 agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `make agent-monitor ARGS=--real`
