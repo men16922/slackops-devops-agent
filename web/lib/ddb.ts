@@ -23,11 +23,13 @@ import type {
 } from "./types";
 import { recentDays } from "./time";
 
-export const TABLE = process.env.DDB_TABLE ?? "slackops-agent";
+// env 값은 .trim() — 복붙 시 선행/후행 공백이 DynamoDB tableName 정규식을 깨는 것을 방지.
+export const TABLE = process.env.DDB_TABLE?.trim() || "slackops-agent";
 
+const endpoint = process.env.DDB_ENDPOINT?.trim();
 const raw = new DynamoDBClient({
-  region: process.env.AWS_REGION ?? "ap-northeast-2",
-  ...(process.env.DDB_ENDPOINT ? { endpoint: process.env.DDB_ENDPOINT } : {}),
+  region: process.env.AWS_REGION?.trim() || "us-east-1",
+  ...(endpoint ? { endpoint } : {}),
 });
 
 export const doc = DynamoDBDocumentClient.from(raw, {
