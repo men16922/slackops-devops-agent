@@ -1,7 +1,7 @@
 # PRESENTATION — SlackOps DevOps Agent (H0)
 
-> 발표/제출용 슬라이드 **초안** (방향 판단용). 슬라이드 노출 = **English**(제출 언어), `🗣️ 노트` = 한글 발표/근거.
-> 분량 12 슬라이드 / 3분 데모 영상과 짝(데모 스크립트는 `docs/guide/kr/DEMO_SCRIPT.md` 예정). 4축 매핑은 슬라이드 10.
+> 발표/제출용 슬라이드 (최신화 2026-06-20). 슬라이드 노출 = **English**(제출 언어), `🗣️ 노트` = 한글 발표/근거.
+> 3분 데모 **대본 + 녹화 워크플로 = 슬라이드 11 / 11b**. 4축 매핑 = 슬라이드 10. 이벤트 구동(EventBridge→Lambda) = shipped.
 
 ---
 
@@ -42,15 +42,17 @@ MVP scope = **Read-only analysis + PR creation** (no prod changes).
 
 ## Slide 5 — ⭐ The safe-autonomy loop (the core idea)
 ```
-existing alert (CloudWatch alarm / SLO burn / failed deploy)
-   → agent triages → 🔔 Slack ping + dashboard bell
-   → human reads rationale → ✅ diff approval gate → worker executes → 📊 telemetry
+CloudWatch alarm → ALARM ─(EventBridge)→ λ Lambda: detect() → propose
+   → DynamoDB queue → 🔔 Slack ping + dashboard bell
+   → human reads rationale → ✅ diff approval gate → worker (Claude) executes → 📊 telemetry
 ```
 - We **don't** invent a new monitoring system — we sit **on top of alerts you already have**.
+- The alarm path is now **event-driven (shipped)**: EventBridge → Lambda producer, serverless,
+  fires **even when the EC2 worker is stopped**. Real-time, not a timer poll.
 - The agent **triages & proposes**; the human **holds the approval boundary**.
 - Autonomy made **visible** (notifications) and **safe** (approval gate).
 
-> 🗣️ **데모의 척추이자 Originality 축.** 핵심 재프레이밍: "우리는 감지기가 아니라 *alert→안전한 조치* 사이의 빈칸을 채운다." 신호 소스 상세 = Appendix A. 이 한 장이 클라이맥스.
+> 🗣️ **데모의 척추이자 Originality 축.** 핵심 재프레이밍: "우리는 감지기가 아니라 *alert→안전한 조치* 사이의 빈칸을 채운다." 이젠 EventBridge→Lambda로 **실제 이벤트 구동**(데모에서 라이브로 보임). 이 한 장이 클라이맥스.
 
 ---
 
@@ -62,13 +64,15 @@ Slack (Socket Mode, no inbound port)        Web Dashboard (Next.js / Vercel)
         ┌─────────── DynamoDB single-table (one shared job queue) ───────────┐
         │  conditional-write: atomic claim + optimistic-lock approval gate    │
         └─────────────────────────────────────────────────────────────────────┘
-             ▲                                 ▲
-   EC2 agent (IAM Instance Profile) ── worker · chat-agent · monitor (systemd)
-   Claude Code Headless + AWS API MCP (read-only) · OTel → ADOT
+          ▲          ▲                          ▲
+   CloudWatch     EC2 agent (IAM Instance Profile) ── worker · chat-agent · monitor (systemd)
+   alarm →        Claude Code Headless + AWS API MCP (read-only) · OTel → ADOT
+   EventBridge → λ Lambda (detect→propose, serverless)
 ```
-- **Dual control plane** (Slack + web) over **one** queue.
+- **Four producers, one queue**: Slack · Vercel · resident agent · **event-driven Lambda**.
+- Full diagram: `architecture.png` (rendered from `architecture.md`).
 
-> 🗣️ Design 축 = 풀스택 정합. 두 컨트롤 플레인이 단일 테이블을 공유 — 알림(Slack/벨)도 같은 큐를 읽는다. "one source, two surfaces."
+> 🗣️ Design 축 = 풀스택 정합. 사람(Slack/web)·상주 에이전트·**이벤트(Lambda)** 가 같은 단일 테이블 큐를 공유. "one queue, many producers."
 
 ---
 
@@ -93,9 +97,9 @@ Slack (Socket Mode, no inbound port)        Web Dashboard (Next.js / Vercel)
 
 ## Slide 9 — Observability (differentiator #2)
 - Every run instrumented: **latency / tokens / cost(USD) / tool-calls** via OTel → ADOT.
-- Dashboard Telemetry surfaces per-command cost — *usually a few cents per run*.
+- Dashboard Telemetry surfaces per-command cost — **measured: ~$0.15 / 2.7K–6K tokens per diagnose** (live).
 
-> 🗣️ "투명성". 실측 수치(N초/$0.0X/M calls)는 배포 후 캡처해 채운다(현재 placeholder).
+> 🗣️ "투명성". 실측 완료 — diagnose 1회 ~$0.15, Slack done 알림에 비용/토큰 표시. 화면으로 증명 가능.
 
 ---
 
@@ -111,33 +115,55 @@ Slack (Socket Mode, no inbound port)        Web Dashboard (Next.js / Vercel)
 
 ---
 
-## Slide 11 — Demo (≤3 min, single take)
-**The trigger is real, and we say so on screen.** Recommended: cloud, force a real CloudWatch alarm.
-1. **(0:00) Problem/target** — oncall toil, "AI proposes, human gates."
-2. **(0:20) Trigger** — `aws cloudwatch set-alarm-state --alarm-name checkout-5xx --state-value ALARM`
-   → caption: *"In prod this fires on a threshold; here we force the transition to show the pipeline."*
-3. **(0:40) Triage + notify** — EventBridge → resident `agent_monitor` → `propose_job(diagnose)`
-   → **Slack channel ping + dashboard bell** light up (the wow).
-4. **(1:10) Human gate** — open proposal → read rationale + (for `pr`) **diff** → ✅ Approve.
-   Show the **optimistic lock**: a second approve → "already handled".
-5. **(1:50) Execute** — `worker` runs Claude + **AWS API MCP (read-only)** against real CloudWatch
-   → DONE. Show a write attempt → **"denied by security policy"**.
-6. **(2:20) Telemetry + audit** — per-run cost/tokens + Audit timeline (who/when approved).
-7. **(2:40) Close** — overlay: Socket Mode (no inbound) · IAM profile (no keys) · injection isolation · L0/L1.
+## Slide 11 — Demo (≤3 min) — shot list + narration (대본)
 
-> 🗣️ 연출이 아니라 *파이프라인 증명*. `set-alarm-state`로 실 alarm 전이를 투명하게 강제 → "임계치 대신 손으로 당겼다"고 자막. 로컬 fallback(=`--signals-file`)은 Appendix C. README 낭독 금지, 연속 take. 샷 상세 = DEMO_SCRIPT.md(예정).
+> On-screen = English. Narration below = what you read for the voiceover (English, short sentences).
+> Pre-roll setup (not recorded): EC2 up (`make cloud-up`, 4 services active) · Slack channel + dashboard open ·
+> event path deployed (`make cloud-lambda-deploy`) · terminal ready with `make cloud-alarm`.
+
+| Time | On-screen action | Narration (voiceover) |
+| --- | --- | --- |
+| **0:00–0:20** | Title card → split screen: Slack + Vercel dashboard | "On-call means console round-trips and risky access. SlackOps is a DevOps agent that proposes actions and alerts — while a human holds the approval boundary." |
+| **0:20–0:45** | Slack: type `/devops diagnose checkout-service` → real CloudWatch report renders | "I ask the agent to diagnose a service. It reads real CloudWatch through a read-only AWS MCP and returns a correlated root cause — not a canned reply." |
+| **0:45–1:15** | Terminal: `make cloud-alarm` → caption *"forcing a real CloudWatch alarm to ALARM"* → Slack **ping** + dashboard **bell** light up | "Now the autonomous path. A real CloudWatch alarm fires an EventBridge rule, which invokes a Lambda. The Lambda detects the signal and proposes a job — in real time. The agent pinged Slack and the dashboard bell, with no human in the loop yet." |
+| **1:15–1:55** | Dashboard: open the proposal → read rationale → **Approve** → (try a 2nd approve → "already handled") | "A human reads the rationale and approves. The approval is an atomic DynamoDB conditional write — so a duplicate approval is safely rejected. This is the boundary." |
+| **1:55–2:25** | Dashboard/Slack: job runs → **DONE** with cost/tokens. Then show a write attempt → **"denied by security policy"** | "Only after approval does the worker run Claude against real AWS. One diagnose costs about fifteen cents. And a write is denied by policy — the agent is read-only by IAM, not by prompt." |
+| **2:25–2:50** | DynamoDB console (`items.png` live): JOB#/AUDIT#/METRIC# rows + Audit timeline | "Every producer — Slack, the dashboard, and the event-driven Lambda — shares one DynamoDB table. Conditional writes give atomic claim and an optimistic-lock approval gate, with no separate coordinator." |
+| **2:50–3:00** | Closing overlay: Socket Mode (no inbound) · IAM profile (no keys) · 4-layer injection defense · L0/L1 | "That's how you run an agent in production — safely. AI proposes and rings the bell; a human holds the boundary." |
+
+> 🗣️ 연출이 아니라 *파이프라인 증명*. `make cloud-alarm`이 실 alarm 을 ALARM 으로 전이 → EventBridge→Lambda 가 실시간으로 제안(라이브). "임계치 대신 손으로 당겼다" 자막. write-denied 한 컷이 가장 강력. README 낭독 금지.
+
+---
+
+## Slide 11b — 녹화 워크플로 (Mac)
+
+> 회원님 방식(맥 화면녹화 → 길이 편집 → 음성 더빙)에 맞춘 단계.
+
+1. **세그먼트 단위로 화면 녹화** (`Cmd+Shift+5` 또는 QuickTime). 위 표의 7컷을 **각각 따로** 녹화 — NG 나면 그 컷만 다시.
+   - 마이크 끄고 **무음 화면만** 먼저 확보(음성은 나중에 더빙).
+   - 커서/타이핑 또렷하게, 폰트 크게(터미널/브라우저 zoom).
+2. **편집(iMovie)**: 7컷을 순서대로 배치 → 각 컷을 표의 타이밍에 맞게 트림 → 전체 ≤ 3:00.
+   - 캡션(자막) 추가: "forcing a real CloudWatch alarm", "denied by security policy" 등 핵심 컷.
+3. **보이스오버 더빙**: 위 narration 을 컷별로 녹음(iMovie *Record Voiceover*). 문장 짧게 끊어 읽기 → 컷 길이에 맞춤.
+   - 영어가 부담이면: **영어 자막 + 무음**(또는 배경음악)도 허용. 핵심은 화면이 말하게 하는 것.
+4. **마무리**: 1080p export → YouTube 업로드(공개/미등록) → 링크를 `final_submission.md` *Video demo link* 에 기입.
+
+> 팁: **EC2 가 떠 있는 동안 한 번에** 0:20/0:45/1:55 컷(Slack diagnose · cloud-alarm · write-denied)을 캡처 → 끝나면 `make cloud-stop`. 대시보드 승인/벨/DynamoDB 컷은 EC2 없이도 녹화 가능(Vercel + 콘솔).
 
 ---
 
 ## Slide 12 — Honest limits & roadmap
-- **Detection is bring-your-own-signal.** We are the triage/response layer, not a monitor. The demo
-  **forces** an alarm (`set-alarm-state`) or feeds a captured signal — in prod you wire your real
-  CloudWatch alarms / Datadog / PagerDuty into the signal bus. We don't claim to *find* novel failures.
-- Resident monitor without a live feed = heartbeat, not an observer; roadmap = EventBridge alarm feed + Tier2 `--real`.
-- DynamoDB Local = in-memory (demo); prod = real table. SQLite = MVP/test only.
-- L2(Execute) intentionally disabled (hard invariant). Roadmap: live alarm feed, persistent notification dedupe, ADOT live numbers.
+- **Detection is bring-your-own-signal.** We are the triage/response layer, not a monitor. We don't
+  claim to *find* novel failures — in prod you wire your real CloudWatch alarms / Datadog / PagerDuty in.
+- **Shipped this round:** the alarm path is now **event-driven** — a real CloudWatch alarm → EventBridge
+  → Lambda → proposal (serverless, fires with EC2 off). The demo **forces** the alarm transition
+  (`set-alarm-state`) transparently — in prod the threshold fires it.
+- The `checkout-service` incident is a **simulated scenario seeded into real CloudWatch**: the access
+  path (Instance Profile, read-only MCP) and the analysis are real; only the incident is staged.
+- DynamoDB Local = in-memory (demo); prod = real table. SQLite = MVP/test only. L2(Execute) intentionally disabled.
+- **Roadmap:** persistent notification dedupe, ADOT live numbers, Security Hub categories, L1 remediation PRs (human-gated).
 
-> 🗣️ 정직성 = 신뢰. "감지를 잘한다"가 아니라 "기존 alert를 안전한 조치로 바꾼다"로 한계를 *재정의*해 오히려 출시성을 강화. (QA_TEST §3 동기화)
+> 🗣️ 정직성 = 신뢰. "감지를 잘한다"가 아니라 "기존 alert를 안전한 조치로 바꾼다"로 한계를 *재정의*. 이벤트 구동은 이제 roadmap 이 아니라 **shipped** — 데모에서 라이브로 증명.
 
 ---
 
@@ -203,7 +229,7 @@ Prometheus Alert  ─┘
 | 기능 | 로컬 테스트 | 클라우드 테스트 |
 | --- | --- | --- |
 | **대화형 producer**(chat) | `make demo` → 채팅 입력 → 스트리밍 응답/제안 (실 Claude, DynamoDB Local) | Vercel 대시보드 채팅 → 실 DynamoDB |
-| **자율 제안**(monitor) | `make agent-monitor [--real]` 또는 `--signals-file <captured>` → 🤖 PENDING | systemd 상주 + `set-alarm-state`→EventBridge→propose |
+| **자율 제안**(이벤트 구동) | `make agent-monitor [--real]` 또는 `--signals-file <captured>` → 🤖 PENDING | **`make cloud-alarm`** → set-alarm-state→EventBridge→**Lambda**→propose (shipped) |
 | **Slack 알림**(신규) | `app.main` 로컬 실행(실 Slack 토큰 + `SLACK_NOTIFY_CHANNEL`) → 채널 ping. Socket Mode라 인바운드 불필요 | EC2 systemd `app.main` → 채널 ping |
 | **대시보드 벨**(신규) | `make demo` → 제안 발생 시 벨 카운트↑ / "mark seen" | Vercel 빌드에 포함 → 실 DynamoDB 폴링 |
 | **승인 게이트 + 락** | 대시보드 Approve → 재승인 "이미 처리됨" | 동일(실 DynamoDB) |
