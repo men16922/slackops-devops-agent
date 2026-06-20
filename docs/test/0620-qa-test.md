@@ -20,7 +20,8 @@
 - [x] **Slack 작업 생명주기 알림** — ✅ **라이브 확인**(2026-06-20): `make demo-all` + `SLACK_NOTIFY_CHANNEL` →
       `🤖 Agent proposal — diagnose checkout-service` + `detect iam`(스케줄러) 채널 ping(rationale + deep-link).
       *(done/실패 이벤트 알림은 코어 단위테스트 ✅, 라이브 추가 확인 권장 — 작업 1건 done까지)*
-- [ ] **상주 모니터 dedupe** — `make demo-incident` 2회 → 2번째는 dedupe(같은 제안 안 쌓임). *(단위테스트 ✅)*
+- [ ] **상주 모니터 dedupe** — `make demo-incident`를 **back-to-back(연속) 2회** 또는 **worker 없이** 2회 →
+      2번째는 dedupe(같은 제안 안 쌓임). *(시간 두고 하면 첫 제안이 done 으로 비워져 재제안=정상. 단위테스트 ✅)*
 - [ ] **L1 pr 승인 흐름** — `awaiting_approval` pr → 대시보드 Approve → worker가 approved claim → execute
       **시도**(로컬은 `git push`에서 FAIL=정상). 진짜 PR은 클라우드/`gh auth login` 환경.
 
@@ -34,7 +35,9 @@
 - [ ] **실 거버넌스 스캔 findings** — Detections Scan now / `/devops detect iam` → **실 IAM Access Analyzer findings**.
 - [ ] **write-denied** — 쓰기 op 시도 → `"denied by security policy"`(read-only 경계 증명). ★ 제출 강추 컷.
 - [ ] **실 DynamoDB 데이터 + 콘솔 스크린샷** — Job/Audit/Metric 실 항목.
-- [ ] *(선택)* **alarm 트리거** — `aws cloudwatch set-alarm-state … ALARM` → 신호 주입 흐름(EventBridge 자동 적재는 roadmap).
+- [ ] **alarm 트리거 시나리오** — **`make cloud-alarm`**(실 AWS 자격) → 실 CloudWatch alarm 강제 ALARM →
+      describe-alarms를 신호로 에이전트가 diagnose 제안(실 큐) → worker 실행 → Slack 알림. `ARGS=--real` = Tier2(Claude가 alarm 직접 조회).
+      비용: alarm ~$0.10/월 → 끝나면 `make cloud-alarm-clean`. (EventBridge 자동 적재는 roadmap — 이 타깃이 다리.)
 - [ ] **💰 비용 안전** — 클라우드 스캔은 **IAM Access Analyzer(무료)만**. **AWS Config recorder 켜지 말 것**(과금).
       roadmap 3종(Security Hub/GuardDuty/Trusted Advisor)은 미배선→호출 불가. read API·`set-alarm-state`는 무료. Claude 추론비는 AWS 아님(구독).
 
