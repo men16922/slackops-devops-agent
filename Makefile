@@ -24,6 +24,8 @@ DEV_ENV := PYTHONPATH=src DDB_ENDPOINT=$${DDB_ENDPOINT:-http://localhost:8931} \
 	AWS_REGION=$${AWS_REGION:-us-east-1} \
 	AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-local} AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-local}
 
+install:       ## 로컬 파이썬 의존성 설치(slack-bolt/fastapi/boto3/… + dev). Slack 앱 실행 전 1회.
+	python3 -m pip install -e '.[dev]'
 demo:          ## 로컬 데모 풀스택 한 번에 — web+DB(docker) + chat_agent/worker poller (Ctrl-C 정리). 토큰 필요.
 	@bash scripts/demo.sh
 demo-all:      ## demo + Slack 앱(app.main) 함께 — .env 의 SLACK 토큰 필요(Ctrl-C 전체 종료).
