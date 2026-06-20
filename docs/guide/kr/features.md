@@ -13,10 +13,12 @@
 | A2 | 로그 조회·분석 | `/devops logs <service>` | CloudWatch 로그를 AWS API MCP(read-only)로 가져와 요약·이상 분석 | L0 | 읽기전용 tool allowlist |
 | A3 | 종합 진단 | `/devops diagnose <service>` | CloudWatch + kubectl + git diff 다중소스 종합 진단(소스별 실패 격리) | L0 | sanitizer 격리 |
 | A4 | Terraform 리뷰 | `/devops tf-review` | `terraform plan` 결과의 리스크·비용·보안 리뷰 (**apply 경로 없음**) | L1 | plan 격리, no-apply |
-| A5 | PR 생성 | `/devops pr <설명>` | 브랜치 생성 → 코드 수정 → 단위 테스트 → **diff를 Slack에 먼저 게시** | L1 | **출력 게이트(사람 승인 후에만 push/PR)** |
+| A5 | 거버넌스 스캔 | `/devops detect <category>` | iam/config/ssm/incident 카테고리 **read-only AWS 스캔 → findings** | L0 | read-only allowlist |
+| A6 | PR 생성 | `/devops pr <설명>` | 브랜치 생성 → 코드 수정 → 단위 테스트 → **diff를 먼저 게시** | L1 | — |
 
 - 채널에 앱 초대 후 사용: `/invite @slackops-devops-agent`
-- A5의 PR은 사용자가 **diff를 보고 승인**해야만 실제 push/PR 진행(승인 전엔 제안 상태).
+- **A6(pr)은 Slack 동기 경로 미등록** — 출력 게이트가 store 상태를 써서 **job queue(worker) 경유**로만 실행(사람이 diff 승인 후 push/PR). Slack에 치면 "구현 예정" 응답.
+- A5(detect)는 Slack/대시보드/스케줄러 모두에서 트리거 가능(실 findings 는 클라우드).
 
 ---
 
@@ -46,8 +48,8 @@
 | --- | --- | --- |
 | **상주 모니터** | EC2 systemd 로 상주(`agent_monitor --loop`). 신호 관찰 → 조치를 큐에 **자율 제안**(L0). | 동일 제안 반복 차단(dedupe 가드) |
 | **거버넌스 탐지** | 탐지 메뉴에서 ON + `scheduled` 인 카테고리를 주기적으로 스캔 적재(IAM Access Analyzer·AWS Config·SSM Patch·CloudWatch). | read-only AWS + 사람 게이트 |
-| **Slack 제안 알림** | 새 자율 제안이 큐에 들어오면 **Slack 채널로 ping**(명령·근거·승인 링크). `SLACK_NOTIFY_CHANNEL` 설정 시. | 게시만(read-only) |
-| **대시보드 알림** | 같은 제안을 **🔔 벨**(B8)로도 표시 — 두 표면, 한 큐. | — |
+| **Slack 작업 알림** | 큐의 **생명주기 이벤트**를 채널에 게시 — 새 작업(누가 web/slack/agent로 명령했는지)·승인 대기·**완료(done)/실패** → 다른 운영자도 인지. `SLACK_NOTIFY_CHANNEL` 설정 시. | 게시만(read-only) |
+| **대시보드 알림** | 자율 제안을 **🔔 벨**(B8)로도 표시 — 두 표면, 한 큐. | — |
 
 > 핵심: 에이전트는 *제안·알림*만 하고, **사람이 승인 게이트**를 쥔다. "감지를 발명"하는 게 아니라 *기존 신호/감사를 안전한 조치로* 바꾼다.
 

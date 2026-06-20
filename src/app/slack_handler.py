@@ -22,7 +22,8 @@ CommandHandler = Callable[[str], str]
 
 USAGE = (
     "Usage: `/devops <command> [args]`\n"
-    "commands: `ping` · `logs <service>` · `diagnose <service>` · `tf-review` · `pr <description>`"
+    "commands: `ping` · `logs <service>` · `diagnose <service>` · "
+    "`detect <iam|config|ssm|incident>` · `tf-review` · `pr <description>`"
 )
 
 
@@ -126,11 +127,12 @@ def register_default_commands(handler: SlackHandler) -> SlackHandler:
     pr 은 의도적으로 동기 경로에 등록하지 않는다 — 출력 게이트(AWAITING_APPROVAL)가
     store 상태를 요구하므로 job queue(worker) 경유로만 실행한다.
     """
-    from app.commands import diagnose, logs, ping, tf_review
+    from app.commands import detect, diagnose, logs, ping, tf_review
 
     handler.register("ping", lambda _args: ping.handle_ping())
     handler.register("logs", lambda args: logs.handle_logs(args))
     handler.register("diagnose", lambda args: diagnose.handle_diagnose(args))
+    handler.register("detect", lambda args: detect.handle_detect(args))
     handler.register("tf-review", lambda _args: tf_review.handle_tf_review())
     return handler
 

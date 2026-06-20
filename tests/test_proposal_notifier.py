@@ -1,11 +1,11 @@
-"""proposal_notifier 테스트 — 순수 notify_new_proposals + run_forever (Slack SDK 불필요)."""
+"""proposal_notifier 테스트 — 작업 생명주기 이벤트 알림(순수, Slack SDK 불필요)."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.proposal_notifier import format_proposal, notify_new_proposals, run_forever
-from app.store import Job, JobSource, JobStatus, SqliteJobStore
+from app.proposal_notifier import notify_job_events, run_forever
+from app.store import JobSource, JobStatus, SqliteJobStore
 from tests._helpers import counter_clock, counter_id
 
 
@@ -14,93 +14,105 @@ def store() -> SqliteJobStore:
     return SqliteJobStore(":memory:", clock=counter_clock(), id_factory=counter_id())
 
 
-def _agent_job(
-    store: SqliteJobStore,
-    command: str = "diagnose",
-    args: str = "api",
-    rationale: str = "5xx",
-) -> Job:
-    return store.enqueue(
-        command, args, source=JobSource.AGENT, requested_by="agent", rationale=rationale
+def test_new_web_job_notifies_queued(store: SqliteJobStore) -> None:
+    job = store.enqueue("diagnose", "api", source=JobSource.WEB, requested_by="kim")
+    posts: list[str] = []
+    newly = notify_job_events(store, posts.append, {})
+    assert newly == [job.id]
+    assert "Queued" in posts[0]
+    assert "kim" in posts[0]
+
+
+def test_agent_pending_notifies_proposal(store: SqliteJobStore) -> None:
+    store.enqueue(
+        "diagnose", "api", source=JobSource.AGENT, requested_by="agent", rationale="5xx"
     )
-
-
-def test_notify_posts_for_open_agent_jobs_only(store: SqliteJobStore) -> None:
-    a1 = _agent_job(store, "diagnose", "api")
-    a2 = _agent_job(store, "logs", "web")
-    store.enqueue("diagnose", "x", source=JobSource.WEB)  # 사람 작업 — 알림 제외
     posts: list[str] = []
-    seen: set[str] = set()
-    newly = notify_new_proposals(store, posts.append, seen)
-    assert set(newly) == {a1.id, a2.id}
-    assert len(posts) == 2
-    assert seen == {a1.id, a2.id}
+    notify_job_events(store, posts.append, {})
+    assert "Agent proposal" in posts[0]
+    assert "5xx" in posts[0]
 
 
-def test_notify_dedupes_via_seen(store: SqliteJobStore) -> None:
-    _agent_job(store)
+def test_done_notifies_with_cost(store: SqliteJobStore) -> None:
+    job = store.enqueue("diagnose", "api")
+    store.claim()
+    store.complete(job.id, status=JobStatus.DONE, cost_usd=0.1389, tokens=1759)
     posts: list[str] = []
-    seen: set[str] = set()
-    notify_new_proposals(store, posts.append, seen)
-    second = notify_new_proposals(store, posts.append, seen)
-    assert second == []
-    assert len(posts) == 1
+    notify_job_events(store, posts.append, {})
+    assert any("Done" in p and "0.1389" in p for p in posts)
 
 
-def test_notify_skips_terminal(store: SqliteJobStore) -> None:
-    job = _agent_job(store)
-    store.claim()  # pending → running
-    store.complete(job.id, status=JobStatus.DONE)
+def test_failed_notifies_error(store: SqliteJobStore) -> None:
+    job = store.enqueue("pr", "x")
+    store.claim()
+    store.complete(job.id, status=JobStatus.FAILED, error="git push denied")
     posts: list[str] = []
-    assert notify_new_proposals(store, posts.append, set()) == []
+    notify_job_events(store, posts.append, {})
+    assert any("Failed" in p and "git push denied" in p for p in posts)
+
+
+def test_awaiting_approval_notifies(store: SqliteJobStore) -> None:
+    job = store.enqueue("pr", "bump timeout")
+    store.claim()
+    store.await_approval(job.id, "diff --git ...")
+    posts: list[str] = []
+    notify_job_events(store, posts.append, {})
+    assert any("Awaiting approval" in p for p in posts)
+
+
+def test_running_not_notified(store: SqliteJobStore) -> None:
+    job = store.enqueue("diagnose", "api")
+    store.claim()  # running — NOTIFY_STATUSES 밖
+    posts: list[str] = []
+    seen: dict[str, str] = {}
+    notify_job_events(store, posts.append, seen)
     assert posts == []
+    assert seen[job.id] == "running"
 
 
-def test_notify_posts_chronological(store: SqliteJobStore) -> None:
-    """list_recent 최신순을 reversed 해 오래된 제안 먼저 게시."""
-    _agent_job(store, "diagnose", "first")
-    _agent_job(store, "diagnose", "second")
+def test_prime_suppresses_then_notifies_transition(store: SqliteJobStore) -> None:
+    job = store.enqueue("diagnose", "api", source=JobSource.WEB)
     posts: list[str] = []
-    notify_new_proposals(store, posts.append, set())
-    assert "first" in posts[0]
-    assert "second" in posts[1]
+    seen: dict[str, str] = {}
+    notify_job_events(store, posts.append, seen, prime=True)  # 무게시 기록
+    assert posts == []
+    assert seen[job.id] == "pending"
+    store.claim()
+    store.complete(job.id, status=JobStatus.DONE)
+    notify_job_events(store, posts.append, seen)  # done 전이 → 게시
+    assert any("Done" in p for p in posts)
 
 
-def test_format_proposal_with_dashboard_url(
-    store: SqliteJobStore, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("DASHBOARD_URL", "https://app.example.com/")
-    job = _agent_job(store, "diagnose", "api", "5xx spike")
-    text = format_proposal(job)
-    assert "diagnose" in text
-    assert "5xx spike" in text
-    assert f"https://app.example.com/jobs/{job.id}" in text
+def test_no_repost_same_status(store: SqliteJobStore) -> None:
+    store.enqueue("diagnose", "api", source=JobSource.WEB)
+    posts: list[str] = []
+    seen: dict[str, str] = {}
+    notify_job_events(store, posts.append, seen)
+    n = len(posts)
+    notify_job_events(store, posts.append, seen)  # 상태 그대로 → 재게시 없음
+    assert len(posts) == n
 
 
-def test_format_proposal_without_dashboard_url(
-    store: SqliteJobStore, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.delenv("DASHBOARD_URL", raising=False)
-    job = _agent_job(store)
-    assert f"(job {job.id})" in format_proposal(job)
+def test_post_failure_retries(store: SqliteJobStore) -> None:
+    store.enqueue("diagnose", "api", source=JobSource.WEB)
+    seen: dict[str, str] = {}
+    calls = {"n": 0}
+
+    def flaky(_text: str) -> None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("rate limited")
+
+    notify_job_events(store, flaky, seen)  # 1st post raises → seen 미갱신
+    notify_job_events(store, flaky, seen)  # 재시도 → 성공
+    assert calls["n"] == 2
 
 
-def test_run_forever_sleeps_and_dedupes(store: SqliteJobStore) -> None:
-    _agent_job(store)
+def test_run_forever_primes_first_iteration(store: SqliteJobStore) -> None:
+    store.enqueue("diagnose", "api", source=JobSource.WEB)
     posts: list[str] = []
     sleeps: list[float] = []
     posted = run_forever(store, posts.append, max_iterations=3, sleep=sleeps.append)
-    assert posted == 1  # 첫 주기만 게시, 이후 dedupe
-    assert len(posts) == 1
-    assert len(sleeps) == 3  # 매 주기 sleep 주입 호출
-
-
-def test_post_failure_leaves_id_unseen(store: SqliteJobStore) -> None:
-    job = _agent_job(store)
-    seen: set[str] = set()
-
-    def boom(_text: str) -> None:
-        raise RuntimeError("rate limited")
-
-    assert notify_new_proposals(store, boom, seen) == []
-    assert job.id not in seen  # 다음 주기 재시도 가능
+    assert posted == 0  # prime(1회) 후 상태 변화 없음 → 게시 0
+    assert posts == []
+    assert len(sleeps) == 3

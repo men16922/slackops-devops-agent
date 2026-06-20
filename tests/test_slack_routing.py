@@ -63,6 +63,16 @@ def test_tf_review_routes_to_handler(
     assert handler.route("tf-review") == "tf-ok"
 
 
+def test_detect_routes_to_handler(
+    handler: SlackHandler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`/devops detect <category>` 동기 경로 등록 — 핸들러에 카테고리 인자 전달."""
+    monkeypatch.setattr(
+        "app.commands.detect.handle_detect", lambda args: f"scan {args}"
+    )
+    assert handler.route("detect iam") == "scan iam"
+
+
 def test_logs_routes_to_logs_handler(
     handler: SlackHandler, monkeypatch: pytest.MonkeyPatch
 ) -> None:
