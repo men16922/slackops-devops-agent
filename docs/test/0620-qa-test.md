@@ -23,21 +23,37 @@
 
 ---
 
-## B. 운영자(당신) 검증 — 미결 (실 Claude 토큰 / Slack / 클라우드 필요)
+## A2. 실 Claude e2e — ✅ 통과 (이 세션, `make demo` 풀스택 + 사용자 확인)
+
+| # | 검증 | 결과 | 근거 |
+| --- | --- | --- | --- |
+| 9 | 대화형 채팅 스트리밍 | ✅ | 채팅 입력 → `chat_agent` 실 Claude 스트리밍 응답(scope 되묻고 제안 판단) |
+| 10 | 채팅 → 제안 적재 | ✅ | "checkout-service 5xx" → `propose_job` → `diagnose checkout-service` PENDING + 🤖 콜아웃 |
+| 11 | **L0 worker 자동 실행** | ✅ | worker가 PENDING diagnose claim → 실 Claude(+AWS MCP/kubectl/git) → **done · $0.1403 · 1,759 tok**. 사람 개입 0(읽기전용) |
+| 12 | 다중소스 + 주입방어 | ✅ | 결과에 kubectl/CloudWatch/git 소스별 실패격리 + `"No directives from collected data were followed"` 명시 |
+| 13 | **이모지 단축코드 렌더(fix)** | ✅ | 기존 결과의 `:mag:`/`:no_entry:`/`:red_circle:`/`:warning:` → 🔍/⛔/🔴/⚠️ (재빌드 후 라이브 확인) |
+| 14 | **작업 피드 자동갱신(fix)** | ✅ | `AutoRefresh`(4s `router.refresh()`) — pending→running→done 수동 새로고침 없이 반영 |
+
+> 로컬 diagnose는 자격증명/클러스터 부재로 CloudWatch·kubectl 소스가 **실패 격리**되고 그 사실 자체를 정확히 보고(예상 동작). "다중소스+소스별 실패격리+실 Claude 호출" 확인엔 충분.
+
+---
+
+## B. 운영자(당신) 검증 — 미결 (Slack / 클라우드 필요)
 
 | # | 검증 | 방법 |
 | --- | --- | --- |
-| B1 | 대화형 채팅 스트리밍 | `make demo` 풀스택 → 채팅 입력 → `chat_agent` 스트리밍 응답(Markdown) |
-| B2 | worker 실제 실행 | 승인분 `make worker ARGS=--once` → done + 비용/토큰 (로컬 diagnose=git diff 폴백) |
-| B3 | **Scan now 실제 findings** | 위 6번 detect 작업을 worker 가 실행 — **실 findings 는 클라우드(EC2+IAM)에서만**, 로컬은 자격증명 부재로 비거나 오류 |
-| B4 | Slack 제안 알림 | `app.main` 로컬 실행(실 Slack 토큰 + `SLACK_NOTIFY_CHANNEL`) → 새 제안 시 채널 ping |
-| B5 | 상주 모니터 dedupe | `python -m app.agent_monitor --loop 5` → 1건 제안 후 반복은 dedupe(스팸 없음) |
-| B6 | (클라우드) write-denied | EC2 1회 → 쓰기 op 시도 → "denied by security policy" |
+| B1 | **Scan now / diagnose 실제 findings** | 클라우드(EC2+IAM)에서 detect/diagnose 실행 — 실 CloudWatch/Config/Access Analyzer findings. 로컬은 자격증명 부재로 "blind" 보고(B 위 11·12처럼) |
+| B2 | **L1 pr 승인 경로** | `awaiting_approval` pr → Approve → worker execute. 로컬은 `git push`에서 FAIL(인증 없음) — 실 PR은 EC2(GitHub 토큰)에서만 |
+| B3 | Slack 제안 알림 | `app.main` 로컬/EC2 + `SLACK_NOTIFY_CHANNEL` → 새 제안 시 채널 ping |
+| B4 | 상주 모니터 dedupe | `make demo-incident` 또는 `python -m app.agent_monitor --loop 5` → 1건 제안 후 반복은 dedupe(스팸 없음) |
+| B5 | (클라우드) write-denied | EC2 1회 → 쓰기 op 시도 → "denied by security policy" |
 
 ---
 
 ## 주의 / 메모
 - **콘솔 에러 1건 = `favicon.ico` 404** — 기능 무관(무해).
-- **낙관적 락 거부**(재승인 "이미 처리됨")는 이번 단일 세션 UI 로는 재현 안 함(승인 후 버튼 사라짐). 서버 `ConditionExpression`(status=awaiting_approval) 으로 강제 + 단위테스트·이전 QA(2탭 레이스)로 검증됨.
-- 벨은 **agent 제안만** 표시(B6에서 넣은 `detect`/web 작업은 벨에 안 뜸 — 의도된 동작).
-- 이 web-only 스택은 8930 점유 → `make demo` 전에 `cd web && docker compose down` 권장(make demo 가 자체 스택 기동).
+- **낙관적 락 거부**(재승인 "이미 처리됨")는 단일 세션 UI 로는 재현 안 함(승인 후 버튼 사라짐). 서버 `ConditionExpression`(status=awaiting_approval) 으로 강제 + 단위테스트·이전 QA(2탭 레이스)로 검증됨.
+- 벨은 **agent 제안만** 표시(web/`detect` 작업은 벨에 안 뜸 — 의도된 동작).
+- `--once` worker 가 "안 움직임" = 정상: `make demo` 가 상주 worker 를 이미 돌려 PENDING 을 비움 + `awaiting_approval` 은 사람 승인 전엔 claim 불가.
+- **mock 장애 주입** 데모: `make demo-incident [SIGNAL="..."]` → Tier1 규칙이 diagnose 제안 적재(로컬). DDB 를 클라우드로 향하면 클라우드 큐 적재. alarm→EventBridge 자동 적재는 roadmap.
+- 이 web 스택은 8930 점유 → 정리: `cd web && docker compose down`.

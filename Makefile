@@ -30,6 +30,10 @@ mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config �
 	$(DEV_ENV) python3 -m app.mcp_server
 agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `make agent-monitor ARGS=--real`
 	$(DEV_ENV) python3 -m app.agent_monitor $(ARGS)
+demo-incident: ## mock 장애 신호 주입 → Tier1 규칙이 제안 적재. 신호 지정: `make demo-incident SIGNAL="..."`
+	@echo "$${SIGNAL:-service=checkout-service ALB 504 error rate 23%, upstream gateway timeout, OOMKilled x2}" > /tmp/slackops-incident.txt
+	@echo "demo-incident: 신호 주입 → $$(cat /tmp/slackops-incident.txt)"
+	$(DEV_ENV) python3 -m app.agent_monitor --signals-file /tmp/slackops-incident.txt $(ARGS)
 worker:        ## 공유 큐 폴링 worker(승인된 job 실행 — 실 Claude). 1건만: `make worker ARGS=--once`
 	$(DEV_ENV) python3 -m app.worker $(ARGS)
 chat-agent:    ## 대화 버스 폴링 에이전트(Claude 스트리밍 응답 — 실 Claude). 1건만: `make chat-agent ARGS=--once`
