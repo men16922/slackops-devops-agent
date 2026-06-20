@@ -47,7 +47,7 @@ export default async function MetricsPage() {
     <>
       <h1>Telemetry</h1>
       <p className="page-sub">
-        OpenTelemetry 계측 결과 (최근 2일, GSI2 <span className="mono">METRIC#yyyymmdd</span>).
+        OpenTelemetry metrics (last 2 days, GSI2 <span className="mono">METRIC#yyyymmdd</span>).
       </p>
 
       <div className="cards">
@@ -76,7 +76,7 @@ export default async function MetricsPage() {
       <h2>By command</h2>
       <div className="panel">
         {rollup.length === 0 ? (
-          <div className="notice">계측 데이터 없음.</div>
+          <div className="notice">No metrics data.</div>
         ) : (
           <table>
             <thead>
@@ -110,7 +110,7 @@ export default async function MetricsPage() {
       <h2>Recent runs</h2>
       <div className="panel">
         {metrics.length === 0 ? (
-          <div className="notice">계측 데이터 없음.</div>
+          <div className="notice">No metrics data.</div>
         ) : (
           <table>
             <thead>

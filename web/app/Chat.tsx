@@ -102,10 +102,10 @@ export function Chat() {
         setConv(null);
         res = await sendUserMessage(fresh, text);
       }
-      if (!res.ok) setErr(res.message ?? "전송 실패");
+      if (!res.ok) setErr(res.message ?? "Send failed");
       else setInput("");
     } catch {
-      setErr("전송 중 오류가 발생했습니다.");
+      setErr("An error occurred while sending.");
     } finally {
       setSending(false);
     }
@@ -116,17 +116,17 @@ export function Chat() {
       {messages.length > 0 && (
         <div className="chat-header">
           <button className="chat-new" onClick={newConversation} disabled={agentBusy}>
-            ＋ 새 대화
+            ＋ New conversation
           </button>
         </div>
       )}
       <div className="chat-log">
         {messages.length === 0 ? (
           <p className="chat-empty muted">
-            운영 에이전트와 대화하세요. 예: <span className="mono">api 5xx 늘었어, 원인 봐줘</span> ·{" "}
-            <span className="mono">checkout 타임아웃 올리는 PR 준비해줘</span>
+            Chat with the ops agent. e.g. <span className="mono">api 5xx is rising, find the cause</span> ·{" "}
+            <span className="mono">prepare a PR to raise the checkout timeout</span>
             <br />
-            에이전트가 필요하다 판단하면 작업을 제안하고, 아래 Job Queue 에서 승인/거절합니다.
+            When the agent decides it's warranted, it proposes a job; approve/reject it in the Job Queue below.
           </p>
         ) : (
           messages.map((m) => (
@@ -146,15 +146,15 @@ export function Chat() {
             </div>
           ))
         )}
-        {agentBusy && <div className="chat-typing muted">에이전트 응답 중…</div>}
+        {agentBusy && <div className="chat-typing muted">Agent is responding…</div>}
         <div ref={endRef} />
       </div>
 
       {conv?.proposed_job_id && (
         <div className="chat-proposed">
-          🤖 작업이 제안되었습니다 —{" "}
+          🤖 A job has been proposed —{" "}
           <Link href={`/jobs/${conv.proposed_job_id}`} className="mono">
-            Job Queue 에서 승인/거절 →
+            Approve/reject in the Job Queue →
           </Link>
         </div>
       )}
@@ -164,7 +164,7 @@ export function Chat() {
           className="chat-input mono"
           rows={2}
           value={input}
-          placeholder={agentBusy ? "에이전트 응답을 기다리는 중…" : "메시지를 입력…(Enter 전송, Shift+Enter 줄바꿈)"}
+          placeholder={agentBusy ? "Waiting for the agent…" : "Type a message… (Enter to send, Shift+Enter for newline)"}
           disabled={sending || agentBusy}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -173,14 +173,14 @@ export function Chat() {
               void send();
             }
           }}
-          aria-label="대화 입력"
+          aria-label="Chat input"
         />
         <button
           className="btn approve"
           disabled={sending || agentBusy || input.trim().length === 0}
           onClick={() => void send()}
         >
-          {sending ? "전송 중…" : "Send"}
+          {sending ? "Sending…" : "Send"}
         </button>
       </div>
       {err && <p className="action-msg" style={{ color: "var(--red)" }}>{err}</p>}

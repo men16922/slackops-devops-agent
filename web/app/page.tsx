@@ -13,7 +13,7 @@ export default async function JobsPage() {
     <>
       <h1>Job Queue</h1>
       <p className="page-sub">
-        에이전트와 대화해 작업을 제안받고(아래 채팅), 승인하면 Slack/Web 공유 큐로 실행됩니다 (GSI2{" "}
+        Chat with the agent to get job proposals (below); approve them to run on the shared Slack/Web queue (GSI2{" "}
         <span className="mono">FEED</span>).
       </p>
 
@@ -22,7 +22,7 @@ export default async function JobsPage() {
       <div className="panel">
         {jobs.length === 0 ? (
           <div className="notice">
-            작업이 없습니다. 시드가 실행됐는지(seed 컨테이너) 또는 DynamoDB 연결을 확인하세요.
+            No jobs. Check that the seed ran (seed container) or the DynamoDB connection.
           </div>
         ) : (
           <table>

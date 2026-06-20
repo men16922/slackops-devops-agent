@@ -53,7 +53,7 @@ async function transition(
     );
   } catch (e: unknown) {
     if (e instanceof Error && e.name === "ConditionalCheckFailedException") {
-      return { ok: false, message: "이미 처리된 작업입니다(승인 대기 상태가 아님)." };
+      return { ok: false, message: "Job already handled (not awaiting approval)." };
     }
     throw e;
   }
@@ -103,13 +103,13 @@ export async function enqueueJob(
 
   // default deny — 알려진 명령만 허용(주입 방어: 자유 텍스트를 Claude 에 직접 전달하지 않음).
   if (!ALLOWED_COMMANDS.includes(command as AllowedCommand)) {
-    return { ok: false, message: `허용되지 않은 명령입니다: ${command || "(빈값)"}` };
+    return { ok: false, message: `Command not allowed: ${command || "(empty)"}` };
   }
   if (ARGS_REQUIRED.has(command) && args.length === 0) {
-    return { ok: false, message: `'${command}' 는 인자가 필요합니다 (예: 서비스명/설명).` };
+    return { ok: false, message: `'${command}' requires an argument (e.g. service name / description).` };
   }
   if (args.length > ARGS_MAX) {
-    return { ok: false, message: `인자가 너무 깁니다(최대 ${ARGS_MAX}자).` };
+    return { ok: false, message: `Argument too long (max ${ARGS_MAX} chars).` };
   }
 
   const id = randomUUID();
@@ -137,5 +137,5 @@ export async function enqueueJob(
   );
 
   revalidatePath("/");
-  return { ok: true, message: `큐에 추가됨: ${command}` };
+  return { ok: true, message: `Queued: ${command}` };
 }

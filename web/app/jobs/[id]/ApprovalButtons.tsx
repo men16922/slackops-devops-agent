@@ -23,7 +23,7 @@ export function ApprovalButtons({ id }: { id: string }) {
           disabled={pending}
           onClick={() => run(approveJob)}
         >
-          {pending ? "처리 중…" : "Approve"}
+          {pending ? "Processing…" : "Approve"}
         </button>
         <button
           className="btn reject"

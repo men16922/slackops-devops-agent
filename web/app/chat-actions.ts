@@ -52,9 +52,9 @@ export async function sendUserMessage(
   rawContent: string,
 ): Promise<SendResult> {
   const content = rawContent.trim();
-  if (content.length === 0) return { ok: false, message: "메시지가 비어 있습니다." };
+  if (content.length === 0) return { ok: false, message: "Message is empty." };
   if (content.length > CONTENT_MAX) {
-    return { ok: false, message: `메시지가 너무 깁니다(최대 ${CONTENT_MAX}자).` };
+    return { ok: false, message: `Message too long (max ${CONTENT_MAX} chars).` };
   }
 
   const now = utcnowIso();
@@ -88,9 +88,9 @@ export async function sendUserMessage(
         new GetCommand({ TableName: TABLE, Key: { PK: `CHAT#${convId}`, SK: "META" } }),
       );
       if (!got.Item) {
-        return { ok: false, code: "gone", message: "대화를 찾을 수 없습니다 — 새 대화를 시작합니다." };
+        return { ok: false, code: "gone", message: "Conversation not found — starting a new one." };
       }
-      return { ok: false, code: "busy", message: "지금은 에이전트가 응답 중입니다. 잠시 후 다시." };
+      return { ok: false, code: "busy", message: "The agent is responding right now. Try again shortly." };
     }
     throw e;
   }

@@ -31,10 +31,10 @@ export default async function JobDetailPage({
 
       {job.source === "agent" && (
         <div className="panel rationale">
-          <div className="rationale-label">🤖 에이전트 자율 제안</div>
+          <div className="rationale-label">🤖 Autonomous agent proposal</div>
           <p>
             {job.rationale ??
-              "운영 에이전트가 시스템을 관찰하고 이 작업을 제안했습니다. 실행은 사람 승인 후에만 진행됩니다."}
+              "The ops agent observed the system and proposed this job. It runs only after human approval."}
           </p>
         </div>
       )}
@@ -83,7 +83,7 @@ export default async function JobDetailPage({
 
       {job.status === "awaiting_approval" && (
         <>
-          <h2>Output Gate — 승인 필요</h2>
+          <h2>Output Gate — approval required</h2>
           {job.diff && <pre className="diff">{job.diff}</pre>}
           <div style={{ marginTop: 14 }}>
             <ApprovalButtons id={job.id} />
@@ -94,7 +94,7 @@ export default async function JobDetailPage({
       <h2>Audit Timeline</h2>
       <div className="panel">
         {audit.length === 0 ? (
-          <div className="notice">감사 이벤트 없음.</div>
+          <div className="notice">No audit events.</div>
         ) : (
           <ul className="timeline">
             {audit.map((e) => (
