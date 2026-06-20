@@ -12,8 +12,10 @@ Last updated: 2026-06-20
 ## Verification Baseline
 - 3-layer gate: `python3 -m pytest tests/ -q` → **278 passed, 1 skipped** (fastapi-not-installed local-only skip)
   + `ruff check src tests` + `mypy src` (strict) all green.
-- diagnose/logs **agentic AWS API MCP** (D13) local real e2e: `handle_logs`/`handle_diagnose('checkout-service')` via real
-  claude + `uvx awslabs.aws-api-mcp-server@1.3.45` → real CloudWatch (streams/trace-ids quoted); write op → "denied by security policy".
+- diagnose/logs **agentic AWS API MCP** (D13) e2e: local (`handle_logs`/`handle_diagnose('checkout-service')` via real claude +
+  `uvx awslabs.aws-api-mcp-server@1.3.45`) AND **cloud via Slack on real EC2 using Instance Profile (zero stored keys)** — real
+  CloudWatch (streams/trace-ids quoted); write op → "denied by security policy". EC2 terminated after.
+- **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
   render + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
 - lazy-import design — all modules import-safe even without fastapi/slack_bolt installed.
@@ -77,9 +79,9 @@ Last updated: 2026-06-20
   (closes the cloud full-loop gap). Playwright real-Claude e2e verified chat behavior + table render.
 
 ## Active Focus
-- Cloud deploy A–C verified (provisioned IAM/DynamoDB/EC2 in us-east-1, then terminated EC2). diagnose/logs migrated to
-  agentic AWS API MCP (D13), verified locally. **Next: Phase 3-deploy** — relaunch EC2 (t3.medium, user-data now installs uvx)
-  + Slack cloud e2e of the MCP path; then H0 [manual] Vercel deploy + submission.
+- Code complete + all-English + cloud MCP e2e verified (Slack→EC2→AWS MCP via Instance Profile), EC2 terminated. Local web
+  dashboard verified English. **Next: H0 [manual] submission** — Vercel deploy (link/Team ID) → artifacts (architecture diagram /
+  DynamoDB screenshot / 3-min English demo / text description). Deadline 2026-06-29.
 - AWS credit request **rejected** → $63.91 on hand + free tier (live: DynamoDB `slackops-agent` us-east-1, IAM role/profile, SSM tokens).
 
 ## Open Risks
