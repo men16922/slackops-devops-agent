@@ -64,6 +64,46 @@ def test_list_pending_filters_to_pending_and_awaiting(store: SqliteJobStore) -> 
     assert "logs" not in cmds  # done 은 제외
 
 
+def test_propose_dedupes_identical_open_agent_job(store: SqliteJobStore) -> None:
+    """동일 (command, args) AGENT 제안이 이미 열려있으면 두 번째는 dedupe(무해 no-op)."""
+    first = propose_job_impl(store, "diagnose", "api", "r1")
+    assert first["ok"] is True
+    assert isinstance(first["job_id"], str)
+    second = propose_job_impl(store, "diagnose", "api", "r2")
+    assert second["ok"] is True
+    assert second.get("deduped") is True
+    assert second["job_id"] is None
+    assert len(store.list_recent()) == 1
+
+
+def test_propose_not_deduped_when_args_differ(store: SqliteJobStore) -> None:
+    propose_job_impl(store, "diagnose", "api", "r")
+    res = propose_job_impl(store, "diagnose", "web", "r")
+    assert res.get("deduped") is not True
+    assert isinstance(res["job_id"], str)
+    assert len(store.list_recent()) == 2
+
+
+def test_propose_not_deduped_after_terminal(store: SqliteJobStore) -> None:
+    """dedupe 는 '열려있는' 동안만 — done 이 되면 같은 제안을 다시 올릴 수 있다."""
+    first = propose_job_impl(store, "diagnose", "api", "r")
+    store.claim()  # pending → running
+    store.complete(str(first["job_id"]), status=JobStatus.DONE)
+    res = propose_job_impl(store, "diagnose", "api", "r")
+    assert res.get("deduped") is not True
+    assert isinstance(res["job_id"], str)
+    assert len(store.list_recent()) == 2
+
+
+def test_propose_dedupe_scoped_to_agent(store: SqliteJobStore) -> None:
+    """사람/web 가 동일 명령을 넣어도 agent 제안은 별개로 적재(의도적 재제출 보존)."""
+    store.enqueue("diagnose", "api", source=JobSource.WEB)
+    res = propose_job_impl(store, "diagnose", "api", "r")
+    assert res.get("deduped") is not True
+    assert isinstance(res["job_id"], str)
+    assert len(store.list_recent()) == 2
+
+
 def test_build_server_smoke() -> None:
     """FastMCP 래퍼가 구성되는지 — mcp SDK 미설치 환경이면 skip."""
     pytest.importorskip("mcp")

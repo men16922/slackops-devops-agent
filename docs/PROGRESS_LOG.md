@@ -4,6 +4,24 @@ Last updated: 2026-06-20
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Original 2026-06-11~12 first-half entries: docs/archive/progress-2026-06.md
 
+## 2026-06-20 — safe-autonomy loop visible + governance Detections menu (F1–F5)
+- Status: Done (local-complete + gated). Cloud captures pending (manual).
+- Changed: **F1 monitor resident** — dedupe guard in `propose_job_impl` (source=AGENT open-dup skip) +
+  4th systemd unit (`agent_monitor --loop 300`). **F2 Slack notify** — new `proposal_notifier.py`
+  (pure `notify_new_proposals` + `run_forever`) as a daemon thread in `main.py` (reuses Bolt client;
+  `SLACK_NOTIFY_CHANNEL`/`DASHBOARD_URL`). **F3 dashboard bell** — `listPendingAgentJobs` +
+  `/api/jobs/agent-pending` + `NotificationBell.tsx` (poll + localStorage watermark). **F4 governance
+  detect** — `commands/detect.py` (scan-as-job, agentic AWS MCP read-only; iam/config/ssm/incident) +
+  `detect` L0 (permissions/allowlist/worker) + `store/detection_config.py` (Sqlite+DynamoDb) +
+  `agent_monitor.enqueue_due_scans` scheduler + IAM read perms (access-analyzer/config/ssm).
+  **F5 Detections menu** — `web/lib/detections` catalog + `getDetectionConfigs` +
+  `setDetectionEnabled`/`scanNow` + `/detections` page + `DetectionCard` + nav + seed + css.
+  Docs: `features.md` updated; new `DEVPOST.md`/`DEMO_SCRIPT.md` (en+kr).
+- Verified: **`make check` 307 passed · ruff · mypy 31 · doc-budget** + web **`next build`** green
+  (`/detections`, `/api/jobs/agent-pending`). make-demo e2e + cloud captures = pending (manual).
+- Blockers: None.
+- Next: local make-demo walk-through; Vercel deploy + EC2 1-run cloud captures (real CloudWatch / scan findings / write-denied).
+
 ## 2026-06-20 — cloud MCP e2e (Instance Profile) + full English-ification (agent + web UI)
 - Status: Done. Verified the AWS MCP path on real EC2, then switched all user-facing text to English for H0 submission.
 - Changed: **English-ification** — agent Slack/chat responses (diagnose/logs/tf-review/pr prompt templates + slack_handler /

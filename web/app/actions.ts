@@ -20,11 +20,23 @@ export interface ActionResult {
 
 // 웹 producer 가 큐에 넣을 수 있는 명령 — allowlist.py:_COMMAND_TOOLS 와 동일 집합(+ping).
 // default deny: 이 집합 밖 명령은 거부(주입 방어 — Slack/web 입력 직접 전달 금지).
-const ALLOWED_COMMANDS = ["ping", "logs", "diagnose", "tf-review", "pr"] as const;
+const ALLOWED_COMMANDS = [
+  "ping",
+  "logs",
+  "diagnose",
+  "detect",
+  "tf-review",
+  "pr",
+] as const;
 type AllowedCommand = (typeof ALLOWED_COMMANDS)[number];
 
 // 인자가 필수인 명령(빈 인자 거부). tf-review/ping 은 인자 불필요.
-const ARGS_REQUIRED: ReadonlySet<string> = new Set(["logs", "diagnose", "pr"]);
+const ARGS_REQUIRED: ReadonlySet<string> = new Set([
+  "logs",
+  "diagnose",
+  "detect",
+  "pr",
+]);
 
 const ARGS_MAX = 280;
 
@@ -138,4 +150,40 @@ export async function enqueueJob(
 
   revalidatePath("/");
   return { ok: true, message: `Queued: ${command}` };
+}
+
+// ── 거버넌스 탐지 토글/스캔 (CONFIG#detections + scan-as-job) ──
+const DETECTION_PK = "CONFIG#detections";
+
+// 탐지 카테고리 토글 upsert — detection_config.py:DynamoDb set_config 미러.
+export async function setDetectionEnabled(
+  category: string,
+  enabled: boolean,
+  mode: "on-demand" | "scheduled" = "on-demand",
+): Promise<ActionResult> {
+  const now = utcnowIso();
+  await doc.send(
+    new PutCommand({
+      TableName: TABLE,
+      Item: {
+        PK: DETECTION_PK,
+        SK: category,
+        GSI2PK: DETECTION_PK,
+        GSI2SK: category,
+        category,
+        enabled,
+        mode,
+        updated_at: now,
+      },
+    }),
+  );
+  revalidatePath("/detections");
+  return { ok: true };
+}
+
+// "Scan now" — detect 작업을 큐에 적재(worker 가 read-only AWS 스캔 → findings = 결과).
+// enqueueJob 의 default-deny(detect 허용 + category 필수)를 그대로 지난다.
+export async function scanNow(category: string): Promise<ActionResult> {
+  const res = await enqueueJob("detect", category);
+  return res.ok ? { ok: true, message: `Scan queued: ${category}` } : res;
 }

@@ -51,7 +51,9 @@ def test_pr_allowlist_covers_branch_to_pr_workflow() -> None:
 
 
 def test_known_commands_are_claude_backed_only() -> None:
-    assert known_commands() == frozenset({"logs", "diagnose", "tf-review", "pr"})
+    assert known_commands() == frozenset(
+        {"logs", "diagnose", "detect", "tf-review", "pr"}
+    )
 
 
 def test_allowlist_matches_permissions_registry() -> None:

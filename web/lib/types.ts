@@ -54,6 +54,17 @@ export interface Metric {
   error?: string;
 }
 
+// ── 거버넌스 탐지 토글 — store/detection_config.py 계약 미러 ──
+export type DetectionMode = "on-demand" | "scheduled";
+
+export interface DetectionConfig {
+  category: string;
+  enabled: boolean;
+  mode: DetectionMode;
+  updated_at: string;
+  last_scan?: string;
+}
+
 // ── 대화 버스(web↔에이전트) — store/chat_store.py 계약 미러 ──
 export type ChatStatus = "open" | "awaiting_agent" | "streaming" | "done";
 export type ChatRole = "user" | "assistant";

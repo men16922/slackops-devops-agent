@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { NotificationBell } from "./NotificationBell";
 
 export const metadata: Metadata = {
   title: "SlackOps DevOps Agent — Dashboard",
@@ -22,9 +23,13 @@ export default function RootLayout({
           </div>
           <nav>
             <Link href="/">Jobs</Link>
+            <Link href="/detections">Detections</Link>
             <Link href="/metrics">Metrics</Link>
           </nav>
-          <div className="src muted">store: DynamoDB single-table</div>
+          <div className="topbar-right">
+            <NotificationBell />
+            <div className="src muted">store: DynamoDB single-table</div>
+          </div>
         </header>
         <main className="container">{children}</main>
       </body>

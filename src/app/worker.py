@@ -75,7 +75,7 @@ def default_executors(
     Args:
         runner: claude-backed 핸들러에 전달할 subprocess 실행기(테스트 주입점).
     """
-    from app.commands import diagnose, logs, ping, pr, tf_review
+    from app.commands import detect, diagnose, logs, ping, pr, tf_review
 
     def _merge_metrics(
         outcome: CommandOutcome, captured: list[RunMetrics]
@@ -97,6 +97,12 @@ def default_executors(
         text = diagnose.handle_diagnose(
             job.args, runner=runner, on_metrics=captured.append
         )
+        return _merge_metrics(CommandOutcome(result=text), captured)
+
+    def detect_executor(job: Job) -> CommandOutcome:
+        # job.args = 탐지 카테고리(iam/config/ssm/incident). scan-as-job — findings = 결과.
+        captured: list[RunMetrics] = []
+        text = detect.handle_detect(job.args, runner=runner, on_metrics=captured.append)
         return _merge_metrics(CommandOutcome(result=text), captured)
 
     def tf_review_executor(_job: Job) -> CommandOutcome:
@@ -122,6 +128,7 @@ def default_executors(
         "ping": lambda _job: CommandOutcome(result=ping.handle_ping()),
         "logs": logs_executor,
         "diagnose": diagnose_executor,
+        "detect": detect_executor,
         "tf-review": tf_review_executor,
         "pr": pr_executor,
     }

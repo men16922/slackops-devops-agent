@@ -30,6 +30,12 @@ from app.store.chat_store import (
     Message,
     SqliteChatStore,
 )
+from app.store.detection_config import (
+    DetectionConfig,
+    DetectionConfigStore,
+    DynamoDbDetectionConfigStore,
+    SqliteDetectionConfigStore,
+)
 from app.store.dynamodb_store import DynamoDbJobStore
 from app.store.sqlite_store import SqliteJobStore
 from app.store.telemetry_store import (
@@ -49,8 +55,11 @@ __all__ = [
     "ChatStatus",
     "ChatStore",
     "Conversation",
+    "DetectionConfig",
+    "DetectionConfigStore",
     "DynamoDbAuditStore",
     "DynamoDbChatStore",
+    "DynamoDbDetectionConfigStore",
     "DynamoDbJobStore",
     "DynamoDbTelemetryStore",
     "Job",
@@ -61,6 +70,7 @@ __all__ = [
     "MetricRecord",
     "SqliteAuditStore",
     "SqliteChatStore",
+    "SqliteDetectionConfigStore",
     "SqliteJobStore",
     "SqliteTelemetryStore",
     "TelemetryStore",

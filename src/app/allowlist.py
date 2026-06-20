@@ -37,6 +37,8 @@ class AllowlistDenied(Exception):
 # 직접 조회(agentic). 서버 read-only 모드 + IAM read-only 가 hard boundary(mcp_config.py).
 _COMMAND_TOOLS: dict[str, tuple[str, ...]] = {
     "logs": AWS_MCP_TOOLS,
+    # detect(거버넌스 스캔)도 logs 와 동일 — AWS API MCP read 도구만(에이전트가 직접 조회).
+    "detect": AWS_MCP_TOOLS,
     "diagnose": (
         *AWS_MCP_TOOLS,
         "Bash(kubectl get:*)",

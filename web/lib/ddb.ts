@@ -16,6 +16,8 @@ import type {
   AuditEvent,
   ChatMessage,
   Conversation,
+  DetectionConfig,
+  DetectionMode,
   Job,
   Metric,
 } from "./types";
@@ -47,6 +49,34 @@ export async function listRecentJobs(limit = 50): Promise<Job[]> {
     }),
   );
   return (r.Items ?? []).map((it) => it as Job);
+}
+
+export async function listPendingAgentJobs(limit = 50): Promise<Job[]> {
+  // 에이전트 자율 제안 중 아직 열린 것(알림 벨용) — listRecentJobs 를 in-app 필터(새 GSI 불필요).
+  const jobs = await listRecentJobs(limit);
+  return jobs.filter(
+    (j) =>
+      j.source === "agent" &&
+      (j.status === "pending" || j.status === "awaiting_approval"),
+  );
+}
+
+export async function getDetectionConfigs(): Promise<DetectionConfig[]> {
+  // PK=CONFIG#detections 의 모든 카테고리 토글 — detection_config.py:list_configs 미러.
+  const r = await doc.send(
+    new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :pk",
+      ExpressionAttributeValues: { ":pk": "CONFIG#detections" },
+    }),
+  );
+  return (r.Items ?? []).map((it) => ({
+    category: String(it.category),
+    enabled: Boolean(it.enabled),
+    mode: (it.mode === "scheduled" ? "scheduled" : "on-demand") as DetectionMode,
+    updated_at: String(it.updated_at ?? ""),
+    last_scan: it.last_scan as string | undefined,
+  }));
 }
 
 export async function getJob(id: string): Promise<Job | null> {

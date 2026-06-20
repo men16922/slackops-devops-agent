@@ -70,6 +70,10 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   echo "UV_CACHE_DIR=/opt/slackops-devops-agent/.uv-cache"
   echo "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317"
   echo "OTEL_SERVICE_NAME=slackops-devops-agent"
+  # 제안 알림(선택) — 채널 미설정 시 notifier 는 no-op. SSM 파라미터 부재 시 빈 값(부팅 실패 방지).
+  echo "SLACK_NOTIFY_CHANNEL=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_NOTIFY_CHANNEL --query Parameter.Value --output text 2>/dev/null || true)"
+  # 대시보드 deep-link 용(예: https://<app>.vercel.app). 부재 시 링크 대신 (job <id>) 텍스트.
+  echo "DASHBOARD_URL=$(aws ssm get-parameter --region "$REGION" --name /slackops/DASHBOARD_URL --query Parameter.Value --output text 2>/dev/null || true)"
 } > /etc/slackops-devops-agent.env
 chmod 600 /etc/slackops-devops-agent.env
 
@@ -130,8 +134,29 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
 
+# --- systemd unit: agent_monitor(Tier1 상주 producer — 신호 관찰 → 자율 제안) ---
+# 기본 Tier1(--real 없음 → 토큰 0). 정적 _DEMO_SIGNALS 를 5분 간격 관찰 → propose_job.
+# mcp_server 의 dedupe 가드가 동일 제안 반복 적재를 막는다(스팸 방지). 실관찰은 --signals-file/--real.
+cat > /etc/systemd/system/slackops-devops-agent-monitor.service <<'UNIT'
+[Unit]
+Description=slackops-devops-agent monitor (Tier1 resident producer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=devopsagent
+EnvironmentFile=/etc/slackops-devops-agent.env
+ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.agent_monitor --loop 300
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 systemctl daemon-reload
 systemctl enable --now \
   slackops-devops-agent.service \
   slackops-devops-agent-worker.service \
-  slackops-devops-agent-chat-agent.service
+  slackops-devops-agent-chat-agent.service \
+  slackops-devops-agent-monitor.service

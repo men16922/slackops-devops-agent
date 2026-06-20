@@ -48,7 +48,39 @@ def bootstrap_socket_mode() -> None:
     from app.slack_handler import SlackHandler, register_default_commands
 
     handler = register_default_commands(SlackHandler.from_env())
+    _serve_proposal_notifier(handler)
     handler.start()
+
+
+def _serve_proposal_notifier(handler: Any) -> None:
+    """새 AGENT 제안을 Slack 채널로 알리는 폴링 루프를 데몬 스레드에서 기동.
+
+    SLACK_NOTIFY_CHANNEL 미설정 시 no-op(기능 비활성). Slack 앱 프로세스가 이미 보유한
+    Bolt client(봇 토큰)로 게시한다 — 별도 프로세스/유닛·토큰 배선 불필요. 스레드 최상위
+    try/except 로 알림 실패가 Slack 앱을 죽이지 않게 한다(health 스레드 선례).
+    """
+    import os
+
+    channel = os.environ.get("SLACK_NOTIFY_CHANNEL")
+    if not channel:
+        return
+
+    import structlog
+
+    from app.mcp_server import store_from_env
+    from app.proposal_notifier import make_post_fn, run_forever
+
+    log = structlog.get_logger()
+
+    def _loop() -> None:
+        try:
+            store = store_from_env()
+            post_fn = make_post_fn(handler.app.client, channel)
+            run_forever(store, post_fn)
+        except Exception as exc:  # noqa: BLE001 — 알림 스레드는 Slack 앱을 죽이면 안 된다.
+            log.warning("proposal_notifier.crashed", error=str(exc))
+
+    threading.Thread(target=_loop, daemon=True, name="proposal-notifier").start()
 
 
 def _serve_health_api() -> None:

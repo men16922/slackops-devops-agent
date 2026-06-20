@@ -8,11 +8,12 @@ from app.agent_monitor import (
     MONITOR_TOOLS,
     build_monitor_prompt,
     detect,
+    enqueue_due_scans,
     run_monitor_headless,
     simulate_detection,
 )
 from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
-from app.store import JobSource, SqliteJobStore
+from app.store import JobSource, SqliteDetectionConfigStore, SqliteJobStore
 from tests._helpers import RecordingRunner, counter_clock, counter_id, result_json
 
 
@@ -66,6 +67,15 @@ def test_simulate_detection_no_signal_no_job(store: SqliteJobStore) -> None:
     assert store.list_recent() == []
 
 
+def test_simulate_detection_deduped_returns_none(store: SqliteJobStore) -> None:
+    """상주 루프가 같은 신호를 재관찰해도 두 번째는 dedupe → None, 큐 1건만(스팸 방지)."""
+    first = simulate_detection(store, "service=api 5xx error rate 12%")
+    assert first is not None
+    second = simulate_detection(store, "service=api 5xx error rate 12%")
+    assert second is None
+    assert len(store.list_recent()) == 1
+
+
 # ── 프롬프트 격리(주입 방어 재사용) ──────────────────────────
 
 
@@ -78,6 +88,30 @@ def test_build_monitor_prompt_isolates_untrusted() -> None:
 
 
 # ── Tier2 인자 조립(실 claude 호출 없음, mock 주입) ──────────
+
+
+# ── 스케줄 거버넌스 스캔(enqueue_due_scans) ──────────────────
+
+
+def test_enqueue_due_scans_only_enabled_scheduled(store: SqliteJobStore) -> None:
+    cfg = SqliteDetectionConfigStore(":memory:")
+    cfg.set_config("iam", enabled=True, mode="scheduled")
+    cfg.set_config("config", enabled=True, mode="on-demand")  # 제외(on-demand)
+    cfg.set_config("ssm", enabled=False, mode="scheduled")  # 제외(disabled)
+    assert enqueue_due_scans(store, cfg) == ["iam"]
+    jobs = store.list_recent()
+    assert len(jobs) == 1
+    assert jobs[0].command == "detect"
+    assert jobs[0].args == "iam"
+
+
+def test_enqueue_due_scans_deduped(store: SqliteJobStore) -> None:
+    cfg = SqliteDetectionConfigStore(":memory:")
+    cfg.set_config("iam", enabled=True, mode="scheduled")
+    assert enqueue_due_scans(store, cfg) == ["iam"]
+    # 같은 detect 가 아직 열려있으면 다음 주기는 dedupe → 빈 목록, 큐 1건.
+    assert enqueue_due_scans(store, cfg) == []
+    assert len(store.list_recent()) == 1
 
 
 def test_run_monitor_headless_registers_mcp_and_propose_tool() -> None:

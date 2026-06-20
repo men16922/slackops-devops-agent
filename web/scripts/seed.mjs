@@ -336,6 +336,22 @@ async function seedData() {
     auditItem(agentDiag.id, 1, isoAt(-60), "proposed", "agent", "error rate 12%"),
   );
 
+  // 탐지 토글 시드 — 실배선 4개(데모용 iam/config ON). roadmap 은 web 카탈로그에만 존재.
+  const detItem = (category, enabled, mode = "on-demand") => ({
+    PK: "CONFIG#detections",
+    SK: category,
+    GSI2PK: "CONFIG#detections",
+    GSI2SK: category,
+    category,
+    enabled,
+    mode,
+    updated_at: isoAt(0),
+  });
+  items.push(detItem("iam", true, "scheduled"));
+  items.push(detItem("config", true, "on-demand"));
+  items.push(detItem("ssm", false));
+  items.push(detItem("incident", false));
+
   for (const item of items) await put(item);
   console.log(`[seed] inserted ${items.length} items`);
 }

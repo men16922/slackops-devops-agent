@@ -24,9 +24,11 @@ from typing import TYPE_CHECKING
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner, run_headless
 from app.mcp_server import propose_job_impl, store_from_env
 from app.sanitizer import build_prompt
+from app.store.detection_config import MODE_SCHEDULED
 
 if TYPE_CHECKING:
     from app.store.base import Job, JobStore
+    from app.store.detection_config import DetectionConfigStore
 
 # Tier 2 에이전트가 호출할 수 있는 유일한 도구(propose 만 — 직접 실행 금지).
 MONITOR_TOOLS: list[str] = ["mcp__slackops__propose_job", "mcp__slackops__list_pending"]
@@ -172,6 +174,32 @@ def run_monitor_headless(
     return result.output
 
 
+def enqueue_due_scans(
+    job_store: JobStore, config_store: DetectionConfigStore
+) -> list[str]:
+    """enabled + mode=scheduled 탐지 카테고리마다 detect 작업을 큐에 제안(배치 스캔).
+
+    propose_job_impl 경유 → default-deny + dedupe 가드를 그대로 통과한다(이미 열린 동일
+    detect 작업이 있으면 skip — 스캔은 빠르게 DONE 되므로 다음 주기에 재적재). on-demand
+    카테고리는 대시보드 "Scan now" 로만 돌고 여기선 제외한다.
+
+    Returns 새로 적재된 카테고리 목록(dedupe 로 건너뛴 것은 제외).
+    """
+    queued: list[str] = []
+    for cfg in config_store.list_configs():
+        if not (cfg.enabled and cfg.mode == MODE_SCHEDULED):
+            continue
+        result = propose_job_impl(
+            job_store,
+            "detect",
+            cfg.category,
+            f"Scheduled {cfg.category} governance scan",
+        )
+        if result.get("ok") and result.get("job_id"):
+            queued.append(cfg.category)
+    return queued
+
+
 _DEMO_SIGNALS = (
     "service=api  ALB 5xx error rate 12% over last 5m; "
     "upstream 504 gateway timeout on /checkout; p99 latency 8.1s"
@@ -202,22 +230,35 @@ def main() -> None:
 
     store = store_from_env()
 
+    # 스케줄 거버넌스 스캔용 토글 store — 부재/오류 시 None(스캔만 생략, 신호 감지는 계속).
+    config_store: DetectionConfigStore | None
+    try:
+        from app.store.detection_config import config_store_from_env
+
+        config_store = config_store_from_env()
+    except Exception:  # noqa: BLE001 — boto3/DDB 부재면 스케줄 스캔만 비활성.
+        config_store = None
+
     def one_cycle() -> None:
         if args.real:
             output = run_monitor_headless(signals)
             log.info("monitor.real.done", output=output[:500])
-            return
-        job = simulate_detection(store, signals)
-        if job is None:
-            log.info("monitor.sim.no_action")
         else:
-            log.info(
-                "monitor.sim.proposed",
-                job_id=job.id,
-                command=job.command,
-                args=job.args,
-                rationale=job.rationale,
-            )
+            job = simulate_detection(store, signals)
+            if job is None:
+                log.info("monitor.sim.no_action")
+            else:
+                log.info(
+                    "monitor.sim.proposed",
+                    job_id=job.id,
+                    command=job.command,
+                    args=job.args,
+                    rationale=job.rationale,
+                )
+        if config_store is not None:
+            queued = enqueue_due_scans(store, config_store)
+            if queued:
+                log.info("monitor.scheduled_scans", categories=queued)
 
     if args.loop and args.loop > 0:
         import time

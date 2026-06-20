@@ -32,6 +32,25 @@ _PENDING_STATUSES: frozenset[str] = frozenset(
 )
 
 
+def _has_open_agent_duplicate(store: JobStore, command: str, args: str) -> bool:
+    """동일 AGENT 제안이 이미 열려있으면(PENDING/AWAITING_APPROVAL) True — 중복 제안 차단.
+
+    상주 모니터(Tier1)가 같은 신호를 반복 관찰해 동일 제안을 매 주기 쌓는 것을 막는다.
+    list_recent(50) in-app 필터만 사용 — 스키마/GSI 무변경. (command, args) 는 enqueue 가
+    저장하는 형태(args.strip())와 같은 기준으로 비교(호출부에서 strip 된 값 전달 — 불변).
+    source=AGENT 로 한정: 사람/web 재제출은 의도적이므로 dedupe 하지 않는다.
+    """
+    for job in store.list_recent(50):
+        if (
+            job.source is JobSource.AGENT
+            and job.status.value in _PENDING_STATUSES
+            and job.command == command
+            and job.args == args
+        ):
+            return True
+    return False
+
+
 def propose_job_impl(
     store: JobStore,
     command: str,
@@ -48,6 +67,7 @@ def propose_job_impl(
 
     Returns:
         성공: {"ok": True, "job_id", "status", "command"}.
+        중복: {"ok": True, "deduped": True, "job_id": None, "status": "skipped"} — 무해 no-op.
         거부: {"ok": False, "error"} — 미지/비허용 명령(주입 방어 default deny).
     """
     name = command.strip()
@@ -59,9 +79,18 @@ def propose_job_impl(
                 f"allowed: {sorted(permissions.known_commands())}"
             ),
         }
+    clean_args = args.strip()
+    if _has_open_agent_duplicate(store, name, clean_args):
+        return {
+            "ok": True,
+            "deduped": True,
+            "job_id": None,
+            "status": "skipped",
+            "command": name,
+        }
     job = store.enqueue(
         name,
-        args.strip(),
+        clean_args,
         source=JobSource.AGENT,
         requested_by="agent",
         rationale=rationale.strip() or None,

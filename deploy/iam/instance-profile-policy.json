@@ -55,6 +55,22 @@
       "Resource": "*"
     },
     {
+      "Sid": "GovernanceDetectionsReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "access-analyzer:List*",
+        "access-analyzer:Get*",
+        "config:Describe*",
+        "config:Get*",
+        "config:List*",
+        "ssm:DescribeInstancePatchStates",
+        "ssm:DescribeInstanceInformation",
+        "ssm:ListComplianceItems",
+        "ssm:ListResourceComplianceSummaries"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "OtelExport",
       "Effect": "Allow",
       "Action": [

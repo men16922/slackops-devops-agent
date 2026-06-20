@@ -53,6 +53,8 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec("diagnose", PermissionLevel.OBSERVE, claude_backed=True),
     CommandSpec("tf-review", PermissionLevel.PREPARE, claude_backed=True),
     CommandSpec("pr", PermissionLevel.PREPARE, claude_backed=True),
+    # 거버넌스 탐지 스캔(read-only AWS) — logs/diagnose 와 같은 L0 관찰.
+    CommandSpec("detect", PermissionLevel.OBSERVE, claude_backed=True),
 )
 
 # subcommand → 요구 권한 레벨(레지스트리에서 파생). 여기 없는 명령은 전부 거부(default deny).
