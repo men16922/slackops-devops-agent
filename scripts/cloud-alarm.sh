@@ -38,31 +38,35 @@ aws cloudwatch put-metric-alarm \
   --threshold 5 --comparison-operator GreaterThanThreshold \
   --treat-missing-data notBreaching
 
-# 2) 기준선 — 폴링 비교용으로 현재 pending agent 제안 수를 센다.
-pending_count() {
+# 2) 기준선 — 상태 무관 'agent diagnose <svc>' 작업 수(worker 가 PENDING 을 즉시 비워도
+#    총량은 신규 1건당 +1 → 빠른 소비에도 robust). list_pending 만 세면 오탐.
+job_count() {
   python3 - <<'PY' 2>/dev/null || echo 0
-from app.mcp_server import store_from_env, list_pending_impl
+from app.mcp_server import store_from_env
 import os
 svc = os.environ.get("SERVICE", "checkout-service")
-n = sum(1 for j in list_pending_impl(store_from_env())
-        if j.get("source") == "agent" and j.get("command") == "diagnose" and j.get("args") == svc)
+n = sum(1 for j in store_from_env().list_recent(50)
+        if j.source.value == "agent" and j.command == "diagnose" and j.args == svc)
 print(n)
 PY
 }
-BEFORE="$(SERVICE="$SERVICE" pending_count)"
+BEFORE="$(SERVICE="$SERVICE" job_count)"
 
-# 3) ALARM 강제(투명한 데모) — 상태 전이가 EventBridge 이벤트를 발행한다.
-#    reason 에 5xx/error rate/service 마커 포함(Lambda 의 결정적 detect 가 매칭).
+# 3) 상태 전이 보장 — 이미 ALARM 이면 같은 상태 set 은 전이 없음 → 이벤트 미발행.
+#    먼저 OK 로 리셋(룰은 ALARM 만 매칭 → 무시) 후 ALARM 으로 강제해 전이를 만든다.
 REASON="demo: service=$SERVICE ALB 5xx error rate 23% over 5m; upstream 504 gateway timeout; p99 8.1s"
-echo "cloud-alarm: set-alarm-state → ALARM (EventBridge 이벤트 발행)…"
+echo "cloud-alarm: reset → OK, then force → ALARM (EventBridge 이벤트 발행)…"
+aws cloudwatch set-alarm-state --alarm-name "$ALARM_NAME" --state-value OK \
+  --state-reason "demo reset" >/dev/null
+sleep 2
 aws cloudwatch set-alarm-state --alarm-name "$ALARM_NAME" --state-value ALARM --state-reason "$REASON"
 
 # 4) 폴링 — EventBridge→Lambda 가 큐에 새 제안을 올릴 때까지(최대 ~40s).
 echo "cloud-alarm: EventBridge → Lambda → DynamoDB 제안 대기…"
 for i in $(seq 1 20); do
-  NOW="$(SERVICE="$SERVICE" pending_count)"
+  NOW="$(SERVICE="$SERVICE" job_count)"
   if [ "$NOW" -gt "$BEFORE" ]; then
-    echo "cloud-alarm: ✅ 실시간 제안 적재 확인 (pending agent diagnose '$SERVICE': $BEFORE → $NOW)"
+    echo "cloud-alarm: ✅ 실시간 제안 확인 (agent diagnose '$SERVICE': $BEFORE → $NOW) — EventBridge→Lambda 경로"
     echo "cloud-alarm: done — 대시보드/Slack 에서 제안 확인 → 승인/실행. 정리: make cloud-alarm-clean"
     exit 0
   fi
