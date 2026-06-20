@@ -3,7 +3,7 @@
 
 .PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent
 .PHONY: cloud-whoami cloud-iam cloud-ddb cloud-up cloud-deploy cloud-status cloud-console cloud-ssm cloud-schedule cloud-start cloud-stop cloud-down
-.PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean
+.PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean cloud-vercel-key cloud-vercel-key-clean
 
 check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
 
@@ -48,6 +48,10 @@ cloud-alarm:   ## (클라우드) 실 CloudWatch alarm 강제 ALARM → **EventBr
 	@bash scripts/cloud-alarm.sh
 cloud-alarm-clean: ## (클라우드) 데모 alarm 삭제(비용 정리). 이벤트 경로는 cloud-lambda-clean.
 	aws cloudwatch delete-alarms --alarm-names "$${ALARM_NAME:-slackops-demo-checkout-5xx}"
+cloud-vercel-key: ## (클라우드) Vercel 대시보드용 최소권한 IAM 키 발급(테이블 스코프, read+approve). READONLY=1 가능. ★직접 실행(Secret 보호).
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/vercel/create-key.sh
+cloud-vercel-key-clean: ## (클라우드) Vercel IAM 사용자/키 정리(노출 의심·제출 후).
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/vercel/delete-key.sh
 
 # ===== cloud 배포 라이프사이클 (실 AWS) — deploy/*.sh 래퍼. 실 자격증명 필요(aws sts get-caller-identity) =====
 # 인프라 순서 고정: IAM → DynamoDB → EC2 (deploy-checklist.md [B]). EC2 인스턴스 ID 는 ID_FILE 에 기록 →
