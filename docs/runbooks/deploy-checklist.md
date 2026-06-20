@@ -212,7 +212,7 @@ IAM → Users → Create user(콘솔 OFF, 프로그래매틱 전용) → 인라�
 ## [F] 제출물 체크리스트 (H0 Requirements, 마감 6/29)
 
 - [ ] **텍스트 설명** — 무엇/누구/왜 + "AWS Database used: **DynamoDB**". 보안(권한 L0/1 + 주입방어 4계층)·계측(OTel) 차별화 서술. AI 초안을 **본인 목소리로 편집(필수)**.
-- [ ] **아키텍처 다이어그램** — Slack+Vercel→DynamoDB single-table→EC2 worker→Claude/도구 + OTel + 권한·주입방어. (`docs/images/architecture.png`)
+- [ ] **아키텍처 다이어그램** — Slack+Vercel→DynamoDB single-table→EC2 worker→Claude/도구 + OTel + 권한·주입방어 + 이벤트구동(EventBridge→Lambda). (`docs/submission/architecture.png`)
 - [ ] **데모영상 <3분(YouTube)** — 문제→대상→동작(diagnose, 대시보드 승인 게이트)→DB 통합 설명. README 낭독 금지.
 - [ ] **DynamoDB 사용 증빙 스크린샷** ([B-2]/[E]).
 - [ ] **Published Vercel Link + Team ID** ([D-2]).
