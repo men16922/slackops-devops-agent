@@ -1,7 +1,7 @@
 # slackops-devops-agent — Makefile
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
-.PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent quarkify-setup quarkify quarkify-check
+.PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent
 
 check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
 
@@ -34,16 +34,6 @@ worker:        ## 공유 큐 폴링 worker(승인된 job 실행 — 실 Claude).
 	$(DEV_ENV) python3 -m app.worker $(ARGS)
 chat-agent:    ## 대화 버스 폴링 에이전트(Claude 스트리밍 응답 — 실 Claude). 1건만: `make chat-agent ARGS=--once`
 	$(DEV_ENV) python3 -m app.chat_agent $(ARGS)
-
-# ===== Quarkify (선택적 탐색 가속 — gitignore 생성물, 게이트 아님) =====
-# 코드 심볼·호출그래프 인덱스. make check 에 절대 미포함(부재 산출물의 빌드의존화 금지).
-# 정책: 대형·고빈도 심볼은 인덱스 우선, 드문 리터럴은 grep. 상세 CLAUDE.md "## Quarkify".
-quarkify-setup:   ## one-time: clone the pinned Quarkify tool (zero deps, no npm)
-	@bash tools/quarkify/setup.sh
-quarkify:         ## regenerate whole-src code topology → .quarkify/src (fast)
-	@bash tools/quarkify/generate.sh
-quarkify-check:   ## .quarkify/src 신선도 검사(비차단; stale면 make quarkify 안내). make check 미포함
-	@bash harness/check-quarkify.sh --check
 
 # ===== overnight harness targets (scripts/overnight/Makefile.harness.snippet) =====
 OVN := scripts/overnight

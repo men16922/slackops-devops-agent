@@ -38,10 +38,9 @@ Last updated: 2026-06-11
 - New global (invariant) rules go in this file. No guessing (if it's not documented, say "not in the docs").
 - Korean body + English identifiers/commands/paths.
 
-## 7. Navigation tooling discipline (optional accelerator — Quarkify)
-- Code exploration follows a **measured conditional policy** — for large packages / high-frequency symbols (broad searches), prefer the `.quarkify/src`
-  index (regenerate with `make quarkify` when needed, idempotent ~seconds); for rare literals / small files, use grep.
-  *(This repo is small (~3.6K LOC) — grep-first is the default for everyday exploration; use the index only for broad symbol searches.)*
-- The index is **for locating only; final confirmation is the original file** (quark leaves are empty folders, no line numbers).
-- It's an optional local accelerator, so **don't gate on it** (not part of `make check` — don't make the build depend on an absent artifact).
-- Details: entry point CLAUDE.md "## Quarkify" section.
+## 7. Navigation tooling discipline (LSP-first)
+- **Symbols → LSP, text → grep.** For definitions, references, and call graphs use Claude Code LSP (pyright): `workspaceSymbol`,
+  `findReferences` (type-aware, no substring false positives), `incomingCalls`/`outgoingCalls`. Reserve grep for string literals,
+  non-Python files, and whole-tree text patterns. Source remains the authority — confirm bodies in the original file.
+- The former Quarkify index was retired (2026-06-19) after LSP strictly dominated it on this repo; don't gate on navigation tooling.
+- Details: entry point CLAUDE.md "## Code navigation (LSP)" section.

@@ -19,9 +19,6 @@ venv/
 # SQLite job queue (MVP)
 *.db
 
-# Quarkify 코드 토폴로지 인덱스 (선택적 탐색 가속 — 로컬 빌드 생성물)
-.quarkify/
-
 # Playwright MCP 아티팩트 + 로컬 스크린샷 (검증용, 커밋 안 함)
 .playwright-mcp/
 screenshots/
