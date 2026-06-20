@@ -1,6 +1,9 @@
 # 작업 하네스 런타임
 .harness/
 
+# cloud 배포 런타임 — make cloud-up 이 기록하는 EC2 인스턴스 ID(환경별, 커밋 금지)
+deploy/.instance-id
+
 # Python
 __pycache__/
 *.pyc

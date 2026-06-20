@@ -38,8 +38,9 @@ curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin s
 useradd --system --create-home --shell /sbin/nologin devopsagent || true
 APP_DIR=/opt/slackops-devops-agent
 # 기본값 = 실 repo. private repo 면 clone 인증 필요(public 전환 또는 SSM PAT) — deploy/README §B-3 / action_item §B-3.
+# 기본 브랜치(main)를 clone — main 이 작업/제출 브랜치(전체 동기화 유지). 다른 브랜치는 REPO_BRANCH 로 override.
 REPO_URL="${REPO_URL:-https://github.com/men16922/slackops-devops-agent.git}"
-git clone "$REPO_URL" "$APP_DIR" || true
+git clone ${REPO_BRANCH:+--branch "$REPO_BRANCH"} "$REPO_URL" "$APP_DIR" || true
 python3.11 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR"
 chown -R devopsagent:devopsagent "$APP_DIR"

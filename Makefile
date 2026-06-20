@@ -2,6 +2,7 @@
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
 .PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent
+.PHONY: cloud-whoami cloud-iam cloud-ddb cloud-up cloud-deploy cloud-status cloud-console cloud-ssm cloud-schedule cloud-start cloud-stop cloud-down
 
 check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
 
@@ -42,6 +43,44 @@ cloud-alarm:   ## (클라우드) 실 CloudWatch alarm 강제 발화 → 에이�
 	@bash scripts/cloud-alarm.sh $(ARGS)
 cloud-alarm-clean: ## (클라우드) 데모 alarm 삭제(비용 정리).
 	aws cloudwatch delete-alarms --alarm-names "$${ALARM_NAME:-slackops-demo-checkout-5xx}"
+
+# ===== cloud 배포 라이프사이클 (실 AWS) — deploy/*.sh 래퍼. 실 자격증명 필요(aws sts get-caller-identity) =====
+# 인프라 순서 고정: IAM → DynamoDB → EC2 (deploy-checklist.md [B]). EC2 인스턴스 ID 는 ID_FILE 에 기록 →
+# 이후 cloud-status/console/ssm/stop/down 이 읽는다. 캡처 체크리스트: docs/test/0620-qa-test.md.
+CLOUD_REGION  ?= us-east-1
+ID_FILE       := deploy/.instance-id
+AWSC          := AWS_REGION=$(CLOUD_REGION) AWS_DEFAULT_REGION=$(CLOUD_REGION) aws
+# 저장된 인스턴스 ID 를 읽고 없으면 명확히 실패시키는 가드(파괴적 타깃에서 빈 인자 방지).
+NEED_ID        = ID="$$(cat $(ID_FILE) 2>/dev/null)"; [ -n "$$ID" ] || { echo "no instance id — run 'make cloud-up' first"; exit 1; }
+
+cloud-whoami:  ## 현재 AWS 자격증명/계정/리전 확인(배포 전 점검).
+	@$(AWSC) sts get-caller-identity --output table && echo "region=$(CLOUD_REGION)"
+cloud-iam:     ## (인프라 1/3) IAM role+instance-profile 생성. 멱등 아님 — 이미 있으면 EntityAlreadyExists(정상 스킵).
+	@( cd deploy/iam && ./create-role.sh ) || echo "cloud-iam: 이미 존재할 수 있음(EntityAlreadyExists) — 계속 진행 가능"
+cloud-ddb:     ## (인프라 2/3) DynamoDB 단일테이블(slackops-agent, PAY_PER_REQUEST, GSI1/2). 멱등(있으면 생략).
+	( cd deploy/dynamodb && AWS_REGION=$(CLOUD_REGION) ./create-table.sh )
+cloud-up:      ## (인프라 3/3) EC2 기동(t3.medium·인바운드0·systemd 4개) → ID 기록 + running 대기. INSTANCE_TYPE 오버라이드 가능.
+	@INSTANCE_ID="$$( cd deploy/ec2 && AWS_REGION=$(CLOUD_REGION) ./launch-instance.sh )"; \
+	  echo "$$INSTANCE_ID" > $(ID_FILE); \
+	  echo "launched: $$INSTANCE_ID → $(ID_FILE)"; echo "waiting instance-running..."; \
+	  $(AWSC) ec2 wait instance-running --instance-ids "$$INSTANCE_ID"; \
+	  echo "running. 부팅/설치 로그: make cloud-console (수 분 후), 접속: make cloud-ssm"
+cloud-deploy: cloud-iam cloud-ddb cloud-up   ## 인프라 전체 한 번에(IAM→DDB→EC2). 멱등 부분만 안전 재실행.
+cloud-status:  ## EC2 상태/타입/AZ 출력.
+	@$(NEED_ID); $(AWSC) ec2 describe-instances --instance-ids "$$ID" \
+	  --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name,Type:InstanceType,AZ:Placement.AvailabilityZone}' --output table
+cloud-console: ## EC2 시리얼 콘솔 출력 마지막 40줄(부팅/cloud-init/설치 디버그).
+	@$(NEED_ID); $(AWSC) ec2 get-console-output --instance-id "$$ID" --query Output --output text | tail -40
+cloud-ssm:     ## SSM Session Manager 접속(인바운드0 유지 — SSH 대신). 안에서 `systemctl status` 로 4개 유닛 확인.
+	@$(NEED_ID); $(AWSC) ssm start-session --target "$$ID"
+cloud-schedule: ## EventBridge stop/start 스케줄(평일 09–19 Asia/Seoul) 생성 — 상시 가동 금지 불변.
+	@$(NEED_ID); ( cd deploy/eventbridge && AWS_REGION=$(CLOUD_REGION) ./create-schedules.sh "$$ID" )
+cloud-start:   ## 중지된 EC2 재가동.
+	@$(NEED_ID); $(AWSC) ec2 start-instances --instance-ids "$$ID"
+cloud-stop:    ## EC2 stop(캡처 후 비용 절약). DynamoDB/Vercel 은 유지(idle ~$0).
+	@$(NEED_ID); $(AWSC) ec2 stop-instances --instance-ids "$$ID"
+cloud-down:    ## EC2 terminate(완전 삭제) + ID 파일 제거. (DynamoDB/IAM 정리는 deploy-checklist 부록2)
+	@$(NEED_ID); $(AWSC) ec2 terminate-instances --instance-ids "$$ID" && rm -f $(ID_FILE) && echo "terminated + $(ID_FILE) 제거"
 worker:        ## 공유 큐 폴링 worker(승인된 job 실행 — 실 Claude). 1건만: `make worker ARGS=--once`
 	$(DEV_ENV) python3 -m app.worker $(ARGS)
 chat-agent:    ## 대화 버스 폴링 에이전트(Claude 스트리밍 응답 — 실 Claude). 1건만: `make chat-agent ARGS=--once`
