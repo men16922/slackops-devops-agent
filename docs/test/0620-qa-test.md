@@ -16,10 +16,10 @@
 
 ## 🖥️ 로컬 체크리스트 (남은 것 — 토큰만 있으면 가능)
 
-- [ ] **Slack 슬래시 명령(5개)** — `make demo-all` 기동 후 Slack에서:
-      `/devops ping` · `logs <svc>` · `diagnose <svc>` · `detect iam` · `tf-review` → 동기 응답.
-- [ ] **Slack 작업 생명주기 알림** — `.env`에 `SLACK_NOTIFY_CHANNEL=C…` → 웹/에이전트가 작업 만들거나
-      완료 시 **채널 ping**(새작업/승인대기/done+비용/실패). *(코어 `notify_job_events` 단위테스트 ✅)*
+- [~] **Slack 슬래시 명령(5개)** — `/devops ping` ✅ 라이브 확인. logs/diagnose/detect/tf-review 미확인(같은 경로).
+- [x] **Slack 작업 생명주기 알림** — ✅ **라이브 확인**(2026-06-20): `make demo-all` + `SLACK_NOTIFY_CHANNEL` →
+      `🤖 Agent proposal — diagnose checkout-service` + `detect iam`(스케줄러) 채널 ping(rationale + deep-link).
+      *(done/실패 이벤트 알림은 코어 단위테스트 ✅, 라이브 추가 확인 권장 — 작업 1건 done까지)*
 - [ ] **상주 모니터 dedupe** — `make demo-incident` 2회 → 2번째는 dedupe(같은 제안 안 쌓임). *(단위테스트 ✅)*
 - [ ] **L1 pr 승인 흐름** — `awaiting_approval` pr → 대시보드 Approve → worker가 approved claim → execute
       **시도**(로컬은 `git push`에서 FAIL=정상). 진짜 PR은 클라우드/`gh auth login` 환경.
