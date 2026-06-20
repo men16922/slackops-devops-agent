@@ -1,8 +1,9 @@
 # AGENT_BRIEF — slackops-devops-agent
 Last updated: 2026-06-20
 
-> ▶ NEXT SESSION: **클라우드 캡처(EC2)** — 체크리스트 `docs/test/0620-qa-test.md`(diagnose/scan findings·write-denied·
->   DynamoDB screenshot·`make cloud-alarm`·**Vercel 링크/Team ID**). 로컬 e2e(F1–F5+Slack+cloud-alarm)는 전부 검증 완료.
+> ▶ NEXT SESSION (**6/27~28 캡처+제출**): plan `docs/submission/schedule.md`. `make cloud-up`(SSM 5개 자동적용) →
+>   영상 녹화(`docs/submission/PRESENTATION.md` slide 11 대본) → `make cloud-stop` → Devpost 제출(마감 6/30 09:00,
+>   필드=`docs/submission/final_submission.md`). 인프라·기능·Vercel·이벤트구동 전부 live 검증완료, **현재 비용 ≈ $0**(EC2 terminated).
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)

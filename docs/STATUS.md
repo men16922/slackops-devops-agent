@@ -10,8 +10,10 @@ Last updated: 2026-06-20
   `/devops ping` pong from `ip-…ec2.internal`. EC2 then terminated (cost ~$0). Runbook docs/runbooks/deploy-checklist.md.
 
 ## Verification Baseline
-- 3-layer gate: `python3 -m pytest tests/ -q` → **310 passed, 1 skipped** (fastapi-not-installed local-only skip)
-  + `ruff check src tests` + `mypy src` (strict) all green.
+- 3-layer gate: `python3 -m pytest tests/ -q` → **316 passed** (+ alarm_lambda) · `ruff` · `mypy src`(32, strict) all green.
+- **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge rule→Lambda(`alarm_lambda`, detect→propose)
+  →DynamoDB queue→worker(Claude)→DONE→Slack ping+done ($0.15/2.7K–6K tok). Serverless producer fires EC2-off. Then EC2 terminated → cost ≈ $0.
+- **Vercel dashboard live** on real DynamoDB (link + Team ID captured); `web/lib/ddb.ts` trims env + default region us-east-1.
 - diagnose/logs **agentic AWS API MCP** (D13) e2e: local (`handle_logs`/`handle_diagnose('checkout-service')` via real claude +
   `uvx awslabs.aws-api-mcp-server@1.3.45`) AND **cloud via Slack on real EC2 using Instance Profile (zero stored keys)** — real
   CloudWatch (streams/trace-ids quoted); write op → "denied by security policy". EC2 terminated after.
@@ -85,11 +87,10 @@ Last updated: 2026-06-20
   next build green). Real scan findings = cloud-only (EC2+IAM). Reframe: triage/safe-response layer over existing signals.
 
 ## Active Focus
-- **F1–F5 + Slack(`/devops detect` + 작업 생명주기 알림) + `make cloud-alarm` 로컬 e2e 라이브 검증 완료** (Playwright UI · 실 Claude L0
-  done $0.14 · Slack ping+알림 incl. 스케줄러 iam 스캔). UI fix(이모지/AutoRefresh) + 로컬 DX(`make install`/`.env` 자동로드/`demo-all`).
-  **★ NEXT SESSION = 클라우드 캡처(EC2)** — 체크리스트 `docs/test/0620-qa-test.md`: diagnose/scan findings · write-denied ·
-  DynamoDB screenshot · `make cloud-alarm` · **Vercel(링크/Team ID)** → 제출물(다이어그램/영상/텍스트 — 초안 docs/guide/{en,kr}/DEVPOST·DEMO_SCRIPT). 마감 2026-06-29.
-- AWS credit request **rejected** → $63.91 on hand + free tier (live: DynamoDB `slackops-agent` us-east-1, IAM role/profile, SSM tokens).
+- **H0 거의 완료** — 인프라·기능·Vercel·이벤트구동 전부 live 검증. **현재 비용 ≈ $0**(EC2 terminated, alarm 삭제; DynamoDB/Vercel/Lambda/SSM 5개 유지).
+  **★ NEXT SESSION = 6/27~28 캡처+제출** (`docs/submission/schedule.md`): `make cloud-up`(SSM 자동) → 영상(PRESENTATION slide 11 대본) →
+  `cloud-stop` → Devpost 제출(필드=`final_submission.md`, 마감 **6/30 09:00 GMT+9**). 남은 제출물 = 영상/텍스트편집/아티클.
+- AWS credit **rejected** → $63.91 + free tier. branch=**main**(작업브랜치, hackathon-h0와 동일 tip). SSM: bot/app/oauth + SLACK_NOTIFY_CHANNEL + DASHBOARD_URL.
 
 ## Open Risks
 - untrusted input (git diff / kubectl) isolated in `<untrusted_data>`; **CloudWatch now enters via AWS MCP tool_result (D13) —

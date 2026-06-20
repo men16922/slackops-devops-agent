@@ -4,6 +4,13 @@ Last updated: 2026-06-20
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-19): docs/archive/progress-2026-06.md
 
+## 2026-06-20 — event-driven producer (EventBridge→Lambda) + Vercel live + cloud lifecycle + submission pack
+- Status: Done. Full event-driven loop **live-verified on real AWS**; Vercel dashboard live; cost back to **$0**. Submission pack assembled. Next = 6/27 capture+submit.
+- Changed: **`make cloud-*` lifecycle** (whoami/iam/ddb/up/status/console/ssm/schedule/start/stop/down + lambda-deploy/clean + vercel-key + alarm) wrapping `deploy/*.sh`; instance id → `deploy/.instance-id`. **main = working branch** (ff to hackathon-h0, 22 commits; user-data clones default branch). **i18n** diagnose + Tier1 `detect()` rationales → EN. **Event-driven producer** `src/app/alarm_lambda.py` + `deploy/lambda/{build,deploy,clean}.sh`: CloudWatch ALARM→EventBridge rule→Lambda(`detect()`→propose) into the **same DynamoDB queue** (serverless, fires EC2-off); `cloud-alarm.sh` rewritten event-driven. **Slack notifier** enabled via SSM `/slackops/SLACK_NOTIFY_CHANNEL` (+ `DASHBOARD_URL`). **Vercel** deployed (link + Team ID); `web/lib/ddb.ts` trim env + default region us-east-1 (paste-whitespace ValidationException fix). **`docs/submission/`** (renamed from ppt): `final_submission.md` (Devpost form), `schedule.md` (cost/judging), `PRESENTATION.md` (3-min script + Mac recording), `architecture.md`+png (event path), items/tables.png.
+- Verified: `make check` **316 passed** · ruff · mypy(32) · doc-budget. **Live e2e on EC2 (t3.medium)**: CloudWatch ALARM→EventBridge→Lambda(07:51 CW logs)→DynamoDB proposal→worker(Claude)→DONE→Slack ping+done **$0.15/2.7K–6K tok**; diagnose real CloudWatch via Instance Profile (write→denied). Vercel dashboard live on real DynamoDB. **EC2 terminated + demo alarm deleted → cost ≈ $0** (DynamoDB/Vercel/Lambda/EventBridge/SSM kept).
+- Blockers: None. (detect iam needs accessanalyzer perms + an analyzer — secondary/optional.)
+- Next: **6/27~28** `make cloud-up`(SSM auto-applies all 5 params) → record video (PRESENTATION slide 11) → `cloud-stop` → Devpost submit (deadline 6/30 09:00). `final_submission` own-voice edit + bonus article.
+
 ## 2026-06-20 — local e2e verified + Slack/detect/notifications + cloud-alarm + local DX
 - Status: Done. F1–F5 로컬 e2e 라이브 검증 + Slack 라이브 + cloud-alarm 시나리오. 다음 = 클라우드.
 - Changed: Slack `/devops detect` 동기 경로 등록(usage 갱신); 알림을 **작업 생명주기 이벤트**로 일반화

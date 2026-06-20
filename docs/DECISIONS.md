@@ -131,3 +131,20 @@ Last updated: 2026-06-17
   `<untrusted_data>` isolation that pre-fetched logs had. Accepted trade-off; the hard boundary is now IAM read-only +
   `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + read-only-tool allowlist (documented in the module docstrings). EC2 needs
   `uv`/`uvx` (user-data installs + pre-warms). Submission narrative wording: "least-privilege at the IAM + tool-allowlist boundary".
+
+## D14 — alarm→agent is event-driven: EventBridge rule → Lambda producer (not a timer/manual bridge)
+- Decision: a real CloudWatch alarm state-change is the trigger. An **EventBridge rule** (`source aws.cloudwatch`,
+  detail-type "CloudWatch Alarm State Change", `state.value=ALARM`, alarmName prefix `slackops-`) invokes a **Lambda**
+  (`src/app/alarm_lambda.py`, handler `app.alarm_lambda.handler`) that runs the deterministic `detect()` and
+  `propose_job_impl` → writes a PENDING/source=agent proposal into the **same DynamoDB single-table queue**. The Lambda
+  reuses `agent_monitor.detect` + `mcp_server.{propose_job_impl,store_from_env}` (import-safe; package = `app/` only, boto3
+  from runtime, no structlog/mcp needed). Deploy/teardown = `deploy/lambda/{build,deploy,clean}.sh` + `make cloud-lambda-*`;
+  `scripts/cloud-alarm.sh` rewritten to fire the alarm and poll the queue (manual `agent_monitor` bridge removed).
+- Reason: replaces the timer poll (resident `agent_monitor --loop`) + manual `describe-alarms→monitor` bridge with a real
+  event path. Adds a **fourth producer** (Slack/Web human · resident agent · event-driven Lambda) on one queue. Lambda is
+  **proposal-only (L0 write)** — execution/approval stay with the worker + output gate, so the permission model is unchanged.
+  Serverless → detection fires **even when the EC2 worker is stopped** (fits the never-always-on invariant). alarm StateReason
+  is untrusted but `detect()` is deterministic regex → no command injection.
+- Impact: new AWS resources (`slackops-alarm-producer` Lambda + `slackops-alarm-to-agent` rule + IAM role, table-scoped) —
+  free-tier ~$0, kept during judging. Live-verified end-to-end 2026-06-20 (Lambda invocation in CloudWatch logs →
+  proposal → worker → Slack). Submission differentiator: "event-driven autonomous detection, not a timer".
