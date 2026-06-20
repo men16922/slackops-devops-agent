@@ -44,8 +44,8 @@
 | --- | --- | --- |
 | B1 | **Scan now / diagnose 실제 findings** | 클라우드(EC2+IAM)에서 detect/diagnose 실행 — 실 CloudWatch/Config/Access Analyzer findings. 로컬은 자격증명 부재로 "blind" 보고(B 위 11·12처럼) |
 | B2 | **L1 pr 승인 경로** | `awaiting_approval` pr → Approve → worker execute. 로컬은 `git push`에서 FAIL(인증 없음) — 실 PR은 EC2(GitHub 토큰)에서만 |
-| B3 | **Slack 슬래시 명령(detect 포함)** | `app.main` + 봇/앱 토큰 → `/devops detect iam` 등 5개 동기 응답. *(라우팅·핸들러는 단위테스트 ✅, 실 워크스페이스 라이브 미검증)* |
-| B4 | **Slack 작업 생명주기 알림** | 위 + `SLACK_NOTIFY_CHANNEL` → 새작업(누가 web/slack/agent)·승인대기·done(+비용)·실패 채널 ping. *(코어 `notify_job_events` 단위테스트 ✅, 라이브 미검증)* |
+| B3 | **Slack 슬래시 명령(detect 포함)** | web 스택 띄운 뒤 **`make slack`**(.env 자동 로드) → `/devops detect iam` 등 5개 동기 응답. *(라우팅·핸들러 단위테스트 ✅, 실 워크스페이스 라이브 미검증)* |
+| B4 | **Slack 작업 생명주기 알림** | 위 + `.env`/env 에 `SLACK_NOTIFY_CHANNEL` → 새작업(누가 web/slack/agent)·승인대기·done(+비용)·실패 채널 ping. *(코어 `notify_job_events` 단위테스트 ✅, 라이브 미검증)* |
 | B5 | 상주 모니터 dedupe | `make demo-incident` 또는 `python -m app.agent_monitor --loop 5` → 1건 후 반복은 dedupe |
 | B6 | (클라우드) write-denied | EC2 1회 → 쓰기 op 시도 → "denied by security policy" |
 | B7 | **💰 비용 안전(클라우드)** | 클라우드 스캔은 **IAM Access Analyzer(무료)만** 사용. **AWS Config recorder 켜지 말 것**(과금). roadmap 3종(Security Hub/GuardDuty/Trusted Advisor)은 미배선→호출 불가. read API·`set-alarm-state`는 무료. Claude 추론비는 AWS 아님(구독) |
@@ -59,3 +59,5 @@
 - `--once` worker 가 "안 움직임" = 정상: `make demo` 가 상주 worker 를 이미 돌려 PENDING 을 비움 + `awaiting_approval` 은 사람 승인 전엔 claim 불가.
 - **mock 장애 주입** 데모: `make demo-incident [SIGNAL="..."]` → Tier1 규칙이 diagnose 제안 적재(로컬). DDB 를 클라우드로 향하면 클라우드 큐 적재. alarm→EventBridge 자동 적재는 roadmap.
 - 이 web 스택은 8930 점유 → 정리: `cd web && docker compose down`.
+- **`.env` 자동 로드**: `make demo`/`make slack` 가 `.env`(gitignored, 로컬 전용) 를 source → SLACK/CLAUDE 토큰 수동 export 불필요. EC2 는 영향 없음(SSM→env 파일 사용).
+- **pr GitHub 인증**: push/PR 은 표준 git/gh CLI 인증(`gh auth login`)을 사용 — `.env` 의 `GITHUB_APP_*` 는 **미배선 placeholder**(코드/배포 미사용). 로컬은 인증 없으면 push FAIL(예상).

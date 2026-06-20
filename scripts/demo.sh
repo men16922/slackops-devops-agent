@@ -18,6 +18,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# 로컬 편의: .env 가 있으면 자동 로드(SLACK/CLAUDE 토큰 등). gitignored + 로컬 전용 —
+# EC2 는 demo.sh 를 쓰지 않고 SSM→/etc/...env 파일을 쓰므로 영향 없음.
+if [ -f .env ]; then
+  set -a; . ./.env; set +a
+fi
+
 if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   echo "demo: ERROR — CLAUDE_CODE_OAUTH_TOKEN 미설정. 실 Claude 응답에 필요하다." >&2
   echo "  export CLAUDE_CODE_OAUTH_TOKEN=\"\$(claude setup-token)\" 후 다시 실행." >&2

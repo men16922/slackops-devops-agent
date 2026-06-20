@@ -38,6 +38,8 @@ worker:        ## 공유 큐 폴링 worker(승인된 job 실행 — 실 Claude).
 	$(DEV_ENV) python3 -m app.worker $(ARGS)
 chat-agent:    ## 대화 버스 폴링 에이전트(Claude 스트리밍 응답 — 실 Claude). 1건만: `make chat-agent ARGS=--once`
 	$(DEV_ENV) python3 -m app.chat_agent $(ARGS)
+slack:         ## Slack 앱(app.main) 로컬 기동 — .env 자동 로드(토큰). 먼저 web 스택(make demo/docker) 띄워두기.
+	$(DEV_ENV) bash -c 'set -a; [ -f .env ] && . ./.env; set +a; exec python3 -m app.main'
 
 # ===== overnight harness targets (scripts/overnight/Makefile.harness.snippet) =====
 OVN := scripts/overnight
