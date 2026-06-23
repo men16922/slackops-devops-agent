@@ -41,6 +41,8 @@ def store() -> SqliteJobStore:
 @pytest.fixture
 def patched(monkeypatch: pytest.MonkeyPatch, store: SqliteJobStore) -> SqliteJobStore:
     monkeypatch.setattr(alarm_lambda, "store_from_env", lambda: store)
+    # ① 알림은 SSM/네트워크 의존 → 핸들러 테스트에선 no-op 로 차단(별도 단위테스트로 검증).
+    monkeypatch.setattr(alarm_lambda, "notify_detected", lambda *a, **k: True)
     return store
 
 
@@ -90,3 +92,42 @@ def test_duplicate_alarm_deduped(patched: SqliteJobStore) -> None:
     assert first["result"].get("deduped") is not True
     assert second["result"]["deduped"] is True  # 같은 open agent 제안 → 무해 no-op
     assert len(patched.list_recent()) == 1
+
+
+# ── ① "문제 인지" 알림 ─────────────────────────────────────────────
+
+
+def test_format_detected_includes_cmd_and_rationale() -> None:
+    text = alarm_lambda.format_detected("diagnose", "checkout-service", "Detected 5xx spike")
+    assert "diagnose" in text
+    assert "checkout-service" in text
+    assert "Detected 5xx spike" in text
+
+
+def test_notify_detected_posts_then_swallows_failure() -> None:
+    sent: list[str] = []
+    assert alarm_lambda.notify_detected("diagnose", "svc", "why", post=sent.append) is True
+    assert sent and "diagnose" in sent[0]
+
+    def boom(_text: str) -> None:
+        raise RuntimeError("slack down")
+
+    # 게시 실패는 swallow — producer/제안에 영향 없음.
+    assert alarm_lambda.notify_detected("diagnose", "svc", "why", post=boom) is False
+
+
+def test_handler_notifies_new_proposal_only(
+    monkeypatch: pytest.MonkeyPatch, store: SqliteJobStore
+) -> None:
+    monkeypatch.setattr(alarm_lambda, "store_from_env", lambda: store)
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        alarm_lambda,
+        "notify_detected",
+        lambda c, a, r: (calls.append((c, a, r)), True)[1],
+    )
+    alarm_lambda.handler(_event("ALARM", reason=_DEMO_REASON))  # 새 제안 → ① 알림
+    alarm_lambda.handler(_event("ALARM", reason=_DEMO_REASON))  # 중복 → 알림 안 함
+    assert len(calls) == 1
+    assert calls[0][0] == "diagnose"
+    assert calls[0][1] == "checkout-service"

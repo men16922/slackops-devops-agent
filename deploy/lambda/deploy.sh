@@ -32,6 +32,9 @@ aws iam put-role-policy --role-name "$ROLE" --policy-name alarm-producer-queue \
   --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[
     {\"Sid\":\"Queue\",\"Effect\":\"Allow\",\"Action\":[\"dynamodb:GetItem\",\"dynamodb:PutItem\",\"dynamodb:UpdateItem\",\"dynamodb:Query\"],
      \"Resource\":[\"arn:aws:dynamodb:${AWS_REGION}:${ACCOUNT}:table/${TABLE}\",\"arn:aws:dynamodb:${AWS_REGION}:${ACCOUNT}:table/${TABLE}/index/*\"]},
+    {\"Sid\":\"SlackToken\",\"Effect\":\"Allow\",\"Action\":[\"ssm:GetParameter\"],
+     \"Resource\":\"arn:aws:ssm:${AWS_REGION}:${ACCOUNT}:parameter/slackops/*\"},
+    {\"Sid\":\"DecryptToken\",\"Effect\":\"Allow\",\"Action\":[\"kms:Decrypt\"],\"Resource\":\"*\"},
     {\"Sid\":\"Logs\",\"Effect\":\"Allow\",\"Action\":[\"logs:CreateLogGroup\",\"logs:CreateLogStream\",\"logs:PutLogEvents\"],\"Resource\":\"arn:aws:logs:*:*:*\"}]}"
 ROLE_ARN="$(aws iam get-role --role-name "$ROLE" --query Role.Arn --output text)"
 

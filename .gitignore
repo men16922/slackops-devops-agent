@@ -41,3 +41,8 @@ scripts/overnight/logs/
 scripts/overnight/STOP
 scripts/overnight/DONE
 docs/test/history/*-overnight-review-checklist.md
+
+# 제출물 (로컬 관리, 커밋 안 함) + Serena 캐시 + macOS
+docs/submission/
+.serena/
+.DS_Store

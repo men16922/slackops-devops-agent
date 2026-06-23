@@ -16,12 +16,62 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from app.agent_monitor import detect
 from app.mcp_server import propose_job_impl, store_from_env
 
 ALARM_STATE = "ALARM"
+
+# ── ① "문제 인지" 알림 (적재 즉시 — worker 실행/notifier 폴링 race 무관) ──────────
+# notifier(EC2)는 PENDING→DONE 이 빠른 L0 제안에선 PENDING(=제안) 알림을 놓친다. producer 인
+# 이 Lambda 가 적재 직후 직접 Slack 에 알려 "① 문제 감지 → ② 완료"의 첫 단계를 보장한다.
+SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
+NOTIFY_TOKEN_PARAM = "/slackops/SLACK_BOT_TOKEN"  # SecureString
+NOTIFY_CHANNEL_PARAM = "/slackops/SLACK_NOTIFY_CHANNEL"
+
+
+def _post_slack(text: str) -> None:
+    """SSM 토큰/채널로 chat.postMessage. boto3/SSM 은 lazy — Lambda 런타임 제공.
+
+    토큰은 SecureString(WithDecryption), 채널은 평문 파라미터. 호출자가 예외를 swallow 한다.
+    """
+    import urllib.parse
+    import urllib.request
+
+    import boto3  # lazy: 테스트/미설치 환경 import-safe
+
+    ssm = boto3.client("ssm")
+    token = ssm.get_parameter(Name=NOTIFY_TOKEN_PARAM, WithDecryption=True)["Parameter"]["Value"]
+    # 채널은 평문이지만 WithDecryption=True 는 평문에도 무해 → SecureString 으로 저장돼도 안전.
+    channel = ssm.get_parameter(Name=NOTIFY_CHANNEL_PARAM, WithDecryption=True)["Parameter"]["Value"]
+    data = urllib.parse.urlencode({"channel": channel, "text": text}).encode()
+    req = urllib.request.Request(
+        SLACK_POST_URL, data=data, headers={"Authorization": f"Bearer {token}"}
+    )
+    urllib.request.urlopen(req, timeout=5)  # noqa: S310 — 고정 https Slack endpoint
+
+
+def format_detected(command: str, args: str, rationale: str) -> str:
+    """① "문제 감지/triage 시작" Slack 텍스트 — notifier 의 done(②) 포맷과 짝.
+
+    Slack 게시이므로 이모지는 `:shortcode:`(Slack 렌더). rationale 이 '왜 감지했는지'를 보여준다.
+    """
+    cmd = f"`{command}`" + (f" `{args}`" if args else "")
+    why = f"\n> {rationale}" if rationale else ""
+    return f":mag: *Detected — triaging* {cmd}{why}"
+
+
+def notify_detected(
+    command: str, args: str, rationale: str, *, post: Callable[[str], None] | None = None
+) -> bool:
+    """제안 적재 직후 ① 알림. 게시 성공 시 True. 실패는 swallow(제안은 이미 적재됨)."""
+    sender = post or _post_slack
+    try:
+        sender(format_detected(command, args, rationale))
+        return True
+    except Exception:  # noqa: BLE001 — 알림 실패가 producer/제안을 막지 않는다.
+        return False
 
 
 def _detail(event: dict[str, Any]) -> dict[str, Any]:
@@ -66,4 +116,7 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
         return {"ok": True, "proposed": False, "reason": "no detection rule matched"}
     command, args, rationale = decision
     result = propose_job_impl(store_from_env(), command, args, rationale)
+    # 새 제안만 ① 알림(중복=deduped 는 무해 no-op 이라 재알림 안 함).
+    if result.get("ok") and not result.get("deduped"):
+        notify_detected(command, args, rationale)
     return {"ok": True, "proposed": bool(result.get("ok")), "result": result}
