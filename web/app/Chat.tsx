@@ -77,7 +77,7 @@ export function Chat() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length]); // 새 메시지 추가 시에만 스크롤 — 폴링 갱신/스트리밍 중엔 위치 유지
 
   const agentBusy = conv?.status === "awaiting_agent" || conv?.status === "streaming";
 
