@@ -48,8 +48,27 @@ def bootstrap_socket_mode() -> None:
     from app.slack_handler import SlackHandler, register_default_commands
 
     handler = register_default_commands(SlackHandler.from_env())
+    _attach_assistant(handler)
     _serve_proposal_notifier(handler)
     handler.start()
+
+
+def _attach_assistant(handler: Any) -> None:
+    """Slack Assistant(agentic thread) UX 를 Bolt App 에 장착(slash command 와 공존).
+
+    slack_bolt 버전이 Assistant 를 제공하지 않거나 워크스페이스 설정이 없어도 Slack 앱이
+    죽지 않게 try/except 로 감싼다 — slash command 경로는 그대로 동작한다.
+    """
+    import structlog
+
+    log = structlog.get_logger()
+    try:
+        from app.assistant_handler import attach_assistant
+
+        attach_assistant(handler.app)
+        log.info("assistant.attached")
+    except Exception as exc:  # noqa: BLE001 — Assistant 미지원/미설정이 앱을 막지 않게.
+        log.warning("assistant.attach_failed", error=str(exc))
 
 
 def _serve_proposal_notifier(handler: Any) -> None:
