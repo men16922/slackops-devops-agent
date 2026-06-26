@@ -4,6 +4,14 @@ Last updated: 2026-06-20
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-19): docs/archive/progress-2026-06.md
 
+## 2026-06-27 — v2 Assistant flow end-to-end verification (자동) + run_user_message 분리
+- Status: Done. 실 Slack 없이 **바인딩 전 흐름 자동 검증**. 실 워크스페이스 round-trip 은 여전히 미검증.
+- Changed: assistant_handler `_user_message` 로직을 모듈레벨 **run_user_message** 로 추출(테스트 가능 바인딩 — 순수코어+얇은바인딩 원칙).
+- Verified: 통합테스트(fake say/client + 실 store + 시뮬레이트 worker) — ① diagnose→DONE→결과 게시+**Canvas 생성**, ② pr→AWAITING_APPROVAL→
+  **승인 버튼 게시**→클릭→**APPROVED 전이**. **실 slack_bolt 스모크**(importorskip): build_assistant→실 Assistant 생성, attach+register_approval_actions 실 App 배선(데코레이터/app.use/app.action 호환). `make check` **352 passed · ruff · mypy(35) · doc-budget**.
+- Blockers: None. 잔여 리스크 = 실 버튼 클릭 payload 모양(container.message_ts/channel.id/actions[].value)·실 claude 스트리밍·Socket Mode 는 실 Slack 1회로만 확정.
+- Next: 실 Slack sandbox e2e(앱 기동 `python -m app.main` + Assistant DM) → 이후 Modal/mock(D3)/실AWS(D4).
+
 ## 2026-06-26 — v2 pivot (AWSKRUG demo) + Slack Assistant approval gate + Canvas (D1/D2/D2.5)
 - Status: Done (code+gate). Branch `v2`. **아직 실 Slack 미검증** — 다음은 sandbox e2e.
 - Pivot: Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 원문 검증 — 한국 미포함, 일본 포함). 목표 = **AWSKRUG 발표 라이브 데모**.

@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-06-20
+Last updated: 2026-06-27
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -89,8 +89,9 @@ Last updated: 2026-06-20
 ## Active Focus
 - **v2 = AWSKRUG 발표 데모** (branch `v2`, plan `docs/plans/2026-06-25-awskrug-demo.md`). Slack 해커톤 제출 **폐기**(Devpost §3
   Eligibility 한국 미달). 목표 = "Slack 자연어 → 실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
-- **D1/D2/D2.5 코드완료·게이트green** — Slack Assistant 승인게이트(approve/reject 버튼↔출력게이트) + poll-in-thread + 포스트모템 Canvas.
-  **★ NEXT = 실 Slack sandbox e2e**(Assistant 스레드→제안→버튼→Canvas) — 코드는 됐으나 **실 Slack 미검증**. 이후 Modal/mock(D3)/실AWS(D4)/슬라이드.
+- **D1/D2/D2.5 코드완료 + 자동 e2e 검증** — Slack Assistant 승인게이트 + poll-in-thread + 포스트모템 Canvas. run_user_message 종단
+  통합테스트(diagnose→Canvas / pr→버튼→APPROVED) + 실 slack_bolt 스모크 통과. **★ NEXT = 실 Slack sandbox round-trip**(앱 기동→Assistant DM;
+  버튼 payload 모양·실 claude 스트리밍·Socket Mode 는 여기서만 확정). 이후 Modal/mock(D3)/실AWS(D4)/슬라이드.
 - H0 인프라(DynamoDB/Vercel/Lambda/SSM)는 그대로 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier.
   SSM: bot/app/oauth + SLACK_NOTIFY_CHANNEL(+canvas 대상 채널) + DASHBOARD_URL. Canvas scope `canvases:write` 부여완료.
 
