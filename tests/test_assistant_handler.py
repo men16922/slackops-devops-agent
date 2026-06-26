@@ -15,6 +15,7 @@ from app.assistant_handler import (
     build_assistant_prompt,
     followup_for,
     format_footer,
+    maybe_postmortem,
     poll_job,
     run_turn,
 )
@@ -200,6 +201,26 @@ def test_followup_failed_and_rejected_and_none() -> None:
     assert followup_for(_job(JobStatus.REJECTED))[1] is None
     # None(타임아웃 관측 실패) → 안전 안내, blocks 없음.
     assert followup_for(None)[1] is None
+
+
+def test_maybe_postmortem_only_for_done_diagnose_with_result() -> None:
+    job = _job(JobStatus.DONE, command="diagnose", args="checkout-service", result="p99 high")
+    pm = maybe_postmortem(job)
+    assert pm is not None
+    title, md = pm
+    assert "checkout-service" in title
+    assert "p99 high" in md and "Postmortem" in md
+
+
+def test_maybe_postmortem_skips_non_diagnose_or_unsettled() -> None:
+    # pr 완료(diagnose 아님) → 포스트모템 대상 아님.
+    assert maybe_postmortem(_job(JobStatus.DONE, command="pr", result="diff")) is None
+    # 진단이지만 결과 없음 → None.
+    assert maybe_postmortem(_job(JobStatus.DONE, command="diagnose", args="api", result=None)) is None
+    # 아직 미정착(AWAITING_APPROVAL) → None.
+    assert maybe_postmortem(_job(JobStatus.AWAITING_APPROVAL, command="diagnose")) is None
+    # None job → None.
+    assert maybe_postmortem(None) is None
 
 
 def test_format_footer_includes_metrics_and_proposal() -> None:

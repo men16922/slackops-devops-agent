@@ -24,6 +24,7 @@ from typing import Any, Callable
 
 from app.agent_monitor import mcp_config_json
 from app.approval_actions import decision_blocks
+from app.canvas import postmortem_markdown
 from app.claude_runner import (
     DEFAULT_TIMEOUT_S,
     ClaudeTimeoutError,
@@ -42,6 +43,9 @@ SETTLED_STATUSES: frozenset[JobStatus] = frozenset(
 # 제안 후 worker prepare(Claude 호출)가 diff 를 낼 때까지 스레드에서 폴링하는 기본값.
 GATE_POLL_TIMEOUT_S = 90
 GATE_POLL_INTERVAL_S = 2.0
+
+# 완료 시 포스트모템 Canvas 를 만들 명령(읽기 진단 — 산출물 가치가 큰 것만).
+POSTMORTEM_COMMANDS: frozenset[str] = frozenset({"diagnose"})
 
 # 에이전트가 호출 가능한 유일한 도구 — 직접 실행 도구 없음(chat_agent 와 동일한 안전 기본값).
 # 관찰(AWS MCP read 등)은 cloud 배선에서 allowed_tools/mcp_config 주입으로 확장한다.
@@ -190,12 +194,30 @@ def followup_for(job: Job | None) -> tuple[str, list[dict[str, Any]] | None]:
     return (":hourglass: Still working on it — it remains queued for approval.", None)
 
 
+def maybe_postmortem(
+    job: Job | None,
+    *,
+    commands: frozenset[str] = POSTMORTEM_COMMANDS,
+) -> tuple[str, str] | None:
+    """완료된 진단 job 이면 Canvas 포스트모템 (title, markdown) 을 반환(아니면 None).
+
+    DONE + 대상 명령(diagnose) + 결과 텍스트가 있을 때만. args(서비스명)를 제목/헤딩에 쓴다.
+    """
+    if job is None or job.status is not JobStatus.DONE:
+        return None
+    if job.command not in commands or not job.result:
+        return None
+    service = job.args.strip() or job.command
+    return (f"Postmortem — {service}", postmortem_markdown(service, job.result))
+
+
 def build_assistant(
     *,
     runner: StreamRunner | None = None,
     mcp_config: str | None = None,
     allowed_tools: list[str] | None = None,
     jobs: JobStore | None = None,
+    canvas_channel: str | None = None,
     poll_timeout_s: float = GATE_POLL_TIMEOUT_S,
     poll_interval_s: float = GATE_POLL_INTERVAL_S,
     sleep: Callable[[float], None] = time.sleep,
@@ -287,6 +309,18 @@ def build_assistant(
                 say(text=follow_text, blocks=follow_blocks)
             else:
                 say(follow_text)
+
+            # 완료된 진단이면 포스트모템 Canvas 를 채널 탭에 생성(부가 산출물 — 실패해도 흐름 유지).
+            pm = maybe_postmortem(job) if canvas_channel else None
+            if pm is not None:
+                from app.canvas import create_canvas  # lazy: Canvas 미사용 경로 영향 없음
+
+                title, markdown = pm
+                canvas_id = create_canvas(
+                    client, title=title, markdown=markdown, channel_id=canvas_channel
+                )
+                if canvas_id:
+                    say(f":memo: Drafted a postmortem canvas in <#{canvas_channel}>.")
 
     return assistant
 
