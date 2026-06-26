@@ -171,3 +171,25 @@ def test_complete_failed_records_error(store: object) -> None:
     failed = store.complete(job.id, status=JobStatus.FAILED, error="boom")
     assert failed.status is JobStatus.FAILED
     assert failed.error == "boom"
+
+
+# ── 상태머신 집합 invariant (구현 무관 — 상수 정의 무결성 가드) ──────────────
+
+
+def test_state_machine_set_invariants() -> None:
+    from app.store.base import (
+        CLAIMABLE_STATUSES,
+        TERMINAL_STATUSES,
+        JobStatus,
+    )
+
+    all_statuses = set(JobStatus)
+    # enum 값 유일성(중복 문자열 값 없음).
+    assert len({s.value for s in JobStatus}) == len(all_statuses)
+    # 두 집합 모두 JobStatus 의 부분집합(오타/외래 멤버 없음).
+    assert set(TERMINAL_STATUSES) <= all_statuses
+    assert set(CLAIMABLE_STATUSES) <= all_statuses
+    # 종료 상태는 claim 대상이 될 수 없다(종료 후 재실행 금지).
+    assert set(CLAIMABLE_STATUSES).isdisjoint(TERMINAL_STATUSES)
+    # 종료 상태 정의가 정확히 DONE/FAILED/REJECTED 인지(상태머신 문서와 일치).
+    assert set(TERMINAL_STATUSES) == {JobStatus.DONE, JobStatus.FAILED, JobStatus.REJECTED}
