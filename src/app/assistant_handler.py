@@ -23,6 +23,7 @@ import time
 from typing import Any, Callable
 
 from app.agent_monitor import mcp_config_json
+from app.approval_actions import decision_blocks
 from app.claude_runner import (
     DEFAULT_TIMEOUT_S,
     ClaudeTimeoutError,
@@ -31,6 +32,16 @@ from app.claude_runner import (
     run_headless_stream,
 )
 from app.sanitizer import build_prompt
+from app.store.base import Job, JobStatus, JobStore
+
+# 제안된 job 이 "정착"한 것으로 보고 스레드에 후속을 렌더할 상태들(PENDING/RUNNING/APPROVED 은 전이 중).
+SETTLED_STATUSES: frozenset[JobStatus] = frozenset(
+    {JobStatus.AWAITING_APPROVAL, JobStatus.DONE, JobStatus.FAILED, JobStatus.REJECTED}
+)
+
+# 제안 후 worker prepare(Claude 호출)가 diff 를 낼 때까지 스레드에서 폴링하는 기본값.
+GATE_POLL_TIMEOUT_S = 90
+GATE_POLL_INTERVAL_S = 2.0
 
 # 에이전트가 호출 가능한 유일한 도구 — 직접 실행 도구 없음(chat_agent 와 동일한 안전 기본값).
 # 관찰(AWS MCP read 등)은 cloud 배선에서 allowed_tools/mcp_config 주입으로 확장한다.
@@ -132,11 +143,62 @@ def format_footer(result: StreamResult) -> str:
     return foot
 
 
+def poll_job(
+    jobs: JobStore,
+    job_id: str,
+    *,
+    timeout_s: float = GATE_POLL_TIMEOUT_S,
+    interval_s: float = GATE_POLL_INTERVAL_S,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> Job | None:
+    """제안된 job 이 정착(AWAITING_APPROVAL/DONE/FAILED/REJECTED)할 때까지 폴링.
+
+    worker 가 PENDING→RUNNING→(diff)AWAITING_APPROVAL|DONE 으로 진행하는 동안 스레드에서
+    대기한다. 타임아웃이면 마지막으로 본 job(전이 중이거나 None)을 그대로 반환 — 호출자는
+    정착 안 된 상태를 "아직 처리 중"으로 렌더한다.
+
+    Returns:
+        정착한 Job, 또는 타임아웃 시 마지막 관측값(전이중 Job 또는 None).
+    """
+    deadline = monotonic() + timeout_s
+    while True:
+        job = jobs.get(job_id)
+        if job is not None and job.status in SETTLED_STATUSES:
+            return job
+        if monotonic() >= deadline:
+            return job
+        sleep(interval_s)
+
+
+def followup_for(job: Job | None) -> tuple[str, list[dict[str, Any]] | None]:
+    """정착한 제안 job 을 스레드 후속 메시지로 렌더 → (text, blocks).
+
+    AWAITING_APPROVAL 이면 승인 버튼 블록을, 그 외엔 텍스트만 반환(blocks=None).
+    """
+    if job is None:
+        return (":hourglass: Still preparing the change — check the dashboard queue.", None)
+    if job.status is JobStatus.AWAITING_APPROVAL:
+        return ("A change is ready for your review:", decision_blocks(job))
+    if job.status is JobStatus.DONE:
+        return (job.result or ":white_check_mark: Done.", None)
+    if job.status is JobStatus.FAILED:
+        return (f":warning: The job failed: {job.error or 'unknown error'}", None)
+    if job.status is JobStatus.REJECTED:
+        return (":x: The job was rejected.", None)
+    # 전이 중(PENDING/RUNNING/APPROVED) — 타임아웃 도달. 큐에 남아 계속 진행됨.
+    return (":hourglass: Still working on it — it remains queued for approval.", None)
+
+
 def build_assistant(
     *,
     runner: StreamRunner | None = None,
     mcp_config: str | None = None,
     allowed_tools: list[str] | None = None,
+    jobs: JobStore | None = None,
+    poll_timeout_s: float = GATE_POLL_TIMEOUT_S,
+    poll_interval_s: float = GATE_POLL_INTERVAL_S,
+    sleep: Callable[[float], None] = time.sleep,
     throttle_s: float = 1.0,
     monotonic: Callable[[], float] = time.monotonic,
 ) -> Any:
@@ -208,6 +270,23 @@ def build_assistant(
 
         final = (result.output or "_(no response)_") + format_footer(result)
         client.chat_update(channel=channel, ts=ts, text=final)
+
+        # 제안된 job 이 있으면 worker 가 정착시킬 때까지 스레드에서 폴링 → 후속(승인 버튼/결과)
+        # 을 같은 스레드에 게시. 승인 버튼 클릭은 register_approval_actions 핸들러가 처리한다.
+        if jobs is not None and result.proposed_job_id:
+            job = poll_job(
+                jobs,
+                result.proposed_job_id,
+                timeout_s=poll_timeout_s,
+                interval_s=poll_interval_s,
+                sleep=sleep,
+                monotonic=monotonic,
+            )
+            follow_text, follow_blocks = followup_for(job)
+            if follow_blocks is not None:
+                say(text=follow_text, blocks=follow_blocks)
+            else:
+                say(follow_text)
 
     return assistant
 

@@ -13,10 +13,13 @@ from collections.abc import Iterator
 from app.assistant_handler import (
     ASSISTANT_TOOLS,
     build_assistant_prompt,
+    followup_for,
     format_footer,
+    poll_job,
     run_turn,
 )
 from app.claude_runner import StreamResult
+from app.store.base import Job, JobSource, JobStatus
 
 
 def _stream_lines(lines: list[str]):
@@ -110,6 +113,93 @@ def test_run_turn_defaults_to_propose_only_tools() -> None:
     # 기본 Tool Allowlist 는 propose/list 만 — 직접 실행 도구 없음(안전 불변).
     assert seen["tools"] == ASSISTANT_TOOLS
     assert all(t.startswith("mcp__slackops__") for t in seen["tools"])
+
+
+# ── poll_job / followup_for (poll-in-thread 후속 게시) ───────────────────
+
+
+def _job(status: JobStatus, **kw: object) -> Job:
+    base: dict[str, object] = dict(
+        id="j1", command="pr", args="bump mem", source=JobSource.AGENT,
+        status=status, requested_by="agent", created_at="t0", updated_at="t0",
+    )
+    base.update(kw)
+    return Job(**base)  # type: ignore[arg-type]
+
+
+class _FlipStore:
+    """get() 호출이 flip_after 회 이상이면 AWAITING_APPROVAL 로 바뀌는 가짜 store."""
+
+    def __init__(self, job: Job, flip_after: int) -> None:
+        self._job = job
+        self._flip = flip_after
+        self.calls = 0
+
+    def get(self, _job_id: str) -> Job:
+        self.calls += 1
+        self._job.status = (
+            JobStatus.AWAITING_APPROVAL if self.calls >= self._flip else JobStatus.RUNNING
+        )
+        return self._job
+
+
+def _clock(step: float) -> "object":
+    state = {"t": 0.0}
+
+    def now() -> float:
+        state["t"] += step
+        return state["t"]
+
+    return now
+
+
+def test_poll_job_returns_when_settled() -> None:
+    store = _FlipStore(_job(JobStatus.RUNNING), flip_after=3)
+    sleeps: list[float] = []
+    job = poll_job(
+        store, "j1", timeout_s=1000, interval_s=2.0,
+        sleep=sleeps.append, monotonic=_clock(1.0),  # type: ignore[arg-type]
+    )
+    assert job is not None and job.status is JobStatus.AWAITING_APPROVAL
+    assert store.calls == 3
+    assert sleeps == [2.0, 2.0]  # 정착 전 두 번 대기
+
+
+def test_poll_job_times_out_returns_transient() -> None:
+    store = _FlipStore(_job(JobStatus.RUNNING), flip_after=999)  # 절대 정착 안 함
+    job = poll_job(
+        store, "j1", timeout_s=5, interval_s=1.0,
+        sleep=lambda _s: None, monotonic=_clock(10.0),  # type: ignore[arg-type]
+    )
+    # 타임아웃 → 마지막 관측값(전이 중 RUNNING) 반환.
+    assert job is not None and job.status is JobStatus.RUNNING
+
+
+def test_followup_awaiting_returns_approval_blocks() -> None:
+    text, blocks = followup_for(_job(JobStatus.AWAITING_APPROVAL, diff="diff x"))
+    assert blocks is not None
+    action_ids = {
+        e["action_id"]
+        for b in blocks
+        if b["type"] == "actions"
+        for e in b["elements"]
+    }
+    assert action_ids == {"approve_job", "reject_job"}
+    assert "review" in text.lower()
+
+
+def test_followup_done_returns_result_text_only() -> None:
+    text, blocks = followup_for(_job(JobStatus.DONE, result="all good"))
+    assert blocks is None
+    assert text == "all good"
+
+
+def test_followup_failed_and_rejected_and_none() -> None:
+    assert followup_for(_job(JobStatus.FAILED, error="boom"))[1] is None
+    assert "boom" in followup_for(_job(JobStatus.FAILED, error="boom"))[0]
+    assert followup_for(_job(JobStatus.REJECTED))[1] is None
+    # None(타임아웃 관측 실패) → 안전 안내, blocks 없음.
+    assert followup_for(None)[1] is None
 
 
 def test_format_footer_includes_metrics_and_proposal() -> None:

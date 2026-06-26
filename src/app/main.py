@@ -65,8 +65,10 @@ def _attach_assistant(handler: Any) -> None:
     log = structlog.get_logger()
     try:
         from app.assistant_handler import attach_assistant
+        from app.mcp_server import store_from_env
 
-        attach_assistant(handler.app)
+        # jobs 주입 — 제안된 job 이 정착하면 스레드에 승인 버튼/결과를 게시(poll-in-thread).
+        attach_assistant(handler.app, jobs=store_from_env())
         log.info("assistant.attached")
     except Exception as exc:  # noqa: BLE001 — Assistant 미지원/미설정이 앱을 막지 않게.
         log.warning("assistant.attach_failed", error=str(exc))
