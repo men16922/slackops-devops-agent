@@ -87,10 +87,12 @@ Last updated: 2026-06-20
   next build green). Real scan findings = cloud-only (EC2+IAM). Reframe: triage/safe-response layer over existing signals.
 
 ## Active Focus
-- **H0 거의 완료** — 인프라·기능·Vercel·이벤트구동 전부 live 검증. **현재 비용 ≈ $0**(EC2 terminated, alarm 삭제; DynamoDB/Vercel/Lambda/SSM 5개 유지).
-  **★ NEXT SESSION = 6/27~28 캡처+제출** (`docs/submission/schedule.md`): `make cloud-up`(SSM 자동) → 영상(PRESENTATION slide 11 대본) →
-  `cloud-stop` → Devpost 제출(필드=`final_submission.md`, 마감 **6/30 09:00 GMT+9**). 남은 제출물 = 영상/텍스트편집/아티클.
-- AWS credit **rejected** → $63.91 + free tier. branch=**main**(작업브랜치, hackathon-h0와 동일 tip). SSM: bot/app/oauth + SLACK_NOTIFY_CHANNEL + DASHBOARD_URL.
+- **v2 = AWSKRUG 발표 데모** (branch `v2`, plan `docs/plans/2026-06-25-awskrug-demo.md`). Slack 해커톤 제출 **폐기**(Devpost §3
+  Eligibility 한국 미달). 목표 = "Slack 자연어 → 실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
+- **D1/D2/D2.5 코드완료·게이트green** — Slack Assistant 승인게이트(approve/reject 버튼↔출력게이트) + poll-in-thread + 포스트모템 Canvas.
+  **★ NEXT = 실 Slack sandbox e2e**(Assistant 스레드→제안→버튼→Canvas) — 코드는 됐으나 **실 Slack 미검증**. 이후 Modal/mock(D3)/실AWS(D4)/슬라이드.
+- H0 인프라(DynamoDB/Vercel/Lambda/SSM)는 그대로 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier.
+  SSM: bot/app/oauth + SLACK_NOTIFY_CHANNEL(+canvas 대상 채널) + DASHBOARD_URL. Canvas scope `canvases:write` 부여완료.
 
 ## Open Risks
 - untrusted input (git diff / kubectl) isolated in `<untrusted_data>`; **CloudWatch now enters via AWS MCP tool_result (D13) —

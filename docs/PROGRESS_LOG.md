@@ -4,6 +4,20 @@ Last updated: 2026-06-20
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-19): docs/archive/progress-2026-06.md
 
+## 2026-06-26 — v2 pivot (AWSKRUG demo) + Slack Assistant approval gate + Canvas (D1/D2/D2.5)
+- Status: Done (code+gate). Branch `v2`. **아직 실 Slack 미검증** — 다음은 sandbox e2e.
+- Pivot: Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 원문 검증 — 한국 미포함, 일본 포함). 목표 = **AWSKRUG 발표 라이브 데모**.
+  plan `docs/plans/2026-06-25-awskrug-demo.md`(rename from slack-challenge-v2). 기술축 = Slack Assistant + AWS MCP(검색 API 폐기). 90초 wow 시퀀스 박음.
+- Changed: **assistant_handler**(D1, 기존) 위에 — **approval_actions.py**(승인 게이트 순수코어 decision_blocks/apply_decision + Bolt
+  바인딩 register_approval_actions; web actions.ts 와 동일 store.approve/reject 낙관락 + audit, 멱등). **poll-in-thread**
+  (poll_job/followup_for — 제안 job 정착까지 폴링 후 승인버튼/결과를 스레드 게시). **canvas.py**(postmortem_markdown +
+  create_canvas; `canvases.create` scope canvases:write, 채널탭=Free팀 필수). assistant_handler.maybe_postmortem(완료 diagnose→
+  포스트모템 Canvas). main 배선(store/audit/canvas_channel=SLACK_NOTIFY_CHANNEL 주입, try/except 안전). mcp_server 에 _dynamodb_from_env/audit_store_from_env.
+- Verified: **Canvas 스파이크 라이브 통과**(워크스페이스 Hackathon, scope 추가+재설치 후 `canvases.create OK` canvas_id=F0BD7EQ1SJX).
+  `make check` **349 passed · ruff · mypy(35) · doc-budget**. 실 Slack Assistant/버튼/poll UX 는 미검증.
+- Blockers: None. (D2a=Assistant 턴 AWS MCP read 스트리밍은 uvx 의존 → 실 AWS D4 에 묶음.)
+- Next: 실 Slack sandbox e2e(Assistant 스레드→제안→버튼→Canvas) · Modal diff승인 · mock 폴백(D3) · 실 AWS 1회(D4).
+
 ## 2026-06-20 — event-driven producer (EventBridge→Lambda) + Vercel live + cloud lifecycle + submission pack
 - Status: Done. Full event-driven loop **live-verified on real AWS**; Vercel dashboard live; cost back to **$0**. Submission pack assembled. Next = 6/27 capture+submit.
 - Changed: **`make cloud-*` lifecycle** (whoami/iam/ddb/up/status/console/ssm/schedule/start/stop/down + lambda-deploy/clean + vercel-key + alarm) wrapping `deploy/*.sh`; instance id → `deploy/.instance-id`. **main = working branch** (ff to hackathon-h0, 22 commits; user-data clones default branch). **i18n** diagnose + Tier1 `detect()` rationales → EN. **Event-driven producer** `src/app/alarm_lambda.py` + `deploy/lambda/{build,deploy,clean}.sh`: CloudWatch ALARM→EventBridge rule→Lambda(`detect()`→propose) into the **same DynamoDB queue** (serverless, fires EC2-off); `cloud-alarm.sh` rewritten event-driven. **Slack notifier** enabled via SSM `/slackops/SLACK_NOTIFY_CHANNEL` (+ `DASHBOARD_URL`). **Vercel** deployed (link + Team ID); `web/lib/ddb.ts` trim env + default region us-east-1 (paste-whitespace ValidationException fix). **`docs/submission/`** (renamed from ppt): `final_submission.md` (Devpost form), `schedule.md` (cost/judging), `PRESENTATION.md` (3-min script + Mac recording), `architecture.md`+png (event path), items/tables.png.

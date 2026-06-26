@@ -1,9 +1,9 @@
 # AGENT_BRIEF — slackops-devops-agent
 Last updated: 2026-06-20
 
-> ▶ NEXT SESSION (**6/27~28 캡처+제출**): plan `docs/submission/schedule.md`. `make cloud-up`(SSM 5개 자동적용) →
->   영상 녹화(`docs/submission/PRESENTATION.md` slide 11 대본) → `make cloud-stop` → Devpost 제출(마감 6/30 09:00,
->   필드=`docs/submission/final_submission.md`). 인프라·기능·Vercel·이벤트구동 전부 live 검증완료, **현재 비용 ≈ $0**(EC2 terminated).
+> ▶ NEXT SESSION (**v2 AWSKRUG demo**): plan `docs/plans/2026-06-25-awskrug-demo.md`. branch `v2`. Slack 해커톤 제출은
+>   **폐기**(한국 자격 미달 — 부록 §7). 다음 = **실 Slack sandbox e2e**(Assistant 스레드→제안→승인버튼→Canvas; D1/D2/D2.5 코드완료·게이트green이나
+>   실 Slack 미검증). 이후 Modal diff승인 → mock 폴백(D3) → 실 AWS 1회(D4) → 슬라이드/녹화. (H0 인프라는 그대로, 비용 ≈ $0.)
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)
