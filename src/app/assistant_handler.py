@@ -211,6 +211,100 @@ def maybe_postmortem(
     return (f"Postmortem — {service}", postmortem_markdown(service, job.result))
 
 
+def run_user_message(
+    text: str,
+    *,
+    say: Callable[..., Any],
+    set_status: Callable[..., Any],
+    client: Any,
+    runner: StreamRunner | None = None,
+    mcp_config: str | None = None,
+    allowed_tools: list[str] | None = None,
+    jobs: JobStore | None = None,
+    canvas_channel: str | None = None,
+    poll_timeout_s: float = GATE_POLL_TIMEOUT_S,
+    poll_interval_s: float = GATE_POLL_INTERVAL_S,
+    sleep: Callable[[float], None] = time.sleep,
+    throttle_s: float = 1.0,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> None:
+    """Assistant user_message 전체 처리 — Bolt 바인딩과 분리(통합 테스트 가능).
+
+    placeholder 게시 → run_turn 스트리밍 chat.update → 최종 footer → (제안 job 있으면)
+    정착 폴링 → 승인 버튼/결과 후속 → (완료 진단이면) 포스트모템 Canvas. say/client/set_status
+    는 Bolt 가 주입; 테스트는 fake 로 주입해 실 Slack 없이 이 흐름을 끝까지 구동한다.
+    """
+    set_status("is analyzing…")
+    posted = say(":hourglass_flowing_sand: …")
+    channel = posted["channel"]
+    ts = posted["ts"]
+    last = [0.0]
+
+    def on_update(acc: str) -> None:
+        now = monotonic()
+        if now - last[0] < throttle_s:
+            return
+        last[0] = now
+        try:
+            client.chat_update(channel=channel, ts=ts, text=acc)
+        except Exception:  # noqa: BLE001 — 중간 렌더 실패는 무시(최종 갱신이 보정)
+            pass
+
+    try:
+        result = run_turn(
+            text,
+            on_update=on_update,
+            runner=runner,
+            mcp_config=mcp_config,
+            allowed_tools=allowed_tools,
+        )
+    except ClaudeTimeoutError:
+        client.chat_update(
+            channel=channel, ts=ts, text=":hourglass: Timed out — please try again."
+        )
+        return
+    except Exception:  # noqa: BLE001 — 무응답 방지 최종 안전망(slack_handler 선례)
+        client.chat_update(
+            channel=channel,
+            ts=ts,
+            text=":warning: An error occurred while analyzing. Check the server logs.",
+        )
+        return
+
+    final = (result.output or "_(no response)_") + format_footer(result)
+    client.chat_update(channel=channel, ts=ts, text=final)
+
+    # 제안된 job 이 있으면 worker 가 정착시킬 때까지 스레드에서 폴링 → 후속(승인 버튼/결과)
+    # 을 같은 스레드에 게시. 승인 버튼 클릭은 register_approval_actions 핸들러가 처리한다.
+    if jobs is None or not result.proposed_job_id:
+        return
+    job = poll_job(
+        jobs,
+        result.proposed_job_id,
+        timeout_s=poll_timeout_s,
+        interval_s=poll_interval_s,
+        sleep=sleep,
+        monotonic=monotonic,
+    )
+    follow_text, follow_blocks = followup_for(job)
+    if follow_blocks is not None:
+        say(text=follow_text, blocks=follow_blocks)
+    else:
+        say(follow_text)
+
+    # 완료된 진단이면 포스트모템 Canvas 를 채널 탭에 생성(부가 산출물 — 실패해도 흐름 유지).
+    pm = maybe_postmortem(job) if canvas_channel else None
+    if pm is not None:
+        from app.canvas import create_canvas  # lazy: Canvas 미사용 경로 영향 없음
+
+        title, markdown = pm
+        canvas_id = create_canvas(
+            client, title=title, markdown=markdown, channel_id=canvas_channel
+        )
+        if canvas_id:
+            say(f":memo: Drafted a postmortem canvas in <#{canvas_channel}>.")
+
+
 def build_assistant(
     *,
     runner: StreamRunner | None = None,
@@ -252,75 +346,22 @@ def build_assistant(
         set_status: Callable[..., Any],
         client: Any,
     ) -> None:
-        set_status("is analyzing…")
-        text = str(payload.get("text", ""))
-        posted = say(":hourglass_flowing_sand: …")
-        channel = posted["channel"]
-        ts = posted["ts"]
-        last = [0.0]
-
-        def on_update(acc: str) -> None:
-            now = monotonic()
-            if now - last[0] < throttle_s:
-                return
-            last[0] = now
-            try:
-                client.chat_update(channel=channel, ts=ts, text=acc)
-            except Exception:  # noqa: BLE001 — 중간 렌더 실패는 무시(최종 갱신이 보정)
-                pass
-
-        try:
-            result = run_turn(
-                text,
-                on_update=on_update,
-                runner=runner,
-                mcp_config=mcp_config,
-                allowed_tools=allowed_tools,
-            )
-        except ClaudeTimeoutError:
-            client.chat_update(
-                channel=channel, ts=ts, text=":hourglass: Timed out — please try again."
-            )
-            return
-        except Exception:  # noqa: BLE001 — 무응답 방지 최종 안전망(slack_handler 선례)
-            client.chat_update(
-                channel=channel,
-                ts=ts,
-                text=":warning: An error occurred while analyzing. Check the server logs.",
-            )
-            return
-
-        final = (result.output or "_(no response)_") + format_footer(result)
-        client.chat_update(channel=channel, ts=ts, text=final)
-
-        # 제안된 job 이 있으면 worker 가 정착시킬 때까지 스레드에서 폴링 → 후속(승인 버튼/결과)
-        # 을 같은 스레드에 게시. 승인 버튼 클릭은 register_approval_actions 핸들러가 처리한다.
-        if jobs is not None and result.proposed_job_id:
-            job = poll_job(
-                jobs,
-                result.proposed_job_id,
-                timeout_s=poll_timeout_s,
-                interval_s=poll_interval_s,
-                sleep=sleep,
-                monotonic=monotonic,
-            )
-            follow_text, follow_blocks = followup_for(job)
-            if follow_blocks is not None:
-                say(text=follow_text, blocks=follow_blocks)
-            else:
-                say(follow_text)
-
-            # 완료된 진단이면 포스트모템 Canvas 를 채널 탭에 생성(부가 산출물 — 실패해도 흐름 유지).
-            pm = maybe_postmortem(job) if canvas_channel else None
-            if pm is not None:
-                from app.canvas import create_canvas  # lazy: Canvas 미사용 경로 영향 없음
-
-                title, markdown = pm
-                canvas_id = create_canvas(
-                    client, title=title, markdown=markdown, channel_id=canvas_channel
-                )
-                if canvas_id:
-                    say(f":memo: Drafted a postmortem canvas in <#{canvas_channel}>.")
+        run_user_message(
+            str(payload.get("text", "")),
+            say=say,
+            set_status=set_status,
+            client=client,
+            runner=runner,
+            mcp_config=mcp_config,
+            allowed_tools=allowed_tools,
+            jobs=jobs,
+            canvas_channel=canvas_channel,
+            poll_timeout_s=poll_timeout_s,
+            poll_interval_s=poll_interval_s,
+            sleep=sleep,
+            throttle_s=throttle_s,
+            monotonic=monotonic,
+        )
 
     return assistant
 
