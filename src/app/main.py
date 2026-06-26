@@ -49,6 +49,7 @@ def bootstrap_socket_mode() -> None:
 
     handler = register_default_commands(SlackHandler.from_env())
     _attach_assistant(handler)
+    _register_approval_actions(handler)
     _serve_proposal_notifier(handler)
     handler.start()
 
@@ -69,6 +70,31 @@ def _attach_assistant(handler: Any) -> None:
         log.info("assistant.attached")
     except Exception as exc:  # noqa: BLE001 — Assistant 미지원/미설정이 앱을 막지 않게.
         log.warning("assistant.attach_failed", error=str(exc))
+
+
+def _register_approval_actions(handler: Any) -> None:
+    """Slack in-thread Approve/Reject 버튼 핸들러를 Bolt App 에 등록.
+
+    web 대시보드와 동일한 출력 게이트(store.approve/reject + audit)를 Slack 버튼에 연결한다.
+    store/audit 구성 실패(자격증명 미설정 등)가 Slack 앱을 막지 않게 try/except 로 감싼다 —
+    slash·Assistant 경로는 그대로 동작한다.
+    """
+    import structlog
+
+    log = structlog.get_logger()
+    try:
+        from app.approval_actions import register_approval_actions
+        from app.mcp_server import audit_store_from_env, store_from_env
+
+        register_approval_actions(
+            handler.app,
+            jobs=store_from_env(),
+            audit=audit_store_from_env(),
+            log=log,
+        )
+        log.info("approval_actions.registered")
+    except Exception as exc:  # noqa: BLE001 — 승인 버튼 미배선이 Slack 앱을 막지 않게.
+        log.warning("approval_actions.register_failed", error=str(exc))
 
 
 def _serve_proposal_notifier(handler: Any) -> None:
