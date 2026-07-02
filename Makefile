@@ -1,7 +1,7 @@
 # slackops-devops-agent — Makefile
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
-.PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent
+.PHONY: check test lint typecheck check-doc-budget smoke-local demo demo-assistant demo-assistant-mock mcp-server agent-monitor worker chat-agent
 .PHONY: cloud-whoami cloud-iam cloud-ddb cloud-up cloud-deploy cloud-status cloud-console cloud-ssm cloud-schedule cloud-start cloud-stop cloud-down
 .PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean cloud-vercel-key cloud-vercel-key-clean
 
@@ -32,6 +32,10 @@ demo:          ## 로컬 데모 풀스택 한 번에 — web+DB(docker) + chat_a
 	@bash scripts/demo.sh
 demo-all:      ## demo + Slack 앱(app.main) 함께 — .env 의 SLACK 토큰 필요(Ctrl-C 전체 종료).
 	@WITH_SLACK=1 bash scripts/demo.sh
+demo-assistant: ## Assistant 콘솔(실 Slack 없이 동일 흐름) — make demo 스택 위에서, .env 자동 로드(실 Claude 토큰).
+	$(DEV_ENV) bash -c 'set -a; [ -f .env ] && . ./.env; set +a; exec python3 -m app.assistant_console $(ARGS)'
+demo-assistant-mock: ## Assistant 콘솔 오프라인 폴백 — 네트워크/Claude/docker 전부 불필요(canned replay, $0).
+	PYTHONPATH=src python3 -m app.assistant_console --mock $(ARGS)
 mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config 가 자동 기동(수동 점검용)
 	$(DEV_ENV) python3 -m app.mcp_server
 agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `make agent-monitor ARGS=--real`

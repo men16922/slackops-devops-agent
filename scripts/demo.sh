@@ -66,4 +66,5 @@ if [ "${WITH_SLACK:-0}" = "1" ]; then
 fi
 
 echo "demo: ready → http://localhost:8930   (Ctrl-C 로 전체 종료)"
+echo "demo: Assistant 경로는 별도 터미널에서 → make demo-assistant (오프라인 폴백: make demo-assistant-mock)"
 wait

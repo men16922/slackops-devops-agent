@@ -1,9 +1,10 @@
 # AGENT_BRIEF — slackops-devops-agent
-Last updated: 2026-06-20
+Last updated: 2026-07-02
 
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): plan `docs/plans/2026-06-25-awskrug-demo.md`. branch `v2`. Slack 해커톤 제출은
->   **폐기**(한국 자격 미달 — 부록 §7). D1/D2/D2.5 코드완료 + **자동 e2e 검증**(run_user_message 통합 + slack_bolt 스모크, 352 passed).
->   다음 = **실 Slack sandbox round-trip**(앱 기동 `python -m app.main`→Assistant DM). 이후 Modal → mock(D3) → 실 AWS(D4) → 슬라이드. (H0 인프라 유지, 비용 ≈ $0.)
+>   **폐기**(한국 자격 미달 — 부록 §7). D1/D2/D2.5/D3 완료(358 passed) — D3 = Assistant 콘솔(`make demo-assistant[-mock]`)
+>   real+오프라인 e2e + 인젝션 방어 검증. agent 가능 QA 소진 → 남은 건 사람 몫: **실 Slack sandbox round-trip**
+>   (앱 기동 `python -m app.main`→Assistant DM 타이핑) → Modal → 실 AWS(D4) → 캡처/슬라이드. (H0 인프라 유지, 비용 ≈ $0.)
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)
