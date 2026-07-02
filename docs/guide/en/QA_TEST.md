@@ -17,19 +17,19 @@
 > Launch + WSS already verified 2026-07-01. Needs the real Slack workspace over the network — but zero AWS infra.
 > Prereq (all granted): `.env`/SSM `bot/app/oauth` tokens + `SLACK_NOTIFY_CHANNEL` (= Canvas target channel) + `DASHBOARD_URL`, scope `canvases:write`.
 
-## A1. ★ Real Slack sandbox e2e (NEXT — the only blocking gap)
-> Type in a real Assistant thread. **Button payload shape, real claude streaming, and Canvas API are only
-> confirmed here** — the underlying gate/store logic is already verified; this is the Slack binding surface only.
+## A1. ★ Real Slack sandbox e2e — ✅ ALL PASSED 2026-07-02 (plain-DM fallback path)
+> Verified live in the app DM (`register_dm_messages` — the ✨ assistant pane needs a paid surface, the DM
+> fallback covers it). Evidence in PROGRESS_LOG 2026-07-02.
 
-- [ ] **NL diagnose** — type "checkout-service is slow" in the Assistant DM/thread → placeholder → **streaming** incremental render (`chat.update`).
-- [ ] **poll-in-thread** — after the proposed job settles, **approval buttons/result** are posted to the thread.
-- [ ] **Approve click** — Approve → output-gate state machine transitions to `APPROVED` (optimistic lock + audit, idempotent) → worker executes.
-- [ ] **Postmortem Canvas** — right after a completed diagnose, `canvases.create` auto-creates a channel-tab Canvas (`maybe_postmortem`).
-- [ ] **footer** — response shows cost/tokens/tool calls (OTel).
-- [ ] **payload confirm** — the real button-click payload (`container.message_ts` / `channel.id` / `actions[].value`) matches handler assumptions.
+- [x] **NL diagnose** — "checkout-service is slow" → streaming render (`chat.update`, "(edited)") + proposal. 2026-07-02.
+- [x] **poll-in-thread** — pr proposal settled → **diff preview + ✅/❌ buttons** posted to the DM. 2026-07-02.
+- [x] **Approve click** — `awaiting_approval → approved` (optimistic lock) + button message updated to "approved by @…". Local execute intentionally skipped (real push = D4/EC2). 2026-07-02.
+- [x] **Postmortem Canvas** — completed diagnose auto-created the channel-tab Canvas ("Postmortem — checkout-service" in #devops) + "Drafted a postmortem canvas" notice. 2026-07-02.
+- [x] **footer** — `$0.3673 · 4933 tokens · 2 tool calls` shown. 2026-07-02.
+- [x] **payload confirm** — real click payload matched handler assumptions: `actions[].value`=job id, `user.id`=U0BBX3U5Q2W, audit `approved · via slack`. 2026-07-02.
 
 ## A2. Slack platform BUY features (D2.5)
-- [ ] **mrkdwn / Markdown blocks** — table→code block, heading/bold/divider render (visible during the A1 session).
+- [x] **mrkdwn / Markdown blocks** — headings/bold/bullets/inline-code rendered in DM + Canvas during A1. 2026-07-02.
 - ⚠️ **Modal diff approval** (`views.open`) and **Message Shortcut** are **not implemented yet** (no code — they are build tasks in `docs/NEXT_PLAN.md`, not QA items). Verify here only after implementation.
 
 ## A3. Presentation artifacts (D5/D6)
@@ -52,6 +52,7 @@
 ## Known limitations / cautions (disclose honestly when presenting)
 - **CloudWatch ingested via AWS MCP `tool_result` (D13) → bypasses `<untrusted_data>` isolation.** Boundaries = IAM read-only + `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + read-only tool allowlist.
 - Slack Canvas: a Free team cannot create standalone → `channel_id` required (channel-tab form). Uses `SLACK_NOTIFY_CHANNEL`.
+- **⏰ Canvas creation currently runs on a free trial ending July 19** (Slack banner: "Creating canvases … is a paid feature"). Do the demo/captures before 7/19 or plan for a paid workspace.
 - `tool_calls` telemetry: the streaming path (`chat_agent`/Assistant) is collected; worker (non-streaming `run_headless`) metrics are still `None`.
 - Level 2 (Execute)/prod/IAM/DB changes are **inactive** (immutable ban) — out of MVP scope.
 - The local worker's `pr execute` does a real push, so it can only be verified in a GitHub-authenticated environment (= AWS/EC2).

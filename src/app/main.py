@@ -73,11 +73,17 @@ def _attach_assistant(handler: Any) -> None:
         # canvas_channel(SLACK_NOTIFY_CHANNEL) 설정 시 완료된 진단을 포스트모템 Canvas 로 게시.
         jobs = store_from_env()
         canvas_channel = os.environ.get("SLACK_NOTIFY_CHANNEL")
-        attach_assistant(handler.app, jobs=jobs, canvas_channel=canvas_channel)
+        # 실 Claude 진단은 90s 를 넘길 수 있다 — 정착 폴링을 env 로 연장(결과/Canvas 후속 보장).
+        poll_timeout_s = float(os.environ.get("ASSISTANT_POLL_TIMEOUT_S", "240"))
+        attach_assistant(
+            handler.app, jobs=jobs, canvas_channel=canvas_channel, poll_timeout_s=poll_timeout_s
+        )
         log.info("assistant.attached")
         # 일반 앱 DM 폴백 — ✨ 어시스턴트 패널이 없는 플랜/클라이언트에서도 동일 흐름.
-        register_dm_messages(handler.app, jobs=jobs, canvas_channel=canvas_channel)
-        log.info("assistant.dm_fallback_registered")
+        register_dm_messages(
+            handler.app, jobs=jobs, canvas_channel=canvas_channel, poll_timeout_s=poll_timeout_s
+        )
+        log.info("assistant.dm_fallback_registered", poll_timeout_s=poll_timeout_s)
     except Exception as exc:  # noqa: BLE001 — Assistant 미지원/미설정이 앱을 막지 않게.
         log.warning("assistant.attach_failed", error=str(exc))
 

@@ -17,19 +17,19 @@
 > 기동 + WSS 는 2026-07-01 검증 완료. 실 Slack 워크스페이스 네트워크 연결은 필요하지만 AWS 인프라는 0.
 > 사전(모두 부여완료): `.env`/SSM `bot/app/oauth` 토큰 + `SLACK_NOTIFY_CHANNEL`(=Canvas 대상 채널) + `DASHBOARD_URL`, scope `canvases:write`.
 
-## A1. ★ 실 Slack sandbox e2e (NEXT — 유일한 블로킹 갭)
-> 실 Assistant 스레드에서 직접 타이핑. **버튼 payload 모양·실 claude 스트리밍·Canvas API 는 여기서만 확정** —
-> 밑단 게이트/스토어 로직은 이미 검증됨, 이 섹션은 Slack 바인딩 표면뿐.
+## A1. ★ 실 Slack sandbox e2e — ✅ 전부 통과 2026-07-02 (일반 DM 폴백 경로)
+> 앱 DM 에서 라이브 검증(`register_dm_messages` — ✨ 어시스턴트 패널은 유료 표면이라 DM 폴백으로 커버).
+> 증빙은 PROGRESS_LOG 2026-07-02.
 
-- [ ] **자연어 진단** — Assistant DM/스레드에 "checkout-service 느려" → placeholder → **스트리밍** 점진 렌더(`chat.update`).
-- [ ] **poll-in-thread** — 제안 job 정착까지 폴링 후 스레드에 **승인 버튼/결과** 게시.
-- [ ] **승인 버튼 클릭** — Approve → 출력게이트 상태머신 `APPROVED` 전이(낙관락 + audit, 멱등) → worker 실행.
-- [ ] **포스트모템 Canvas** — 완료 diagnose 직후 `canvases.create` 로 채널 탭에 자동 생성(`maybe_postmortem`).
-- [ ] **footer** — 응답에 cost/tokens/tool calls(OTel) 노출 확인.
-- [ ] **payload 확정** — 실 버튼 클릭 payload(`container.message_ts` / `channel.id` / `actions[].value`)가 핸들러 가정과 일치.
+- [x] **자연어 진단** — "checkout-service is slow" → 스트리밍 렌더(`chat.update`, "(edited)") + 제안. 2026-07-02.
+- [x] **poll-in-thread** — pr 제안 정착 → **diff 미리보기 + ✅/❌ 버튼** DM 게시. 2026-07-02.
+- [x] **승인 버튼 클릭** — `awaiting_approval → approved`(낙관락) + 버튼 메시지 "approved by @…" 갱신. 로컬 execute 는 의도적 생략(실 push = D4/EC2). 2026-07-02.
+- [x] **포스트모템 Canvas** — 완료 diagnose 가 채널 탭 Canvas 자동 생성("Postmortem — checkout-service" in #devops) + "Drafted…" 안내. 2026-07-02.
+- [x] **footer** — `$0.3673 · 4933 tokens · 2 tool calls` 노출. 2026-07-02.
+- [x] **payload 확정** — 실 클릭 payload 가 핸들러 가정과 일치: `actions[].value`=job id, `user.id`=U0BBX3U5Q2W, audit `approved · via slack`. 2026-07-02.
 
 ## A2. Slack 플랫폼 BUY 기능 (D2.5)
-- [ ] **mrkdwn / Markdown 블록** — 표→코드블록, 헤딩/bold/divider 렌더 (A1 세션 중 자연히 확인됨).
+- [x] **mrkdwn / Markdown 블록** — A1 세션에서 헤딩/bold/불릿/인라인코드 렌더 확인. 2026-07-02.
 - ⚠️ **Modal diff 승인**(`views.open`)과 **Message Shortcut** 은 **아직 미구현**(코드 없음 — QA 항목이 아니라 `docs/NEXT_PLAN.md` 의 구현 과제). 구현 후에 여기서 검증.
 
 ## A3. 발표 산출물 (D5/D6)
@@ -52,6 +52,7 @@
 ## 알려진 한계 / 주의 (발표 시 정직히 공개)
 - **CloudWatch 가 AWS MCP `tool_result` 로 유입(D13) → `<untrusted_data>` 격리 우회.** 경계 = IAM 읽기전용 + `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + 읽기전용 tool allowlist.
 - Slack Canvas: Free 팀은 standalone 불가 → `channel_id` 필수(채널 탭형). `SLACK_NOTIFY_CHANNEL` 사용.
+- **⏰ Canvas 생성이 현재 무료 트라이얼(7/19 종료)로 동작 중** (Slack 배너: "Creating canvases … is a paid feature"). **데모/캡처를 7/19 전에** 하거나 유료 워크스페이스 대비.
 - `tool_calls` 계측: 스트리밍 경로(`chat_agent`/Assistant)는 수집, worker(비스트림 `run_headless`) metric 은 아직 `None`.
 - L2(Execute)/prod/IAM/DB 변경은 **비활성**(금지 불변) — MVP 범위 밖.
 - 로컬 worker 의 `pr execute` 는 실 push 라 GitHub 인증 환경(=AWS/EC2)에서만 검증.

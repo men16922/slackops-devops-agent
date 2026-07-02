@@ -2,9 +2,9 @@
 Last updated: 2026-07-02
 
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): plan `docs/plans/2026-06-25-awskrug-demo.md`. branch `v2`. Slack 해커톤 제출은
->   **폐기**(한국 자격 미달 — 부록 §7). D1/D2/D2.5/D3 완료(358 passed) — D3 = Assistant 콘솔(`make demo-assistant[-mock]`)
->   real+오프라인 e2e + 인젝션 방어 검증. agent 가능 QA 소진 → 남은 건 사람 몫: **실 Slack sandbox round-trip**
->   (앱 기동 `python -m app.main`→Assistant DM 타이핑) → Modal → 실 AWS(D4) → 캡처/슬라이드. (H0 인프라 유지, 비용 ≈ $0.)
+>   **폐기**(한국 자격 미달 — 부록 §7). D1–D3 + **실 Slack sandbox e2e 전부 통과**(2026-07-02, DM 폴백 경로 — 스트리밍/
+>   승인버튼→approved/Canvas/footer/payload, 359 passed). 남은 건: **A3 캡처·녹화·슬라이드** → **D4 실 AWS 1회**
+>   (`make cloud-up`→진단+write-denied→`cloud-stop`). ⏰ **Canvas 무료 트라이얼 7/19 종료 — 캡처 그 전에.** (비용 ≈ $0.)
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)

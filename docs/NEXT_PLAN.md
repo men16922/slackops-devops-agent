@@ -11,8 +11,9 @@ Last updated: 2026-07-02
 > D1/D2/D2.5/D3 **코드완료·게이트 green**(358 passed). 핵심 미완 = **실 Slack 검증**(사람 타이핑). 상세 단계는 plan §4.
 - [x] D1 Assistant 핸들러 · D2 승인게이트(버튼↔출력게이트)+poll-in-thread · D2.5 포스트모템 Canvas(스파이크 통과) — 2026-06-26.
 - [x] D3 로컬 mock 폴백 — Assistant 콘솔(`make demo-assistant[-mock]`) real+오프라인 e2e + **인젝션 방어 장면 검증** — 2026-07-02.
-- [ ] `[manual]` **실 Slack sandbox e2e** — Assistant 스레드 자연어→제안→승인버튼→완료→Canvas. (현재 실 Slack 미검증)
-- [ ] `[manual]` Modal diff 승인(`views.open`) · mrkdwn 렌더 · Message Shortcut(BUY 잔여).
+- [x] **실 Slack sandbox e2e** — DM 폴백 경로로 6항목 전부 통과(스트리밍/버튼/approved 전이/Canvas/footer/payload) — 2026-07-02.
+      ⏰ Canvas 는 무료 트라이얼 **7/19 종료** — 캡처/데모 그 전에.
+- [ ] Modal diff 승인(`views.open`) · Message Shortcut — **미구현 BUY 잔여**(선택, mrkdwn 렌더는 검증됨).
 - [ ] `[manual]` D4 실 AWS 1회(`make cloud-up`→Assistant 실 CloudWatch 진단+write-denied→`cloud-stop`) + D2a(턴 내 AWS MCP read 스트리밍).
 - [ ] `[manual]` D5/D6 사전 녹화 백업 + 인젝션 장면 **캡처**(동작은 검증됨) + AWSKRUG 슬라이드.
 

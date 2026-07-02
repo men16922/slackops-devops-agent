@@ -4,6 +4,18 @@ Last updated: 2026-07-02
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 
+## 2026-07-02 — ★ 실 Slack sandbox e2e(A1) 전부 통과 — DM 폴백 경로 + Canvas 라이브
+- Status: Done. **v2 핵심 미검증 갭 해소** — 실 워크스페이스(Free 팀, Slack 웹)에서 종단 검증 완료. 잔여 = D4 실 AWS + 발표 산출물.
+- Changed: **manifest 수정**(App Home messages_tab + event_subscriptions: assistant_thread_started/context_changed/message.im
+  + bot scope im:history — "Sending messages turned off"·이벤트 미전달 해결). **register_dm_messages**(assistant_handler) —
+  ✨ 패널 없는 플랜/클라이언트용 **일반 DM 폴백**(message.im→run_user_message, 봇에코/서브타입 필터; 라이브에서 Unhandled 관찰 후 추가).
+  main 에 **ASSISTANT_POLL_TIMEOUT_S**(기본 240s — 실 Claude 진단 90s 초과 대응). .env 토큰 교체(xoxb 재발급 + xapp 정정).
+- Verified: `make check` **359 passed**. **실 Slack 라이브(A1 6항목)**: ① NL diagnose 스트리밍("(edited)") ② pr 제안→diff+승인버튼 게시
+  ③ Approve 클릭 → `approved`(낙관락) + audit `approved·U0BBX3U5Q2W·via slack` + 버튼 메시지 갱신 ④ **채널 탭 Canvas 자동 생성**
+  ("Postmortem — checkout-service" + untrusted_data 미준수 명시) ⑤ footer $0.3673·4933tok·2 tool calls ⑥ payload 가정 일치. mrkdwn 렌더 확인(A2).
+- Blockers: pr execute(실 push)는 로컬 생략(D4/EC2 몫 — worker 가 approved job 집기 전 차단, 리포 무변경 확인). **Canvas = 무료 트라이얼 7/19 종료**(그 전 캡처 필수).
+- Next: A3 캡처/녹화/슬라이드 → D4 실 AWS 1회. (선택) Modal diff·Message Shortcut 구현.
+
 ## 2026-07-02 — D3 로컬 mock 폴백 완료(Assistant 콘솔) + 인젝션 방어 장면 검증
 - Status: Done. QA_TEST 의 agent 가능 항목 전부 소진 — **남은 것은 사람 몫뿐**(§1 실 Slack 타이핑 / §4 실 AWS / §5 녹화·슬라이드).
 - Changed: **app/assistant_console.py** — run_user_message 를 콘솔 fake(say/client, writer/reader 주입)로 구동(Slack 바인딩
