@@ -160,6 +160,7 @@ def test_flow_pr_awaiting_posts_approval_buttons_then_click_transitions() -> Non
 class _FakeApp:
     def __init__(self) -> None:
         self.handlers: dict[str, Any] = {}
+        self.event_handlers: dict[str, Any] = {}
 
     def action(self, action_id: str) -> Any:
         def _register(fn: Any) -> Any:
@@ -167,6 +168,48 @@ class _FakeApp:
             return fn
 
         return _register
+
+    def event(self, event_type: str) -> Any:
+        def _register(fn: Any) -> Any:
+            self.event_handlers[event_type] = fn
+            return fn
+
+        return _register
+
+
+def test_dm_fallback_runs_full_flow_and_filters_noise() -> None:
+    """일반 앱 DM(message.im) 폴백 — Assistant 패널 없이도 동일 흐름 + 노이즈 필터."""
+    from app.assistant_handler import register_dm_messages
+
+    store = SqliteJobStore()
+    job = store.enqueue("diagnose", "checkout-service", source=JobSource.AGENT, requested_by="agent")
+    store.claim()
+    store.complete(job.id, status=JobStatus.DONE, result="p99 breached 1200ms")
+
+    app = _FakeApp()
+    register_dm_messages(
+        app,
+        runner=_propose_stream("diagnose", "checkout-service", job.id),
+        mcp_config="", jobs=store, canvas_channel="C9", sleep=lambda _s: None,
+    )
+    handler = app.event_handlers["message"]
+
+    # 노이즈: 채널 메시지 / 봇 에코 / 서브타입은 무시(응답 없음).
+    for noise in (
+        {"channel_type": "channel", "text": "hi"},
+        {"channel_type": "im", "text": "hi", "bot_id": "B1"},
+        {"channel_type": "im", "text": "hi", "subtype": "message_changed"},
+    ):
+        say, client = _Say(), _Client()
+        handler(event=noise, say=say, client=client)
+        assert not say.posts and not client.updates
+
+    # 실제 사용자 DM → 스트리밍 최종 갱신 + 진단 결과 + Canvas 흐름까지 그대로.
+    say, client = _Say(), _Client()
+    handler(event={"channel_type": "im", "text": "checkout-service is slow"}, say=say, client=client)
+    assert client.updates and "$0.0120" in client.updates[-1]["text"]
+    assert any(t and "p99 breached 1200ms" in t for t in [p["text"] for p in say.posts])
+    assert client.api_calls and client.api_calls[0][0] == "canvases.create"
 
 
 def test_real_slack_bolt_assistant_constructs_and_wires() -> None:

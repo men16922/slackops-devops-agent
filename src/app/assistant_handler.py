@@ -375,3 +375,29 @@ def attach_assistant(app: Any, **kwargs: Any) -> Any:
     assistant = build_assistant(**kwargs)
     app.use(assistant)
     return assistant
+
+
+def register_dm_messages(app: Any, **kwargs: Any) -> None:
+    """일반 앱 DM(message.im)을 Assistant 스레드와 같은 흐름으로 처리하는 폴백 바인딩.
+
+    Assistant 미들웨어는 ✨ 어시스턴트 패널의 스레드 메시지만 처리한다 — 패널이 없는
+    플랜/클라이언트에서도 앱 DM 타이핑으로 동일 UX(스트리밍→제안→승인버튼→Canvas)가
+    동작하게 한다. 어시스턴트 스레드 메시지는 Assistant 미들웨어가 먼저 소비하므로
+    여기로 오지 않는다(이중 처리 없음). kwargs 는 run_user_message 로 passthrough.
+    """
+
+    def _on_message(event: dict[str, Any], say: Callable[..., Any], client: Any) -> None:
+        if event.get("channel_type") != "im":
+            return
+        if event.get("bot_id") or event.get("subtype"):
+            return  # 봇 에코·메시지 수정/삭제 등 서브타입 무시(응답 루프 방지)
+        run_user_message(
+            str(event.get("text", "")),
+            say=say,
+            set_status=lambda _msg: None,  # 일반 DM 엔 상태표시("is analyzing…") 표면이 없다
+            client=client,
+            **kwargs,
+        )
+
+    # 데코레이터 대신 호출형 등록(approval_actions 선례 — app 이 Any 라 mypy untyped 회피).
+    app.event("message")(_on_message)

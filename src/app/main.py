@@ -66,17 +66,18 @@ def _attach_assistant(handler: Any) -> None:
 
     log = structlog.get_logger()
     try:
-        from app.assistant_handler import attach_assistant
+        from app.assistant_handler import attach_assistant, register_dm_messages
         from app.mcp_server import store_from_env
 
         # jobs 주입 — 제안된 job 이 정착하면 스레드에 승인 버튼/결과를 게시(poll-in-thread).
         # canvas_channel(SLACK_NOTIFY_CHANNEL) 설정 시 완료된 진단을 포스트모템 Canvas 로 게시.
-        attach_assistant(
-            handler.app,
-            jobs=store_from_env(),
-            canvas_channel=os.environ.get("SLACK_NOTIFY_CHANNEL"),
-        )
+        jobs = store_from_env()
+        canvas_channel = os.environ.get("SLACK_NOTIFY_CHANNEL")
+        attach_assistant(handler.app, jobs=jobs, canvas_channel=canvas_channel)
         log.info("assistant.attached")
+        # 일반 앱 DM 폴백 — ✨ 어시스턴트 패널이 없는 플랜/클라이언트에서도 동일 흐름.
+        register_dm_messages(handler.app, jobs=jobs, canvas_channel=canvas_channel)
+        log.info("assistant.dm_fallback_registered")
     except Exception as exc:  # noqa: BLE001 — Assistant 미지원/미설정이 앱을 막지 않게.
         log.warning("assistant.attach_failed", error=str(exc))
 
