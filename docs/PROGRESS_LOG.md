@@ -1,8 +1,19 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-02
+Last updated: 2026-07-04
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
+
+## 2026-07-04 — overnight-harness: vendored → plugin-based 전환 + kiro-cli 5번째 엔진
+- Status: Done. 자율 야간 루프가 이제 5개 엔진(claude/codex/opencode/agy/**kiro**)을 지원하며, 러너는 플러그인(SSOT)에서 런타임 해석.
+- Changed: vendored behavior 제거(run.sh/status.sh/dashboard.sh/notify.sh) → Makefile을 HARNESS_ROOT resolution 기반 snippet으로 교체.
+  `.claude/harness-config.json`에 `harness_root` 핀 + `engines` + `kiro` 블록 추가.
+  `.kiro/steering/harness-*.md` 6파일 + `.kiro/agents/overnight-harness.json` 플러그인 최신 템플릿으로 갱신.
+  플러그인 본체(`claude-overnight-harness` main)에도 kiro 엔진 정식 등록(run.sh case + docs/ENGINES + INSTALL + README).
+- Verified: `make overnight-where` → 플러그인 정상 해석. `harness-init.sh --check` 전항목 ✓.
+  `bash -n run.sh` syntax OK. 플러그인 `832fd44` push 완료, 이 리포 `9b2d107` push 완료.
+- Blockers: None.
+- Next: `KIRO_AGENT=overnight-harness make overnight-kiro-once` 실 구동 스모크 테스트.
 
 ## 2026-07-02 — ★ 실 Slack sandbox e2e(A1) 전부 통과 — DM 폴백 경로 + Canvas 라이브
 - Status: Done. **v2 핵심 미검증 갭 해소** — 실 워크스페이스(Free 팀, Slack 웹)에서 종단 검증 완료. 잔여 = D4 실 AWS + 발표 산출물.
