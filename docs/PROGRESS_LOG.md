@@ -1,8 +1,17 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-04
+Last updated: 2026-07-05
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
+
+## 2026-07-05 — workspace 정리 + AWSKRUG 발표 자료 v2 작성
+- Status: Done. 로컬 237MB 절감 + git 정리(폐기 Devpost 문서 삭제, 완료 plan 아카이빙) + 발표 슬라이드/대본 신규 작성.
+- Changed: `rm` 로컬 캐시(.mypy_cache/web/.next/docs/submission/.playwright-mcp). `git rm` docs/guide/{kr,en}/DEVPOST.md.
+  `git mv` 완료 plan 3개 → docs/archive/plans/. `docs/presentation/PRESENTATION.md`(대본) + `slides-v2.html`(9장 슬라이드) 신규 작성.
+  기존 `.dc.html`(H0 Devpost 영상용) → `SlackOps Demo Script.dc.html` 세션 내 복원(참고용 유지), `SlackOps DevOps Agent.dc.html` 유실(untracked).
+- Verified: `36870ac` push 완료. `du -sh .` = 283MB(521→283). `git status` clean (untracked = presentation/ + VERIFICATION_ENGINEERING.md).
+- Blockers: None.
+- Next: 슬라이드 디자인 마무리 → A3 캡처(Canvas 7/19 만료 전) → D4 실 AWS 1회.
 
 ## 2026-07-04 — overnight-harness: vendored → plugin-based 전환 + kiro-cli 5번째 엔진
 - Status: Done. 자율 야간 루프가 이제 5개 엔진(claude/codex/opencode/agy/**kiro**)을 지원하며, 러너는 플러그인(SSOT)에서 런타임 해석.
