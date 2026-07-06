@@ -1,6 +1,7 @@
 {
   "$comment": "Per-repo harness config. overnight-harness 플러그인 스킬(sync/checkpoint/tidy-docs/overnight-report/overnight-seed)이 이 파일에서 doc 경로·gate·budget 을 읽는다. 리포 불변표준은 harness/CORE_MANDATES.md, bibles 매핑은 docs/engineering/interp/INTERPRETATION.md.",
   "project_name": "slackops-devops-agent",
+  "harness_root": "/Users/men1692/Desktop/local/claude-overnight-harness/plugins/overnight-harness",
   "docs": {
     "brief": "docs/AGENT_BRIEF.md",
     "status": "docs/STATUS.md",
@@ -13,5 +14,10 @@
   "gate": "make check",
   "smoke": "make smoke-local",
   "budgets": { "brief": 60, "status": 120, "plan": 120, "log": 120 },
-  "engine": "claude"
+  "engine": "claude",
+  "engines": ["claude", "codex", "opencode", "agy", "kiro"],
+  "kiro": {
+    "agent": "overnight-harness",
+    "effort": "high"
+  }
 }

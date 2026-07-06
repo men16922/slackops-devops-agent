@@ -18,5 +18,9 @@ def test_health_and_metrics_routes() -> None:
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
 
+    healthz = client.get("/healthz")
+    assert healthz.status_code == 200
+    assert healthz.json()["status"] == "ok"
+
     metrics = client.get("/metrics")
     assert metrics.status_code == 200

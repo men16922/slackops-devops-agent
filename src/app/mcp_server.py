@@ -123,11 +123,11 @@ def list_pending_impl(store: JobStore, limit: int = 50) -> list[dict[str, object
     return out
 
 
-def store_from_env() -> JobStore:
-    """환경에서 JobStore 구성 — DDB_ENDPOINT 있으면 DynamoDB Local, 없으면 실 DynamoDB.
+def _dynamodb_from_env() -> tuple[Any, str]:
+    """환경에서 DynamoDB resource + 테이블명 구성 — DDB_ENDPOINT 있으면 Local, 없으면 실 DynamoDB.
 
-    대시보드가 읽는 같은 단일테이블(`slackops-agent`)에 적재해 제안이 라이브로 노출된다.
-    boto3 는 lazy import(미설치 환경 import-safe).
+    JobStore/AuditStore 가 같은 단일테이블(`slackops-agent`)·같은 endpoint/region 을 쓰도록
+    공유한다. boto3 는 lazy import(미설치 환경 import-safe).
     """
     import boto3  # lazy: 선택 의존성
 
@@ -137,11 +137,23 @@ def store_from_env() -> JobStore:
     kwargs: dict[str, Any] = {"region_name": region}
     if endpoint:
         kwargs["endpoint_url"] = endpoint
-    dynamodb = boto3.resource("dynamodb", **kwargs)
+    return boto3.resource("dynamodb", **kwargs), table
 
+
+def store_from_env() -> JobStore:
+    """환경에서 JobStore 구성 — 대시보드가 읽는 같은 단일테이블에 적재(제안 라이브 노출)."""
+    dynamodb, table = _dynamodb_from_env()
     from app.store.dynamodb_store import DynamoDbJobStore
 
     return DynamoDbJobStore(table, dynamodb=dynamodb)
+
+
+def audit_store_from_env() -> Any:
+    """환경에서 AuditStore 구성 — JobStore 와 같은 테이블/endpoint(승인 감사 일관)."""
+    dynamodb, table = _dynamodb_from_env()
+    from app.store.audit_store import DynamoDbAuditStore
+
+    return DynamoDbAuditStore(table, dynamodb=dynamodb)
 
 
 def build_server(store: JobStore) -> Any:

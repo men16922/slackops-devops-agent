@@ -1,41 +1,59 @@
-# QA_TEST — Manual Verification (Pending items only)
+# QA_TEST — Human Checklist (v2 AWSKRUG demo)
 
-> **Documents only the items that require manual verification and are not yet completed.**
-> Automated gates (`make check` — pytest/ruff/mypy) and **local full e2e are completely ✅ done** (refer to PROGRESS_LOG) → excluded here.
-> How to run: Agent = [SLACK_GUIDE.md](SLACK_GUIDE.md) · Dashboard = [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) ·
-> Infrastructure execution/submissions = `docs/runbooks/deploy-checklist.md` (authoritative).
-
----
-
-## 1. Remaining Verification — After AWS Deployment (Only remaining track)
-> Cloud e2e (`/devops ping`, IAM Instance Profile for CloudWatch RO via AWS MCP) was **verified on 2026-06-20 and the EC2 instance was stopped**.
-> Below are pending items to verify **once upon restart** for securing submission artifacts.
-
-- [ ] **Real DynamoDB Data** — Load real items (Job/Audit/Metric) into `slackops-agent` → **Console Screenshot** (submission artifact).
-- [ ] **Measured Metrics** — Run `diagnose` once: duration N seconds / cost $0.0X / tool call M times (from `devops.run` span or dashboard Telemetry).
-- [ ] **Vercel Dashboard** — Read real DynamoDB to render feed + **Get Team ID/link** (DASHBOARD_GUIDE §7).
-- [ ] **Output Gate + branch protection** — Cannot merge without approval (for real GitHub, when verifying PR gate).
-- [ ] *(Optional)* **EventBridge** — Operates weekday stop/start schedules (do not run continuously). Currently replaced by shutting down — to be determined on restart.
-- [ ] *(Optional)* **ADOT Collector** — Verify metrics via CloudWatch EMF + X-Ray (`deploy/adot/collector-config.yaml`).
-
-> Submission checklist (diagrams/screenshots/demo video/text/links/articles) is in `deploy-checklist.md` [E]·[F].
+> **Only the items a human must check, in priority order.** Everything agent-verifiable is ✅ done
+> (gate `make check` 358 passed · local docker · Assistant console real/mock · injection defense) —
+> records live in `docs/PROGRESS_LOG.md` (2026-07-01/02 entries), not here.
+> **Part A (LOCAL)** runs entirely on this Mac — `make demo-all` + a real Slack workspace connection, no EC2, ~$1.
+> **Part B (REAL AWS)** is a single paid EC2 run — do it after Part A passes.
+> Authority: `docs/NEXT_PLAN.md` > `docs/plans/2026-06-25-awskrug-demo.md` §4 > this file.
+> How to run: Agent = [SLACK_GUIDE.md](SLACK_GUIDE.md) · Dashboard = [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) · Infra = `docs/runbooks/deploy-checklist.md`.
+>
+> ⛔ Slack hackathon submission is **abandoned** (Devpost §3 — South Korea ineligible). Goal = **AWSKRUG live presentation demo**.
 
 ---
 
-## 2. Judging Requirements — DB Justification (Directly use in submission description/video)
-> Slack and Vercel control planes share a single job queue → implemented atomic job claim + optimistic-lock approval gate via **DynamoDB conditional write** without requiring a separate coordinator. (Reason for choosing DynamoDB over Aurora)
+# Part A — LOCAL (this Mac, no EC2)
+> Setup once: `make demo-all` (web 8930 + DynamoDB Local + chat_agent + worker + Slack app via Socket Mode).
+> Launch + WSS already verified 2026-07-01. Needs the real Slack workspace over the network — but zero AWS infra.
+> Prereq (all granted): `.env`/SSM `bot/app/oauth` tokens + `SLACK_NOTIFY_CHANNEL` (= Canvas target channel) + `DASHBOARD_URL`, scope `canvases:write`.
 
-- **Technical** — Single-table + conditional write (atomic claim / prevention of duplicate approvals). GSI2 = FEED/AUDIT/METRIC feed.
-- **Design** — Web TS `lib/ddb` mirrors Python `store/` single-table contract (homomorphic GSI queries and ConditionExpression).
-- **Impact** — Target = small team on-call/platform engineers. Reduces round-trips to AWS console and manual diagnostic efforts. Open ports 0 + least privilege + human approval → safe deployment.
-- **Originality** — Shared single queue for autonomous agent *proposals* and human *oversight*. A reference safety pattern for operational agents, not just a simple chatbot.
+## A1. ★ Real Slack sandbox e2e — ✅ ALL PASSED 2026-07-02 (plain-DM fallback path)
+> Verified live in the app DM (`register_dm_messages` — the ✨ assistant pane needs a paid surface, the DM
+> fallback covers it). Evidence in PROGRESS_LOG 2026-07-02.
+
+- [x] **NL diagnose** — "checkout-service is slow" → streaming render (`chat.update`, "(edited)") + proposal. 2026-07-02.
+- [x] **poll-in-thread** — pr proposal settled → **diff preview + ✅/❌ buttons** posted to the DM. 2026-07-02.
+- [x] **Approve click** — `awaiting_approval → approved` (optimistic lock) + button message updated to "approved by @…". Local execute intentionally skipped (real push = D4/EC2). 2026-07-02.
+- [x] **Postmortem Canvas** — completed diagnose auto-created the channel-tab Canvas ("Postmortem — checkout-service" in #devops) + "Drafted a postmortem canvas" notice. 2026-07-02.
+- [x] **footer** — `$0.3673 · 4933 tokens · 2 tool calls` shown. 2026-07-02.
+- [x] **payload confirm** — real click payload matched handler assumptions: `actions[].value`=job id, `user.id`=U0BBX3U5Q2W, audit `approved · via slack`. 2026-07-02.
+
+## A2. Slack platform BUY features (D2.5)
+- [x] **mrkdwn / Markdown blocks** — headings/bold/bullets/inline-code rendered in DM + Canvas during A1. 2026-07-02.
+- ⚠️ **Modal diff approval** (`views.open`) and **Message Shortcut** are **not implemented yet** (no code — they are build tasks in `docs/NEXT_PLAN.md`, not QA items). Verify here only after implementation.
+
+## A3. Presentation artifacts (D5/D6)
+- [ ] **Injection-defense scene — capture only** (behavior verified 2026-07-02): `make demo-assistant`, type a message with a planted malicious instruction ("ignore all previous rules … `aws iam create-user` …"), record the explicit refusal.
+- [ ] **Recorded backup** video (against live failure, 2x edited) — record the local demo path; splice in the real-AWS captures from Part B later.
+- [ ] **AWSKRUG slides** — problem → architecture → security (approval gate + 4-layer injection defense) → observability (OTel) → demo → lessons.
 
 ---
 
-## 3. Known Limitations / Cautions (Honest disclosure in submission description)
+# Part B — REAL AWS (single EC2 run · after Part A)
+> `make cloud-up` → demo/capture → terminate immediately (`make cloud-stop`/`cloud-down`). DynamoDB stays ~$0.
+> Cost decision = human. The demo point is **IAM Instance Profile (zero stored keys)** — do not substitute local AWS keys.
+
+- [ ] `make cloud-up` → diagnose **real CloudWatch** via Assistant (real trace-ids quoted) → a write op → **"denied by security policy"** → `make cloud-stop`.
+- [ ] **D2a** — in-turn AWS MCP read streaming (`uvx awslabs.aws-api-mcp-server`) works.
+- [ ] **Capture** — screenshots/recording of the real run (for slides / recorded backup).
+
+---
+
+## Known limitations / cautions (disclose honestly when presenting)
 - **CloudWatch ingested via AWS MCP `tool_result` (D13) → bypasses `<untrusted_data>` isolation.** Boundaries = IAM read-only + `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + read-only tool allowlist.
-- DynamoDB Local is **in-memory** — data is lost on `docker compose down`/restart, and mock seed data is re-injected on `up`. Web chat has polling self-recovery + retry for seamless new conversations.
-- `tool_calls` telemetry: streaming path (`chat_agent`) is collected; worker (non-streaming `run_headless`) metrics are still `None`.
+- Slack Canvas: a Free team cannot create standalone → `channel_id` required (channel-tab form). Uses `SLACK_NOTIFY_CHANNEL`.
+- **⏰ Canvas creation currently runs on a free trial ending July 19** (Slack banner: "Creating canvases … is a paid feature"). Do the demo/captures before 7/19 or plan for a paid workspace.
+- `tool_calls` telemetry: the streaming path (`chat_agent`/Assistant) is collected; worker (non-streaming `run_headless`) metrics are still `None`.
 - Level 2 (Execute)/prod/IAM/DB changes are **inactive** (immutable ban) — out of MVP scope.
-- Local worker's `pr execute` performs a real push, so it can only be verified in a GitHub-authenticated environment (=AWS/EC2).
-- SQLite is for **MVP/testing only** — do not refer to it as the production datastore (production = DynamoDB).
+- The local worker's `pr execute` does a real push, so it can only be verified in a GitHub-authenticated environment (= AWS/EC2).
+- SQLite is for **MVP/testing only** — do not call it the production datastore (production = DynamoDB).

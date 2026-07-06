@@ -1,42 +1,59 @@
-# QA_TEST — 직접 검증 (미결사항만)
+# QA_TEST — 사람 체크리스트 (v2 AWSKRUG 데모)
 
-> **사람이 직접 눈으로 확인해야 하는 것 중 아직 안 끝난 것**만 모은 문서.
-> 자동 게이트(`make check` — pytest/ruff/mypy)와 **로컬 풀 e2e 는 전부 ✅ 완료**(PROGRESS_LOG 참고) → 여기서 제외.
-> 실행 방법: 에이전트 = [SLACK_GUIDE.md](SLACK_GUIDE.md) · 대시보드 = [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) ·
-> 인프라 실행/제출물 = `docs/runbooks/deploy-checklist.md`(권위).
-
----
-
-## 1. 잔여 검증 — AWS 배포 후 (유일한 잔여 트랙)
-> 클라우드 e2e(`/devops ping`, IAM Instance Profile 로 CloudWatch RO via AWS MCP)는 **2026-06-20 검증 완료 후 EC2 종료**.
-> 아래는 제출물 확보를 위해 **재기동 시 1회씩** 확인할 미결 항목.
-
-- [ ] **실 DynamoDB 데이터** — `slackops-agent` 에 실 항목(Job/Audit/Metric) 적재 → **콘솔 스크린샷**(제출물).
-- [ ] **실측 수치** — diagnose 1회: 소요 N초 / 비용 $0.0X / tool call M회 (`devops.run` span 또는 대시보드 Telemetry).
-- [ ] **Vercel 대시보드** — 실 DynamoDB 읽어 피드 렌더 + **Team ID/링크 확보**(DASHBOARD_GUIDE §7).
-- [ ] **출력 게이트 + branch protection** — 승인 없이 머지 불가(실 GitHub, PR 게이트 검증 시).
-- [ ] *(선택)* **EventBridge** — 평일 stop/start 스케줄 동작(상시 가동 금지). 현재는 종료로 대체 — 재기동 시 결정.
-- [ ] *(선택)* **ADOT Collector** — CloudWatch EMF + X-Ray 로 수치 확인(`deploy/adot/collector-config.yaml`).
-
-> 제출물(다이어그램/스크린샷/데모영상/텍스트/링크/아티클) 생산 체크리스트는 `deploy-checklist.md` [E]·[F].
+> **사람이 직접 확인해야 하는 것만, 우선순위 순으로.** agent 가 검증 가능한 것은 전부 ✅ 완료
+> (게이트 `make check` 358 passed · 로컬 docker · Assistant 콘솔 real/mock · 인젝션 방어) —
+> 기록은 `docs/PROGRESS_LOG.md`(2026-07-01/02 엔트리)에 있고 여기엔 두지 않는다.
+> **Part A (LOCAL)** 는 이 Mac 에서 전부 수행 — `make demo-all` + 실 Slack 워크스페이스 연결, EC2 불필요, ~$1.
+> **Part B (REAL AWS)** 는 유료 EC2 1회 — Part A 통과 후 수행.
+> 권위: `docs/NEXT_PLAN.md` > `docs/plans/2026-06-25-awskrug-demo.md` §4 > 이 문서.
+> 실행 방법: 에이전트 = [SLACK_GUIDE.md](SLACK_GUIDE.md) · 대시보드 = [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) · 인프라 = `docs/runbooks/deploy-checklist.md`.
+>
+> ⛔ Slack 해커톤 제출은 **폐기**(Devpost §3 한국 자격 미달). 목표 = **AWSKRUG 발표 라이브 데모**.
 
 ---
 
-## 2. 심사 충족 — DB 정당화 (제출 설명·영상에 그대로)
-> Slack 과 Vercel 두 control plane 이 하나의 작업 큐를 공유 → **DynamoDB conditional write** 로 별도 코디네이터 없이
-> atomic job claim + optimistic-lock 승인 게이트 구현. (Aurora 아닌 DynamoDB 인 이유)
+# Part A — LOCAL (이 Mac · EC2 불필요)
+> 준비 1회: `make demo-all`(web 8930 + DynamoDB Local + chat_agent + worker + Slack 앱 Socket Mode).
+> 기동 + WSS 는 2026-07-01 검증 완료. 실 Slack 워크스페이스 네트워크 연결은 필요하지만 AWS 인프라는 0.
+> 사전(모두 부여완료): `.env`/SSM `bot/app/oauth` 토큰 + `SLACK_NOTIFY_CHANNEL`(=Canvas 대상 채널) + `DASHBOARD_URL`, scope `canvases:write`.
 
-- **Technical** — 단일테이블 + conditional write(atomic claim / 중복승인 차단). GSI2 = FEED/AUDIT/METRIC 피드.
-- **Design** — 웹 TS `lib/ddb` 가 파이썬 `store/` 단일테이블 계약을 미러(GSI 질의·ConditionExpression 동형).
-- **Impact** — 대상 = 소규모 팀 온콜/플랫폼 엔지니어. 콘솔 왕복·수동 진단 토일 감소. 공개 포트 0 + 최소권한 + 사람 승인 → 안전 출시.
-- **Originality** — 에이전트 자율 *제안* + 사람 *경계*가 단일 큐 공유. 단순 챗봇 아닌 안전 운영 패턴 레퍼런스.
+## A1. ★ 실 Slack sandbox e2e — ✅ 전부 통과 2026-07-02 (일반 DM 폴백 경로)
+> 앱 DM 에서 라이브 검증(`register_dm_messages` — ✨ 어시스턴트 패널은 유료 표면이라 DM 폴백으로 커버).
+> 증빙은 PROGRESS_LOG 2026-07-02.
+
+- [x] **자연어 진단** — "checkout-service is slow" → 스트리밍 렌더(`chat.update`, "(edited)") + 제안. 2026-07-02.
+- [x] **poll-in-thread** — pr 제안 정착 → **diff 미리보기 + ✅/❌ 버튼** DM 게시. 2026-07-02.
+- [x] **승인 버튼 클릭** — `awaiting_approval → approved`(낙관락) + 버튼 메시지 "approved by @…" 갱신. 로컬 execute 는 의도적 생략(실 push = D4/EC2). 2026-07-02.
+- [x] **포스트모템 Canvas** — 완료 diagnose 가 채널 탭 Canvas 자동 생성("Postmortem — checkout-service" in #devops) + "Drafted…" 안내. 2026-07-02.
+- [x] **footer** — `$0.3673 · 4933 tokens · 2 tool calls` 노출. 2026-07-02.
+- [x] **payload 확정** — 실 클릭 payload 가 핸들러 가정과 일치: `actions[].value`=job id, `user.id`=U0BBX3U5Q2W, audit `approved · via slack`. 2026-07-02.
+
+## A2. Slack 플랫폼 BUY 기능 (D2.5)
+- [x] **mrkdwn / Markdown 블록** — A1 세션에서 헤딩/bold/불릿/인라인코드 렌더 확인. 2026-07-02.
+- ⚠️ **Modal diff 승인**(`views.open`)과 **Message Shortcut** 은 **아직 미구현**(코드 없음 — QA 항목이 아니라 `docs/NEXT_PLAN.md` 의 구현 과제). 구현 후에 여기서 검증.
+
+## A3. 발표 산출물 (D5/D6)
+- [ ] **인젝션 방어 장면 — 라이브 시연으로 대체**(동작은 2026-07-02 검증 완료). 별도 캡처 불필요.
+- ~~사전 녹화 백업~~ **폐기** — 라이브 시연 + 로컬 mock 폴백(`make demo-assistant-mock`)으로 대체.
+- [ ] **AWSKRUG 슬라이드 디자인** — 문제 → 아키텍처 → 보안(승인게이트+4층 인젝션방어) → 관측성(OTel) → 데모 → 교훈.
 
 ---
 
-## 3. 알려진 한계 / 주의 (제출 설명에 정직히)
+# Part B — REAL AWS (EC2 1회 · Part A 이후)
+> `make cloud-up` → 데모/캡처 → 즉시 종료(`make cloud-stop`/`cloud-down`). DynamoDB ~$0 유지.
+> 비용 결정 = 사람. 데모 포인트가 **IAM Instance Profile(저장 키 0개)** 라 로컬 AWS 키로 대체하지 않는다.
+
+- [x] `make cloud-up` → **실 CloudWatch 진단**(`handle_diagnose("checkout-service")` via AWS API MCP `call_aws` — 실 log-streams/events 조회, P1 진단 리포트 생성 ~90s) → 쓰기 작업(`delete_log_group`/`create_log_group`) → **"Execution of this operation is denied by security policy."** → `make cloud-stop`. 2026-07-06. EC2 `i-080db608831f628c5`, running ~15min, ~$0.01.
+- [x] **D2a** — AWS MCP read 동작 확인: `mcp__awsapi__call_aws`가 `READ_OPERATIONS_ONLY=true` + Instance Profile(저장 키 0개)로 CloudWatch 읽기 성공, 변형 작업 즉시 거부. 2026-07-06.
+- [ ] **캡처** — ~~실 동작 스크린샷/녹화(슬라이드·녹화 백업용)~~ **폐기**: 라이브 시연으로 대체(사전 녹화 안 함).
+
+---
+
+## 알려진 한계 / 주의 (발표 시 정직히 공개)
 - **CloudWatch 가 AWS MCP `tool_result` 로 유입(D13) → `<untrusted_data>` 격리 우회.** 경계 = IAM 읽기전용 + `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + 읽기전용 tool allowlist.
-- DynamoDB Local 은 **in-memory** — `docker compose down`/재기동 시 데이터 소멸, `up` 시 시드 재주입. 웹 채팅은 폴링 자가복구+재시도로 새 대화 무중단.
-- `tool_calls` 계측: 스트리밍 경로(`chat_agent`)는 수집, worker(비스트림 `run_headless`) metric 은 아직 `None`.
+- Slack Canvas: Free 팀은 standalone 불가 → `channel_id` 필수(채널 탭형). `SLACK_NOTIFY_CHANNEL` 사용.
+- **⏰ Canvas 생성이 현재 무료 트라이얼(7/19 종료)로 동작 중** (Slack 배너: "Creating canvases … is a paid feature"). **데모/캡처를 7/19 전에** 하거나 유료 워크스페이스 대비.
+- `tool_calls` 계측: 스트리밍 경로(`chat_agent`/Assistant)는 수집, worker(비스트림 `run_headless`) metric 은 아직 `None`.
 - L2(Execute)/prod/IAM/DB 변경은 **비활성**(금지 불변) — MVP 범위 밖.
-- 로컬 worker 의 pr execute 는 실 push 라 GitHub 인증 환경(=AWS/EC2)에서만 검증.
+- 로컬 worker 의 `pr execute` 는 실 push 라 GitHub 인증 환경(=AWS/EC2)에서만 검증.
 - SQLite 는 **MVP/테스트 한정** — prod 데이터스토어로 호칭하지 않는다(운영 = DynamoDB).

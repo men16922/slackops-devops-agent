@@ -31,6 +31,11 @@ def create_app() -> Any:
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
 
+    @api.get("/healthz")
+    def healthz() -> dict[str, str]:
+        # k8s 관례 alias — liveness/readiness probe 가 /healthz 를 조회하는 배포 환경 대응.
+        return {"status": "ok", "version": __version__}
+
     @api.get("/metrics")
     def metrics() -> dict[str, str]:
         # 지표 수집은 TelemetryStore(+선택 OTel span emit)가 담당 — 대시보드는 store
@@ -48,8 +53,69 @@ def bootstrap_socket_mode() -> None:
     from app.slack_handler import SlackHandler, register_default_commands
 
     handler = register_default_commands(SlackHandler.from_env())
+    _attach_assistant(handler)
+    _register_approval_actions(handler)
     _serve_proposal_notifier(handler)
     handler.start()
+
+
+def _attach_assistant(handler: Any) -> None:
+    """Slack Assistant(agentic thread) UX 를 Bolt App 에 장착(slash command 와 공존).
+
+    slack_bolt 버전이 Assistant 를 제공하지 않거나 워크스페이스 설정이 없어도 Slack 앱이
+    죽지 않게 try/except 로 감싼다 — slash command 경로는 그대로 동작한다.
+    """
+    import structlog
+
+    import os
+
+    log = structlog.get_logger()
+    try:
+        from app.assistant_handler import attach_assistant, register_dm_messages
+        from app.mcp_server import store_from_env
+
+        # jobs 주입 — 제안된 job 이 정착하면 스레드에 승인 버튼/결과를 게시(poll-in-thread).
+        # canvas_channel(SLACK_NOTIFY_CHANNEL) 설정 시 완료된 진단을 포스트모템 Canvas 로 게시.
+        jobs = store_from_env()
+        canvas_channel = os.environ.get("SLACK_NOTIFY_CHANNEL")
+        # 실 Claude 진단은 90s 를 넘길 수 있다 — 정착 폴링을 env 로 연장(결과/Canvas 후속 보장).
+        poll_timeout_s = float(os.environ.get("ASSISTANT_POLL_TIMEOUT_S", "240"))
+        attach_assistant(
+            handler.app, jobs=jobs, canvas_channel=canvas_channel, poll_timeout_s=poll_timeout_s
+        )
+        log.info("assistant.attached")
+        # 일반 앱 DM 폴백 — ✨ 어시스턴트 패널이 없는 플랜/클라이언트에서도 동일 흐름.
+        register_dm_messages(
+            handler.app, jobs=jobs, canvas_channel=canvas_channel, poll_timeout_s=poll_timeout_s
+        )
+        log.info("assistant.dm_fallback_registered", poll_timeout_s=poll_timeout_s)
+    except Exception as exc:  # noqa: BLE001 — Assistant 미지원/미설정이 앱을 막지 않게.
+        log.warning("assistant.attach_failed", error=str(exc))
+
+
+def _register_approval_actions(handler: Any) -> None:
+    """Slack in-thread Approve/Reject 버튼 핸들러를 Bolt App 에 등록.
+
+    web 대시보드와 동일한 출력 게이트(store.approve/reject + audit)를 Slack 버튼에 연결한다.
+    store/audit 구성 실패(자격증명 미설정 등)가 Slack 앱을 막지 않게 try/except 로 감싼다 —
+    slash·Assistant 경로는 그대로 동작한다.
+    """
+    import structlog
+
+    log = structlog.get_logger()
+    try:
+        from app.approval_actions import register_approval_actions
+        from app.mcp_server import audit_store_from_env, store_from_env
+
+        register_approval_actions(
+            handler.app,
+            jobs=store_from_env(),
+            audit=audit_store_from_env(),
+            log=log,
+        )
+        log.info("approval_actions.registered")
+    except Exception as exc:  # noqa: BLE001 — 승인 버튼 미배선이 Slack 앱을 막지 않게.
+        log.warning("approval_actions.register_failed", error=str(exc))
 
 
 def _serve_proposal_notifier(handler: Any) -> None:

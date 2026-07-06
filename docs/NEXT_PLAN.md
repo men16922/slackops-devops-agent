@@ -1,21 +1,24 @@
 # NEXT_PLAN — slackops-devops-agent
-Last updated: 2026-06-20
+Last updated: 2026-07-06
 
 > **Open work only** (≤120 lines). Remove when done (history → PROGRESS_LOG/COMPLETED_SUMMARY). Authority: this file > docs/plans/.
 > Tags: `[auto]` = doable in an unattended overnight round (local code+tests). `[manual]` = operator manual (AWS/Slack/UI).
 > `[blocked]` = same item hit a Blocker twice — no unattended retry before human review (rounds append and skip).
 > Unattended rounds do one `[auto]` top-to-bottom. Each item's "Done:" criterion must be met to finish.
 
-## ★ Active — H0 submit (deadline **2026-06-30 09:00 GMT+9** / judging 7-01~7-25; plans: docs/submission/{schedule,final_submission,PRESENTATION}.md + docs/plans/2026-06-17-h0-submission.md, DECISIONS D5·D6·D7)
-> **거의 완료.** 인프라(DynamoDB/EC2/Lambda+EventBridge/Vercel) · 기능(diagnose/승인게이트/이벤트구동 풀루프) · 캡처(DB screenshot/수치/링크·Team ID) 전부 live 검증.
-> 현재 **비용 ≈ $0** (EC2 terminated, alarm 삭제). DynamoDB/Vercel/Lambda/SSM 유지. 남은 건 영상/텍스트/아티클 + 6/27 캡처세션.
-- [x] 클라우드 배포 + **이벤트 구동 풀루프 live**(CloudWatch ALARM→EventBridge→Lambda→큐→worker→Slack, $0.15/run) · diagnose 실 CloudWatch · write-denied — 2026-06-20.
-- [x] Vercel 배포 (link `slackops-devops-agent.vercel.app` + Team ID) · DynamoDB 증빙 스크린샷 · architecture diagram(+png).
-- [ ] `[manual]` **6/27~28 캡처세션**: `make cloud-up`(SSM 5개 자동) → 영상 녹화(PRESENTATION slide 11 대본) → `make cloud-stop`.
-- [ ] `[manual]` **3-min 데모영상** YouTube + `final_submission.md` *Video link* 기입.
-- [ ] `[manual]` `final_submission.md` 텍스트 **본인 목소리 편집** (AI원문 제출 금지).
-- [ ] `[manual]` (보너스) 아티클 + #H0Hackathon (6/30 전).
-- [ ] `[manual]` **Devpost 제출**(6/27~28 권장) → 이후 EC2 stop 유지, 심사기간 DynamoDB/Vercel만(~$0). teardown=`schedule.md` §4.
+## ★ Active — v2 AWSKRUG 발표 데모 (plan: docs/plans/2026-06-25-awskrug-demo.md, branch `v2`)
+> Slack 해커톤 제출은 **폐기**(Devpost §3 Eligibility 한국 미달 — plan 부록 §7). 목표 = AWSKRUG 라이브 데모.
+> D1/D2/D2.5/D3 **코드완료·게이트 green**(358 passed). 핵심 미완 = **실 Slack 검증**(사람 타이핑). 상세 단계는 plan §4.
+- [x] D1 Assistant 핸들러 · D2 승인게이트(버튼↔출력게이트)+poll-in-thread · D2.5 포스트모템 Canvas(스파이크 통과) — 2026-06-26.
+- [x] D3 로컬 mock 폴백 — Assistant 콘솔(`make demo-assistant[-mock]`) real+오프라인 e2e + **인젝션 방어 장면 검증** — 2026-07-02.
+- [x] **실 Slack sandbox e2e** — DM 폴백 경로로 6항목 전부 통과(스트리밍/버튼/approved 전이/Canvas/footer/payload) — 2026-07-02.
+      ⏰ Canvas 는 무료 트라이얼 **7/19 종료** — 캡처/데모 그 전에.
+- [ ] Modal diff 승인(`views.open`) · Message Shortcut — **미구현 BUY 잔여**(선택, mrkdwn 렌더는 검증됨).
+- [x] `[manual]` D4 실 AWS 1회(EC2 start→`handle_diagnose` 실 CloudWatch 진단+write-denied 확인→EC2 stop) — 2026-07-06.
+- [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
+
+## (폐기) H0 Devpost 제출 — 한국 자격 미달로 중단 (인프라/코드는 v2 가 재사용)
+- [x] 클라우드 배포 + 이벤트구동 풀루프 live · Vercel 배포 · DynamoDB 증빙 — 2026-06-20 (자산은 유지, 비용 ≈ $0).
 
 ## Day 1–3 — AWS/Slack execution (deploy/README.md order) — A–C DONE 2026-06-20
 - [x] Slack App (Socket Mode) created + SSM SecureString tokens (bot/app/CLAUDE_CODE_OAUTH_TOKEN) stored.

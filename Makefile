@@ -1,7 +1,7 @@
 # slackops-devops-agent — Makefile
 # overnight 하네스 커밋 게이트 = `make check` (harness-config.gate). 오프라인·결정적 검증만.
 
-.PHONY: check test lint typecheck check-doc-budget smoke-local demo mcp-server agent-monitor worker chat-agent
+.PHONY: check test lint typecheck check-doc-budget smoke-local demo demo-assistant demo-assistant-mock mcp-server agent-monitor worker chat-agent
 .PHONY: cloud-whoami cloud-iam cloud-ddb cloud-up cloud-deploy cloud-status cloud-console cloud-ssm cloud-schedule cloud-start cloud-stop cloud-down
 .PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean cloud-vercel-key cloud-vercel-key-clean
 
@@ -32,6 +32,10 @@ demo:          ## 로컬 데모 풀스택 한 번에 — web+DB(docker) + chat_a
 	@bash scripts/demo.sh
 demo-all:      ## demo + Slack 앱(app.main) 함께 — .env 의 SLACK 토큰 필요(Ctrl-C 전체 종료).
 	@WITH_SLACK=1 bash scripts/demo.sh
+demo-assistant: ## Assistant 콘솔(실 Slack 없이 동일 흐름) — make demo 스택 위에서, .env 자동 로드(실 Claude 토큰).
+	$(DEV_ENV) bash -c 'set -a; [ -f .env ] && . ./.env; set +a; exec python3 -m app.assistant_console $(ARGS)'
+demo-assistant-mock: ## Assistant 콘솔 오프라인 폴백 — 네트워크/Claude/docker 전부 불필요(canned replay, $0).
+	PYTHONPATH=src python3 -m app.assistant_console --mock $(ARGS)
 mcp-server:    ## propose_job MCP 서버(stdio) — 보통 claude --mcp-config 가 자동 기동(수동 점검용)
 	$(DEV_ENV) python3 -m app.mcp_server
 agent-monitor: ## 에이전트 모니터 1회(Tier1 시뮬레이터). 실제는 `make agent-monitor ARGS=--real`
@@ -97,25 +101,66 @@ chat-agent:    ## 대화 버스 폴링 에이전트(Claude 스트리밍 응답 �
 slack:         ## Slack 앱(app.main) 로컬 기동 — .env 자동 로드(토큰). 먼저 web 스택(make demo/docker) 띄워두기.
 	$(DEV_ENV) bash -c 'set -a; [ -f .env ] && . ./.env; set +a; exec python3 -m app.main'
 
-# ===== overnight harness targets (scripts/overnight/Makefile.harness.snippet) =====
+# ===== overnight harness targets (plugin-resolved — SSOT in overnight-harness plugin) =====
+# Select the engine with ENGINE=claude|codex|opencode|agy|kiro. Default stays Claude.
+ENGINE ?= claude
+
+# HARNESS_ROOT resolution (env override → per-repo pin → highest installed version).
+HARNESS_ROOT ?= $(shell \
+  if [ -n "$$OVERNIGHT_HARNESS_ROOT" ] && [ -d "$$OVERNIGHT_HARNESS_ROOT/templates/scripts/overnight" ]; then \
+    echo "$$OVERNIGHT_HARNESS_ROOT"; \
+  elif [ -n "$$OVERNIGHT_HARNESS_ROOT" ] && [ -d "$$OVERNIGHT_HARNESS_ROOT/plugins/overnight-harness/templates/scripts/overnight" ]; then \
+    echo "$$OVERNIGHT_HARNESS_ROOT/plugins/overnight-harness"; \
+  elif [ -f .claude/harness-config.json ] && grep -q '"harness_root"' .claude/harness-config.json; then \
+    pin="$$(sed -n 's/.*"harness_root"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .claude/harness-config.json | head -1)"; \
+    if [ -d "$$pin/templates/scripts/overnight" ]; then echo "$$pin"; \
+    elif [ -d "$$pin/plugins/overnight-harness/templates/scripts/overnight" ]; then echo "$$pin/plugins/overnight-harness"; fi; \
+  else \
+    { \
+      ls -d $$HOME/.claude/plugins/cache/overnight-harness/overnight-harness/*/ 2>/dev/null; \
+      find $$HOME/.codex/plugins/cache -path '*/overnight-harness/*' -type d 2>/dev/null; \
+      [ -d $$HOME/.gemini/antigravity-cli/plugins/overnight-harness ] && echo $$HOME/.gemini/antigravity-cli/plugins/overnight-harness; \
+      [ -d $$HOME/.cache/opencode/node_modules/opencode-overnight-harness ] && echo $$HOME/.cache/opencode/node_modules/opencode-overnight-harness; \
+    } | while read d; do [ -d "$$d/templates/scripts/overnight" ] && echo "$$d"; done | sort -V | tail -1; \
+  fi)
+
+OVN_SRC := $(HARNESS_ROOT:%/=%)/templates/scripts/overnight
 OVN := scripts/overnight
 
-overnight:           ## run the unattended loop (caffeinate keeps macOS awake)
-	caffeinate -dimsu $(OVN)/run.sh &
-overnight-watch: overnight ## start the loop and tail its log
-	@sleep 1; tail -f $(OVN)/logs/runner.log
-overnight-once:      ## single iteration (smoke test the loop)
-	$(OVN)/run.sh --once
-overnight-stop:      ## graceful stop after the current iteration
-	@touch $(OVN)/STOP && echo "STOP created — loop will exit after current iteration"
-overnight-clean:     ## clear STOP/DONE sentinels before the next run
-	@rm -f $(OVN)/STOP $(OVN)/DONE && echo "cleared STOP/DONE"
-overnight-status:    ## aggregate iteration status across lanes
-	@bash $(OVN)/status.sh
-overnight-logs:      ## tail the runner log
-	@tail -f $(OVN)/logs/runner.log
-overnight-dashboard: ## tmux dashboard (falls back to status.sh)
-	@bash $(OVN)/dashboard.sh
+_harness-guard:
+	@test -x "$(OVN_SRC)/run.sh" || { \
+	  echo "overnight-harness not found (resolved HARNESS_ROOT='$(HARNESS_ROOT)')."; \
+	  echo "Install the plugin, or pass HARNESS_ROOT=/path/to/plugin, or re-run /harness-init."; \
+	  exit 1; }
 
-.PHONY: overnight overnight-watch overnight-once overnight-stop overnight-clean overnight-status overnight-logs overnight-dashboard
+overnight: _harness-guard           ## run the unattended loop (caffeinate keeps macOS awake)
+	OVERNIGHT_ENGINE=$(ENGINE) caffeinate -dimsu $(OVN_SRC)/run.sh &
+overnight-watch: overnight          ## start the loop and tail its log
+	@sleep 1; tail -f $(OVN)/logs/runner.log
+overnight-once: _harness-guard      ## single iteration (smoke test the loop)
+	OVERNIGHT_ENGINE=$(ENGINE) $(OVN_SRC)/run.sh --once
+overnight-claude-once: _harness-guard
+	OVERNIGHT_ENGINE=claude $(OVN_SRC)/run.sh --once
+overnight-codex-once: _harness-guard
+	OVERNIGHT_ENGINE=codex $(OVN_SRC)/run.sh --once
+overnight-opencode-once: _harness-guard
+	OVERNIGHT_ENGINE=opencode $(OVN_SRC)/run.sh --once
+overnight-agy-once: _harness-guard
+	OVERNIGHT_ENGINE=agy $(OVN_SRC)/run.sh --once
+overnight-kiro-once: _harness-guard
+	OVERNIGHT_ENGINE=kiro $(OVN_SRC)/run.sh --once
+overnight-stop:                     ## graceful stop after the current iteration
+	@touch $(OVN)/STOP && echo "STOP created — loop will exit after current iteration"
+overnight-clean:                    ## clear STOP/DONE sentinels before the next run
+	@rm -f $(OVN)/STOP $(OVN)/DONE && echo "cleared STOP/DONE"
+overnight-status: _harness-guard    ## aggregate iteration status across lanes
+	@bash $(OVN_SRC)/status.sh
+overnight-logs:                     ## tail the runner log
+	@mkdir -p $(OVN)/logs; touch $(OVN)/logs/runner.log; tail -f $(OVN)/logs/runner.log
+overnight-dashboard: _harness-guard ## tmux dashboard (falls back to status.sh)
+	@bash $(OVN_SRC)/dashboard.sh
+overnight-where:                    ## print the resolved plugin location (debug)
+	@echo "HARNESS_ROOT = $(HARNESS_ROOT)"; echo "runner       = $(OVN_SRC)/run.sh"
+
+.PHONY: overnight overnight-watch overnight-once overnight-claude-once overnight-codex-once overnight-opencode-once overnight-agy-once overnight-kiro-once overnight-stop overnight-clean overnight-status overnight-logs overnight-dashboard overnight-where _harness-guard
 # ===== end overnight harness targets =====
