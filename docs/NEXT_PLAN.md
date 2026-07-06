@@ -1,5 +1,5 @@
 # NEXT_PLAN — slackops-devops-agent
-Last updated: 2026-07-02
+Last updated: 2026-07-06
 
 > **Open work only** (≤120 lines). Remove when done (history → PROGRESS_LOG/COMPLETED_SUMMARY). Authority: this file > docs/plans/.
 > Tags: `[auto]` = doable in an unattended overnight round (local code+tests). `[manual]` = operator manual (AWS/Slack/UI).
@@ -14,8 +14,8 @@ Last updated: 2026-07-02
 - [x] **실 Slack sandbox e2e** — DM 폴백 경로로 6항목 전부 통과(스트리밍/버튼/approved 전이/Canvas/footer/payload) — 2026-07-02.
       ⏰ Canvas 는 무료 트라이얼 **7/19 종료** — 캡처/데모 그 전에.
 - [ ] Modal diff 승인(`views.open`) · Message Shortcut — **미구현 BUY 잔여**(선택, mrkdwn 렌더는 검증됨).
-- [ ] `[manual]` D4 실 AWS 1회(`make cloud-up`→Assistant 실 CloudWatch 진단+write-denied→`cloud-stop`) + D2a(턴 내 AWS MCP read 스트리밍).
-- [ ] `[manual]` D5/D6 사전 녹화 백업 + 인젝션 장면 **캡처**(동작은 검증됨) + AWSKRUG 슬라이드.
+- [x] `[manual]` D4 실 AWS 1회(EC2 start→`handle_diagnose` 실 CloudWatch 진단+write-denied 확인→EC2 stop) — 2026-07-06.
+- [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
 
 ## (폐기) H0 Devpost 제출 — 한국 자격 미달로 중단 (인프라/코드는 v2 가 재사용)
 - [x] 클라우드 배포 + 이벤트구동 풀루프 live · Vercel 배포 · DynamoDB 증빙 — 2026-06-20 (자산은 유지, 비용 ≈ $0).

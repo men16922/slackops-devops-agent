@@ -1,9 +1,9 @@
 # AGENT_BRIEF — slackops-devops-agent
-Last updated: 2026-07-04
+Last updated: 2026-07-06
 
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): plan `docs/plans/2026-06-25-awskrug-demo.md`. branch `v2`.
 >   overnight-harness 플러그인 전환 완료(5엔진: claude/codex/opencode/agy/kiro). 남은 건:
->   **슬라이드 디자인 마무리 → A3 캡처·시연 준비 → D4 실 AWS 1회.** ⏰ **Canvas 무료 트라이얼 7/19 종료.**
+>   **슬라이드 디자인 마무리 → 라이브 시연 준비.** D4 실 AWS 검증 완료(2026-07-06). 사전녹화 폐기(라이브 시연).
 >   발표 자료: `docs/presentation/PRESENTATION.md`(대본) + `slides-v2.html`(슬라이드).
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 

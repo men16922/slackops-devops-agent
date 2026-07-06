@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-04
+Last updated: 2026-07-06
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -17,6 +17,7 @@ Last updated: 2026-07-04
 - diagnose/logs **agentic AWS API MCP** (D13) e2e: local (`handle_logs`/`handle_diagnose('checkout-service')` via real claude +
   `uvx awslabs.aws-api-mcp-server@1.3.45`) AND **cloud via Slack on real EC2 using Instance Profile (zero stored keys)** — real
   CloudWatch (streams/trace-ids quoted); write op → "denied by security policy". EC2 terminated after.
+  **D4 재검증(2026-07-06):** EC2 `i-080db608831f628c5` restart→`handle_diagnose("checkout-service")` 실 CloudWatch 읽기 성공(~90s, P1 진단 리포트 생성) + `delete_log_group`/`create_log_group` 시도 → MCP "denied by security policy" 즉시 거부. EC2 stop.
 - **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
   render + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
@@ -92,8 +93,8 @@ Last updated: 2026-07-04
 - **D1–D3 + 실 Slack sandbox e2e 완료(359 passed, 2026-07-02)** — Assistant 승인게이트/Canvas/mock 폴백에 더해 **실 워크스페이스
   라이브 통과**: 일반 DM 폴백(register_dm_messages — ✨ 패널은 유료 표면) 경로로 스트리밍→pr 제안→diff+버튼→approved 전이
   (audit via slack)→**채널 탭 Canvas 자동 생성**→footer/payload 확정. manifest(events+messages_tab+im:history) 정비,
-  ASSISTANT_POLL_TIMEOUT_S(240s). **★ NEXT = A3 캡처·녹화·슬라이드 → D4 실 AWS 1회.** ⏰ Canvas 무료 트라이얼 7/19 종료.
-  pr execute(실 push)는 로컬 생략 — D4/EC2 몫. (선택) Modal diff·Message Shortcut 은 미구현 BUY 잔여.
+  ASSISTANT_POLL_TIMEOUT_S(240s). **D4 실 AWS 검증 완료(2026-07-06)**: EC2→CloudWatch 진단+write-denied. ★ NEXT = 슬라이드 디자인 마무리.
+  pr execute(실 push)는 로컬 생략 — 발표 시 EC2 라이브. (선택) Modal diff·Message Shortcut 은 미구현 BUY 잔여.
 - H0 인프라(DynamoDB/Vercel/Lambda/SSM)는 그대로 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier.
   SSM: bot/app/oauth + SLACK_NOTIFY_CHANNEL(+canvas 대상 채널) + DASHBOARD_URL. Canvas scope `canvases:write` 부여완료.
 

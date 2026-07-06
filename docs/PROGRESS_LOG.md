@@ -1,8 +1,17 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
+
+## 2026-07-06 — ★ D4 실 AWS 1회 e2e 통과 (CloudWatch 진단 + write-denied 검증)
+- Status: Done. **v2 핵심 클라우드 경로 검증 완료** — EC2(Instance Profile) → Claude Code Headless → AWS API MCP → 실 CloudWatch 읽기 성공 + 쓰기 거부 확인.
+- Changed: EC2 `i-080db608831f628c5`(t3.medium, us-east-1) start → 서비스 3개 active(slack/worker/chat-agent).
+  `handle_diagnose("checkout-service")` 실행 → Claude가 `mcp__awsapi__call_aws`로 실 CloudWatch Logs 조회 → P1 종합 진단 리포트 생성(~90s).
+  write-denied 테스트: `delete_log_group` + `create_log_group` 시도 → "Execution of this operation is denied by security policy." 즉시 거부(MCP `READ_OPERATIONS_ONLY=true`).
+- Verified: ① SSM 토큰 3개 유효(xoxb/xapp/sk-ant-oat01) ② Slack auth.test ok + chat.postMessage 성공 ③ **실 CloudWatch 진단 exit 0** — log-streams/events 조회·타임라인·근인분석 포함 ④ **write-denied** — MCP 보안 정책이 IAM 이전에 차단 ⑤ EC2 stop 완료(running ~15min, ~$0.01).
+- Blockers: None. Slack DM 경로(사람 타이핑) 미재검증 — 7/2에 이미 통과, 코드 무변경이므로 재검증 불필요.
+- Next: 슬라이드 디자인 마무리. (PLAN에서 D4 체크, D5/D6 사전녹화 폐기 반영.)
 
 ## 2026-07-05 — workspace 정리 + AWSKRUG 발표 자료 v2 작성
 - Status: Done. 로컬 237MB 절감 + git 정리(폐기 Devpost 문서 삭제, 완료 plan 아카이빙) + 발표 슬라이드/대본 신규 작성.
