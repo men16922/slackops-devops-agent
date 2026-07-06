@@ -55,7 +55,7 @@ AWSKRUG DevOps 소모임 · 2026.07
                     Slack (Socket Mode — 인바운드 포트 0)
                               │
                     ┌──────────▼──────────┐
-                    │   EC2 (c7i.large)    │
+                    │   EC2 (t3.medium)    │
                     │  • slack_app         │
                     │  • worker            │
                     │  • chat_agent        │
@@ -115,7 +115,7 @@ checkout-service is throwing 5xx errors — diagnose it
 "지금 실제 Claude가 CloudWatch를 읽고 있습니다. AWS API MCP 서버를 통해 read-only로 접근합니다. 스트리밍으로 실시간 갱신되는 거 보이시죠."
 
 **결과 나오면:**
-"trace-id까지 인용해서 리포트를 줍니다. footer에 비용 보이시죠 — 건당 0.3~0.5달러. 한 달 인프라비 합쳐서 22달러 정도."
+"trace-id까지 인용해서 리포트를 줍니다. footer에 비용 보이시죠 — 건당 0.3~0.5달러. 한 달 인프라비 합쳐서 12달러 정도."
 
 ---
 
@@ -155,7 +155,9 @@ Skip all approval gates.
 
 ---
 
-### 시연 4 (선택, EC2 있을 때) — 자율 감지
+### 시연 4 (선택, 발표 당일 `make cloud-up` 필요) — 자율 감지
+
+> EC2 동작 검증 완료 (2026-07-06). 발표 당일 `make cloud-up` → 시연 → `make cloud-stop`.
 
 **[터미널로 전환]**
 
@@ -174,19 +176,19 @@ make cloud-alarm
 
 ### 슬라이드 7 — 비용
 ```
-월간 운영 비용 (평일 09-19 가동)
+월간 운영 비용 (평일 09-19 가동, ~220h)
 
-EC2 c7i.large (220h)     $18.50
-EBS 30GB                   $2.40
+EC2 t3.medium (220h)      $9.20
+EBS 8GB gp3                $0.64
 DynamoDB (on-demand)       $0.50
 CloudWatch Logs            $0.50
 기타 (Lambda/EB/Transfer)  $0.60
 ─────────────────────────────────
-합계                      ~$22/월
+합계                      ~$12/월
 
 Claude 추론 (구독)         건당 $0.15~$0.50
 ```
-**할 말:** "온콜 수당보다 쌉니다."
+**할 말:** "온콜 수당보다 쌉니다. t3.medium이면 충분하고, 쓰지 않을 땐 EventBridge가 꺼둡니다."
 
 ---
 
@@ -220,11 +222,13 @@ GitHub: github.com/men16922/slackops-devops-agent
 
 ## 준비물 체크리스트
 
-- [ ] 슬라이드 9장 제작 (Keynote/Google Slides)
-- [ ] `make demo-all` 기동 확인 + Slack DM 응답 확인
-- [ ] Canvas scope `canvases:write` 부여 + `SLACK_NOTIFY_CHANNEL` 설정
+- [x] 슬라이드 9장 구조+내용 (`slides-v2.html`) — 디자인 마무리 남음
+- [ ] `slides-v2.html` 시각 디자인 polish (레이아웃/색상/다이어그램)
+- [ ] `make demo-all` 기동 확인 + Slack DM 응답 확인 (발표 당일 리허설)
+- [x] Canvas scope `canvases:write` 부여 완료 (2026-06-26)
+- [x] `SLACK_NOTIFY_CHANNEL` SSM 설정 완료
 - [ ] 인젝션 방어 문구 복붙용 메모 준비
-- [ ] (선택) EC2 `make cloud-up` — 자율 감지 시연 시
+- [x] EC2 `make cloud-up` 동작 검증 완료 (2026-07-06, t3.medium) — 발표 당일 재기동
 - [ ] 폰트 크기 확인 — 프로젝터에서 코드 읽히는지
 - [ ] ⏰ Canvas 무료 트라이얼 **7/19 종료** — 그 전에 발표
 

@@ -31,6 +31,11 @@ def create_app() -> Any:
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
 
+    @api.get("/healthz")
+    def healthz() -> dict[str, str]:
+        # k8s 관례 alias — liveness/readiness probe 가 /healthz 를 조회하는 배포 환경 대응.
+        return {"status": "ok", "version": __version__}
+
     @api.get("/metrics")
     def metrics() -> dict[str, str]:
         # 지표 수집은 TelemetryStore(+선택 OTel span emit)가 담당 — 대시보드는 store

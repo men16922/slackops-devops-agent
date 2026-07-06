@@ -4,6 +4,15 @@ Last updated: 2026-07-06
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 
+## 2026-07-06 — 슬라이드 v2 수정 + PRESENTATION.md 최신화 + /healthz 엔드포인트
+- Status: Done. PDF 슬라이드 13장 v2 완성(Keynote→PDF), PRESENTATION.md 최신화, /healthz 추가.
+- Changed: `docs/presentation/SlackOps DevOps Agent.pdf` (13장, AWSKRUG v2 — 해커톤 문맥 제거, Slack DM 스크린샷 교체, t3.medium 반영, 관측성 슬라이드 추가).
+  `docs/presentation/PRESENTATION.md` — 인스턴스 타입 t3.medium, 비용 $12/월, 시연4 검증완료 표기, 준비물 체크리스트 갱신.
+  `slides-v2.html` 삭제(Standalone HTML로 대체). `src/app/main.py` + `tests/test_main.py` — `/healthz` k8s liveness probe alias 추가.
+- Verified: `make check` 359 passed(이전 세션). /healthz 테스트 추가됨.
+- Blockers: None.
+- Next: 슬라이드 세부 확인(p5~p13 항목 6개 — 인스턴스 타입/비용/YouTube 삭제 등) → 리허설.
+
 ## 2026-07-06 — ★ D4 실 AWS 1회 e2e 통과 (CloudWatch 진단 + write-denied 검증)
 - Status: Done. **v2 핵심 클라우드 경로 검증 완료** — EC2(Instance Profile) → Claude Code Headless → AWS API MCP → 실 CloudWatch 읽기 성공 + 쓰기 거부 확인.
 - Changed: EC2 `i-080db608831f628c5`(t3.medium, us-east-1) start → 서비스 3개 active(slack/worker/chat-agent).
