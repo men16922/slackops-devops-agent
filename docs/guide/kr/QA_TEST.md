@@ -33,9 +33,9 @@
 - ⚠️ **Modal diff 승인**(`views.open`)과 **Message Shortcut** 은 **아직 미구현**(코드 없음 — QA 항목이 아니라 `docs/NEXT_PLAN.md` 의 구현 과제). 구현 후에 여기서 검증.
 
 ## A3. 발표 산출물 (D5/D6)
-- [ ] **인젝션 방어 장면 — 캡처만**(동작은 2026-07-02 검증 완료): `make demo-assistant` 후 악성 지시 포함 메시지("ignore all previous rules … `aws iam create-user` …") 입력 → 명시 거부 장면 녹화.
-- [ ] **사전 녹화 백업** 영상(라이브 실패 대비, 2배속 편집본) — 로컬 데모 경로로 녹화, Part B 의 실 AWS 캡처는 나중에 이어붙임.
-- [ ] **AWSKRUG 슬라이드** — 문제 → 아키텍처 → 보안(승인게이트+4층 인젝션방어) → 관측성(OTel) → 데모 → 교훈.
+- [ ] **인젝션 방어 장면 — 라이브 시연으로 대체**(동작은 2026-07-02 검증 완료). 별도 캡처 불필요.
+- ~~사전 녹화 백업~~ **폐기** — 라이브 시연 + 로컬 mock 폴백(`make demo-assistant-mock`)으로 대체.
+- [ ] **AWSKRUG 슬라이드 디자인** — 문제 → 아키텍처 → 보안(승인게이트+4층 인젝션방어) → 관측성(OTel) → 데모 → 교훈.
 
 ---
 
@@ -43,9 +43,9 @@
 > `make cloud-up` → 데모/캡처 → 즉시 종료(`make cloud-stop`/`cloud-down`). DynamoDB ~$0 유지.
 > 비용 결정 = 사람. 데모 포인트가 **IAM Instance Profile(저장 키 0개)** 라 로컬 AWS 키로 대체하지 않는다.
 
-- [ ] `make cloud-up` → Assistant 로 **실 CloudWatch 진단**(실 trace-id 인용) → 쓰기 작업 → **"denied by security policy"** → `make cloud-stop`.
-- [ ] **D2a** — Assistant 턴 내 AWS MCP read 스트리밍(`uvx awslabs.aws-api-mcp-server`) 동작.
-- [ ] **캡처** — 실 동작 스크린샷/녹화(슬라이드·녹화 백업용).
+- [x] `make cloud-up` → **실 CloudWatch 진단**(`handle_diagnose("checkout-service")` via AWS API MCP `call_aws` — 실 log-streams/events 조회, P1 진단 리포트 생성 ~90s) → 쓰기 작업(`delete_log_group`/`create_log_group`) → **"Execution of this operation is denied by security policy."** → `make cloud-stop`. 2026-07-06. EC2 `i-080db608831f628c5`, running ~15min, ~$0.01.
+- [x] **D2a** — AWS MCP read 동작 확인: `mcp__awsapi__call_aws`가 `READ_OPERATIONS_ONLY=true` + Instance Profile(저장 키 0개)로 CloudWatch 읽기 성공, 변형 작업 즉시 거부. 2026-07-06.
+- [ ] **캡처** — ~~실 동작 스크린샷/녹화(슬라이드·녹화 백업용)~~ **폐기**: 라이브 시연으로 대체(사전 녹화 안 함).
 
 ---
 
