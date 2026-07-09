@@ -17,6 +17,10 @@ Last updated: 2026-07-06
 - [x] `[manual]` D4 실 AWS 1회(EC2 start→`handle_diagnose` 실 CloudWatch 진단+write-denied 확인→EC2 stop) — 2026-07-06.
 - [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
 
+## web 대시보드 UI 리디자인 후속 (branch `feature/dashboard-aws-theme`, 커밋 `35f4b38`)
+- [ ] `[manual]` `feature/dashboard-aws-theme` → main 머지 (기존 워크플로 `merge:` 커밋).
+- [ ] `[auto]` 시드 mock rationale 2개(agent-2001/2002, `web/scripts/seed.mjs`) 한글 → 영어 (H0 English UI / no-Korean-DOM 회복). Done: 재시드 후 Playwright 로 Proposal 컬럼 한글 미검출.
+
 ## (폐기) H0 Devpost 제출 — 한국 자격 미달로 중단 (인프라/코드는 v2 가 재사용)
 - [x] 클라우드 배포 + 이벤트구동 풀루프 live · Vercel 배포 · DynamoDB 증빙 — 2026-06-20 (자산은 유지, 비용 ≈ $0).
 
