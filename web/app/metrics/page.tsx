@@ -50,24 +50,24 @@ export default async function MetricsPage() {
         OpenTelemetry metrics (last 2 days, GSI2 <span className="mono">METRIC#yyyymmdd</span>).
       </p>
 
-      <div className="cards">
-        <div className="card">
+      <div className="cards kpis">
+        <div className="card kpi info">
           <div className="label">Runs</div>
           <div className="value">{fmtNum(totalRuns)}</div>
         </div>
-        <div className="card">
+        <div className="card kpi">
           <div className="label">Total cost</div>
           <div className="value">{fmtCost(totalCost)}</div>
         </div>
-        <div className="card">
+        <div className="card kpi">
           <div className="label">Tokens</div>
           <div className="value">{fmtNum(totalTokens)}</div>
         </div>
-        <div className="card">
+        <div className="card kpi">
           <div className="label">Tool calls</div>
           <div className="value">{fmtNum(totalTools)}</div>
         </div>
-        <div className="card">
+        <div className={`card kpi ${okRate >= 90 ? "ok" : okRate < 70 ? "warn" : "info"}`}>
           <div className="label">Success rate</div>
           <div className="value">{okRate}%</div>
         </div>
@@ -82,24 +82,24 @@ export default async function MetricsPage() {
             <thead>
               <tr>
                 <th>Command</th>
-                <th>Runs</th>
-                <th>Success</th>
-                <th>Cost</th>
-                <th>Tokens</th>
-                <th>Tool calls</th>
+                <th className="num">Runs</th>
+                <th className="num">Success</th>
+                <th className="num">Cost</th>
+                <th className="num">Tokens</th>
+                <th className="num">Tool calls</th>
               </tr>
             </thead>
             <tbody>
               {rollup.map((r) => (
                 <tr key={r.command}>
                   <td className="mono">{r.command}</td>
-                  <td>{r.runs}</td>
-                  <td>
+                  <td className="num mono">{r.runs}</td>
+                  <td className="num mono">
                     {r.ok}/{r.runs}
                   </td>
-                  <td>{fmtCost(r.cost)}</td>
-                  <td>{fmtNum(r.tokens)}</td>
-                  <td>{fmtNum(r.toolCalls)}</td>
+                  <td className="num mono">{fmtCost(r.cost)}</td>
+                  <td className="num mono">{fmtNum(r.tokens)}</td>
+                  <td className="num mono">{fmtNum(r.toolCalls)}</td>
                 </tr>
               ))}
             </tbody>
@@ -117,10 +117,10 @@ export default async function MetricsPage() {
               <tr>
                 <th>Time</th>
                 <th>Command</th>
-                <th>Duration</th>
-                <th>Cost</th>
-                <th>Tokens</th>
-                <th>OK</th>
+                <th className="num">Duration</th>
+                <th className="num">Cost</th>
+                <th className="num">Tokens</th>
+                <th className="num">OK</th>
               </tr>
             </thead>
             <tbody>
@@ -128,10 +128,12 @@ export default async function MetricsPage() {
                 <tr key={`${m.job_id}#${m.ts}`}>
                   <td className="muted">{fmtTime(m.ts)}</td>
                   <td className="mono">{m.command ?? "—"}</td>
-                  <td>{m.duration_ms != null ? `${fmtNum(m.duration_ms)} ms` : "—"}</td>
-                  <td>{fmtCost(m.cost_usd)}</td>
-                  <td>{fmtNum(m.tokens)}</td>
-                  <td>{m.success ? "✓" : "✗"}</td>
+                  <td className="num mono">{m.duration_ms != null ? `${fmtNum(m.duration_ms)} ms` : "—"}</td>
+                  <td className="num mono">{fmtCost(m.cost_usd)}</td>
+                  <td className="num mono">{fmtNum(m.tokens)}</td>
+                  <td className="num">
+                    <span className={m.success ? "ok-mark" : "fail-mark"}>{m.success ? "✓" : "✗"}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
