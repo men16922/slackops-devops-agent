@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-06
+Last updated: 2026-07-10
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -19,6 +19,7 @@ Last updated: 2026-07-06
   CloudWatch (streams/trace-ids quoted); write op → "denied by security policy". EC2 terminated after.
   **D4 재검증(2026-07-06):** EC2 `i-080db608831f628c5` restart→`handle_diagnose("checkout-service")` 실 CloudWatch 읽기 성공(~90s, P1 진단 리포트 생성) + `delete_log_group`/`create_log_group` 시도 → MCP "denied by security policy" 즉시 거부. EC2 stop.
 - **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
+  ⚠️ **예외(2026-07-10)**: 대시보드 리디자인에서 ARGS→Proposal 컬럼이 `rationale`을 노출 → 시드 mock rationale 2개(agent-2001/2002)가 한글이라 DOM에 한글 등장. 실제 prod agent 는 영어 생성이나 시드 mock 미번역 → 영어화 필요.
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
   render + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
 - lazy-import design — all modules import-safe even without fastapi/slack_bolt installed.
@@ -60,6 +61,8 @@ Last updated: 2026-07-06
   metrics aggregation}, actions (approval server action = ConditionExpression transition + audit append, optimistic lock),
   scripts/seed.mjs (create-table.sh schema + 22 mocks). docker-compose (dynamodb-local offline + seed + web,
   port 8930, dummy keys = no real AWS needed). DDB_ENDPOINT toggle switches local↔real DynamoDB (D7).
+  **UI 리디자인(2026-07-10, `35f4b38`)**: AWS 콘솔/Datadog 감성 라이트 테마 — KPI 스탯 타일, STATUS(pill+dot)↔SOURCE(플랫 태그) 형태 분리,
+  제브라/tabular 테이블, Chat=ops 콘솔 카드, ARGS→Proposal 컬럼, LIVE·연결 상태 칩, 이모지 제거·벨 SVG화. `next build` green.
 - ops deploy prep: user-data.sh/deploy README load Claude subscription OAuth token (SSM) added (D6).
   SLACK_GUIDE.md / DASHBOARD_GUIDE.md (root) — operator secret + deploy + dashboard guides.
 - **agent autonomous proposal loop (D9)** — extends the control plane to a shared human+agent producer.

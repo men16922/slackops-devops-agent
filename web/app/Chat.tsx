@@ -113,25 +113,49 @@ export function Chat() {
 
   return (
     <div className="panel chat">
-      {messages.length > 0 && (
-        <div className="chat-header">
+      <div className="chat-head">
+        <span className="chat-head-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.6 4.2L18 8.8l-4.4 1.6L12 15l-1.6-4.6L6 8.8l4.4-1.6L12 3z" />
+            <path d="M18.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z" />
+          </svg>
+        </span>
+        <div className="chat-head-text">
+          <div className="chat-head-title">Ask the ops agent</div>
+          <div className="chat-head-sub">
+            Describe a symptom in plain language — the agent proposes a job you approve below.
+          </div>
+        </div>
+        {messages.length > 0 && (
           <button className="chat-new" onClick={newConversation} disabled={agentBusy}>
             ＋ New conversation
           </button>
-        </div>
-      )}
+        )}
+      </div>
       <div className="chat-log">
         {messages.length === 0 ? (
-          <p className="chat-empty muted">
-            Chat with the ops agent. e.g. <span className="mono">api 5xx is rising, find the cause</span> ·{" "}
-            <span className="mono">prepare a PR to raise the checkout timeout</span>
-            <br />
-            When the agent decides it's warranted, it proposes a job; approve/reject it in the Job Queue below.
-          </p>
+          <div className="chat-empty">
+            <div className="chat-examples">
+              {[
+                "api 5xx is rising, find the cause",
+                "prepare a PR to raise the checkout timeout",
+                "review the latest terraform plan",
+              ].map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  className="chat-chip"
+                  onClick={() => setInput(ex)}
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : (
           messages.map((m) => (
             <div key={m.seq} className={`chat-msg ${m.role}`}>
-              <div className="chat-role">{m.role === "user" ? "🧑 you" : "🤖 agent"}</div>
+              <div className="chat-role">{m.role === "user" ? "You" : "Agent"}</div>
               <div className="chat-bubble">
                 {m.role === "assistant" ? (
                   m.content ? (
@@ -152,7 +176,7 @@ export function Chat() {
 
       {conv?.proposed_job_id && (
         <div className="chat-proposed">
-          🤖 A job has been proposed —{" "}
+          A job has been proposed —{" "}
           <Link href={`/jobs/${conv.proposed_job_id}`} className="mono">
             Approve/reject in the Job Queue →
           </Link>
@@ -176,7 +200,7 @@ export function Chat() {
           aria-label="Chat input"
         />
         <button
-          className="btn approve"
+          className="btn primary"
           disabled={sending || agentBusy || input.trim().length === 0}
           onClick={() => void send()}
         >

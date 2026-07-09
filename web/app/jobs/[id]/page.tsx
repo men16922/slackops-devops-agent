@@ -33,7 +33,7 @@ export default async function JobDetailPage({
 
       {job.source === "agent" && (
         <div className="panel rationale">
-          <div className="rationale-label">🤖 Autonomous agent proposal</div>
+          <div className="rationale-label">Autonomous agent proposal</div>
           <p>
             {job.rationale ??
               "The ops agent observed the system and proposed this job. It runs only after human approval."}
@@ -46,7 +46,9 @@ export default async function JobDetailPage({
           <dt>Args</dt>
           <dd className="mono">{job.args || "—"}</dd>
           <dt>Source</dt>
-          <dd>{job.source}</dd>
+          <dd>
+            <span className={`tag src-${job.source}`}>{job.source}</span>
+          </dd>
           <dt>Requested by</dt>
           <dd className="mono">{job.requested_by || "—"}</dd>
           <dt>Created</dt>
