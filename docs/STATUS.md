@@ -24,8 +24,8 @@ Last updated: 2026-07-15
   Runtime drops the AWS MCP/uvx dependency, unused S3 access, broad SSM enumeration, and child Slack/dashboard secrets.
 - **D17 role/metadata/egress hardening (code-ready, not deployed):** bootstrap-only Instance Profile + separate 1-hour
   runtime/MCP STS roles (45-min refresh); Claude gets neither credential nor DDB env. Four services deny IMDS/direct IP egress
-  and use localhost Squid domain allowlist; internal MCP source/command/tools are CI-locked. New EC2 rehearsal must prove role
-  identities, refresh, proxy allow/deny, and adapter read; prior D4 MCP proof is historical.
+  and use localhost Squid domain allowlist; internal MCP source/command/tools and injection/TOCTOU corpus are CI-locked. New EC2
+  rehearsal must prove role identities, refresh, proxy allow/deny, and adapter read; prior D4 MCP proof is historical.
 - **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
   ⚠️ **예외(2026-07-10)**: 대시보드 리디자인에서 ARGS→Proposal 컬럼이 `rationale`을 노출 → 시드 mock rationale 2개(agent-2001/2002)가 한글이라 DOM에 한글 등장. 실제 prod agent 는 영어 생성이나 시드 mock 미번역 → 영어화 필요.
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
