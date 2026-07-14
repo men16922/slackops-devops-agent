@@ -166,3 +166,12 @@ Last updated: 2026-07-15
   variables; `SLACK_APPROVER_IDS` is an explicit fail-closed Slack button allowlist. EC2 worker uses a configured
   canonical worktree and systemd filesystem hardening. Audit events carry hash-chain links plus structured policy/plan
   context; append writes are conditional to avoid overwrite.
+
+## D16 — fixed AWS read adapters supersede generic AWS API MCP
+- Decision: retire the D13 runtime use of `awslabs.aws-api-mcp-server`. `logs`, `diagnose`, and `detect` now collect only
+  their command-specific boto3 read data, cap it, and pass it through the existing single `<untrusted_data>` boundary.
+  Their Claude tool allowlists are empty. Keep the separate SlackOps FastMCP proposal server (D9).
+- Reason: a generic read-only AWS API tool can still expose secrets, unrelated data, or local-file surface; its tool result
+  also bypassed the prompt data boundary. Fixed adapters turn the service/API list into deterministic policy code.
+- Impact: EC2 user-data no longer installs/pre-warms `uvx`; unused S3 access is removed; SSM bootstrap access cannot bulk
+  enumerate and is limited to named `/slackops/` parameters. New cloud proof is required because old D13/D4 MCP evidence is historical.

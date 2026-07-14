@@ -37,8 +37,8 @@ AWSKRUG DevOps 소모임 · 2026.07
 원칙: "AI는 관찰하고 제안한다. 실행은 사람만."
 
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Slack DM   │ ──→ │  Claude on   │ ──→ │ AWS API MCP │
-│ (자연어)     │     │  EC2 (읽기)   │     │ (read-only) │
+│  Slack DM   │ ──→ │  Claude on   │ ←── │ AWS read    │
+│ (자연어)     │     │  EC2 (분석)   │     │ adapters    │
 └─────────────┘     └──────────────┘     └─────────────┘
                            │
                     ┌──────▼──────┐
@@ -64,8 +64,8 @@ AWSKRUG DevOps 소모임 · 2026.07
                               │ IAM Instance Profile (키 0개)
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
-        CloudWatch      DynamoDB         AWS API MCP
-        (read-only)    (단일 테이블)     (read-only + strict)
+        CloudWatch      DynamoDB       fixed read adapters
+        (read-only)    (단일 테이블)   (bounded + sanitized)
 ```
 **포인트:**
 - Socket Mode = 아웃바운드 전용 WebSocket → SG 인바운드 규칙 0개
@@ -81,7 +81,7 @@ AWSKRUG DevOps 소모임 · 2026.07
 ③ Output Gate       — 결과에서 push/PR argv 제거, diff 추출
 ④ Template Prompt   — 시스템 프롬프트 격리 (injection 방어)
 
-+ IAM read-only + READ_OPERATIONS_ONLY + --strict-mcp-config
++ IAM least privilege + fixed API allowlist + single untrusted-data boundary
 ```
 **할 말:** "프롬프트 인젝션을 시도해도 4겹으로 막습니다. 잠시 후 라이브로 보여드리겠습니다."
 
@@ -112,7 +112,7 @@ checkout-service is throwing 5xx errors — diagnose it
 ```
 
 **[기다리면서 설명]**
-"지금 실제 Claude가 CloudWatch를 읽고 있습니다. AWS API MCP 서버를 통해 read-only로 접근합니다. 스트리밍으로 실시간 갱신되는 거 보이시죠."
+"지금 앱의 고정 read adapter가 CloudWatch 증거만 가져오고, Claude는 그 격리된 데이터를 분석합니다. 모델에는 범용 AWS 도구를 주지 않았습니다."
 
 **결과 나오면:**
 "trace-id까지 인용해서 리포트를 줍니다. footer에 비용 보이시죠 — 건당 0.3~0.5달러. 한 달 인프라비 합쳐서 12달러 정도."

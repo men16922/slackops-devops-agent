@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from app.allowlist import allowed_tools
 from app.claude_runner import build_command
 from app.commands.diagnose import (
     SOURCE_GIT,
@@ -16,7 +15,6 @@ from app.commands.diagnose import (
     handle_diagnose,
 )
 from app.commands.logs import InvalidServiceName
-from app.mcp_config import aws_mcp_config_json
 from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
 from tests._helpers import RecordingFetcher, RecordingRunner, result_json as _result_json
 
@@ -51,7 +49,7 @@ def test_handle_diagnose_assembles_multi_source_fetch_sanitize_run() -> None:
     assert "ERROR boom" in prompt
     assert "Replicas: 0/3" in prompt
     assert "abc123 fix" in prompt
-    assert cmd == build_command(prompt, allowed_tools("diagnose"))
+    assert cmd == build_command(prompt, [])
 
 
 def test_handle_diagnose_all_sources_inside_one_untrusted_block() -> None:
@@ -225,14 +223,16 @@ def test_combine_sources_preserves_order() -> None:
     ) < combined.index("=== source: c ===")
 
 
-def test_handle_diagnose_agentic_default_uses_mcp(monkeypatch: pytest.MonkeyPatch) -> None:
-    # fetchers 미주입(기본) → agentic: kubectl/git 선수집·격리 + CloudWatch 는 MCP.
+def test_handle_diagnose_default_uses_all_fixed_adapters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from app.commands import diagnose as dmod
 
     monkeypatch.setattr(
         dmod,
         "default_fetchers",
         lambda: {
+            SOURCE_LOGS: RecordingFetcher("ERROR boom"),
             SOURCE_KUBECTL: RecordingFetcher("Replicas: 0/3"),
             SOURCE_GIT: RecordingFetcher("abc123 fix"),
         },
@@ -243,19 +243,18 @@ def test_handle_diagnose_agentic_default_uses_mcp(monkeypatch: pytest.MonkeyPatc
     assert reply == "diag ok"
     cmd, _ = runner.calls[0]
     prompt = cmd[2]
-    assert "call_aws" in prompt  # CloudWatch 는 MCP 로 직접 조회 지시
+    assert "ERROR boom" in prompt
     assert "Replicas: 0/3" in prompt  # kubectl 선수집 + 격리
     assert UNTRUSTED_OPEN in prompt and UNTRUSTED_CLOSE in prompt
-    assert cmd == build_command(
-        prompt, list(allowed_tools("diagnose")), aws_mcp_config_json()
-    )
-    assert "--mcp-config" in cmd and "--strict-mcp-config" in cmd
+    assert "call_aws" not in prompt
+    assert cmd == build_command(prompt, [])
+    assert "--mcp-config" not in cmd
 
 
-def test_default_fetchers_cover_kubectl_git_without_external_calls() -> None:
+def test_default_fetchers_cover_all_untrusted_sources_without_external_calls() -> None:
     """기본 선수집 매핑 = kubectl/git(CloudWatch 는 MCP). 매핑만 검사(외부 미실행)."""
     mapping = default_fetchers()
-    assert list(mapping) == [SOURCE_KUBECTL, SOURCE_GIT]  # CloudWatch 선수집 제거
+    assert list(mapping) == [SOURCE_LOGS, SOURCE_KUBECTL, SOURCE_GIT]
     for fetcher in mapping.values():
         assert callable(fetcher)
 

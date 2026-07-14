@@ -15,7 +15,6 @@ from app.allowlist import (
     validate_mapping,
 )
 from app.claude_runner import ClaudeTimeoutError, build_command
-from app.mcp_config import AWS_MCP_TOOLS
 from app.permissions import FORBIDDEN_ACTIONS, PermissionDenied
 from app.telemetry import RunMetrics
 from tests._helpers import RecordingRunner, result_json as _result_json
@@ -24,17 +23,11 @@ from tests._helpers import RecordingRunner, result_json as _result_json
 # ── 명령별 매핑 ──────────────────────────────────────────────────
 
 
-def test_logs_allowlist_scoped_to_aws_mcp() -> None:
-    # CloudWatch 접근은 AWS API MCP read 도구로(agentic) — Bash(aws logs) 아님.
-    assert allowed_tools("logs") == list(AWS_MCP_TOOLS)
-
-
-def test_diagnose_allowlist_covers_read_only_sources() -> None:
-    tools = allowed_tools("diagnose")
-    assert "mcp__awsapi__call_aws" in tools  # CloudWatch 는 MCP read 도구로
-    assert "Bash(kubectl get:*)" in tools
-    assert "Bash(git diff:*)" in tools
-    assert "Bash(aws logs:*)" not in tools  # boto3/Bash CloudWatch 경로 제거
+def test_observation_commands_have_no_model_tools() -> None:
+    """AWS/kubectl/git data는 앱 adapter가 수집하므로 Claude는 분석만 한다."""
+    assert allowed_tools("logs") == []
+    assert allowed_tools("diagnose") == []
+    assert allowed_tools("detect") == []
 
 
 def test_tf_review_has_plan_but_no_apply_path() -> None:
@@ -83,7 +76,7 @@ def test_ping_not_in_allowlist() -> None:
 def test_allowed_tools_returns_copy() -> None:
     first = allowed_tools("logs")
     first.append("Bash(rm:*)")
-    assert allowed_tools("logs") == list(AWS_MCP_TOOLS)
+    assert allowed_tools("logs") == []
 
 
 # ── 금지 불변 검증 ───────────────────────────────────────────────
@@ -128,15 +121,15 @@ def test_run_for_command_passes_allowlist_to_runner() -> None:
     assert len(runner.calls) == 1
     cmd, timeout_s = runner.calls[0]
     assert timeout_s == 30
-    assert cmd == build_command("analyze", list(AWS_MCP_TOOLS))
+    assert cmd == build_command("analyze", [])
 
 
 def test_run_for_command_threads_mcp_config_to_runner() -> None:
-    cfg = '{"mcpServers":{"awsapi":{"command":"uvx","args":["x"]}}}'
+    cfg = '{"mcpServers":{"slackops":{"command":"python","args":["-m","app.mcp_server"]}}}'
     runner = RecordingRunner(stdout=_result_json("ok"))
     run_for_command("logs", "analyze", timeout_s=30, runner=runner, mcp_config=cfg)
     cmd, _ = runner.calls[0]
-    assert cmd == build_command("analyze", list(AWS_MCP_TOOLS), cfg)
+    assert cmd == build_command("analyze", [], cfg)
     idx = cmd.index("--mcp-config")
     assert cmd[idx + 1] == cfg
     assert "--strict-mcp-config" in cmd

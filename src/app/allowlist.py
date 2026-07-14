@@ -22,7 +22,6 @@ from app.claude_runner import (
     SubprocessRunner,
     run_headless,
 )
-from app.mcp_config import AWS_MCP_TOOLS
 from app.telemetry import RunMetrics, RunMetricsHook
 
 
@@ -30,23 +29,14 @@ class AllowlistDenied(Exception):
     """allowlist 에 정의되지 않은 명령(default deny)."""
 
 
-# 명령 → 허용 도구. 읽기 전용(L0)은 조회 명령만, L1(pr)은 branch→수정→test→PR 경로만.
+# 명령 → 허용 도구. L0 AWS 데이터는 앱 측의 고정 read adapter가 수집·격리하므로 모델에는
+# 범용 AWS/MCP/Bash 도구를 주지 않는다. L1(pr)은 branch→수정→test→PR 경로만.
 # 금지 불변(apply/deploy/rollout/iam/db/production)에 해당하는 도구는 어떤 명령에도 없다 —
 # 모듈 로드 시 validate_mapping 으로 강제한다.
-# logs/diagnose 의 CloudWatch 접근은 AWS API MCP read 도구(mcp__awsapi__*)로 — 에이전트가
-# 직접 조회(agentic). 서버 read-only 모드 + IAM read-only 가 hard boundary(mcp_config.py).
 _COMMAND_TOOLS: dict[str, tuple[str, ...]] = {
-    "logs": AWS_MCP_TOOLS,
-    # detect(거버넌스 스캔)도 logs 와 동일 — AWS API MCP read 도구만(에이전트가 직접 조회).
-    "detect": AWS_MCP_TOOLS,
-    "diagnose": (
-        *AWS_MCP_TOOLS,
-        "Bash(kubectl get:*)",
-        "Bash(kubectl describe:*)",
-        "Bash(git diff:*)",
-        "Bash(git log:*)",
-        "Read",
-    ),
+    "logs": (),
+    "detect": (),
+    "diagnose": (),
     "tf-review": (
         "Bash(terraform plan:*)",
         "Bash(terraform show:*)",

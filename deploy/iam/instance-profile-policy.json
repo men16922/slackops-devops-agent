@@ -37,22 +37,16 @@
       "Sid": "SsmRead",
       "Effect": "Allow",
       "Action": [
-        "ssm:GetParameter",
-        "ssm:GetParameters",
-        "ssm:GetParametersByPath",
-        "ssm:DescribeParameters"
+        "ssm:GetParameter"
       ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "S3Read",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:ListBucket",
-        "s3:GetBucketLocation"
-      ],
-      "Resource": "*"
+      "Resource": [
+        "arn:aws:ssm:*:*:parameter/slackops/SLACK_BOT_TOKEN",
+        "arn:aws:ssm:*:*:parameter/slackops/SLACK_APP_TOKEN",
+        "arn:aws:ssm:*:*:parameter/slackops/CLAUDE_CODE_OAUTH_TOKEN",
+        "arn:aws:ssm:*:*:parameter/slackops/SLACK_NOTIFY_CHANNEL",
+        "arn:aws:ssm:*:*:parameter/slackops/SLACK_APPROVER_IDS",
+        "arn:aws:ssm:*:*:parameter/slackops/DASHBOARD_URL"
+      ]
     },
     {
       "Sid": "GovernanceDetectionsReadOnly",

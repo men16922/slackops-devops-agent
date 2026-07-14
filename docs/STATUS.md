@@ -19,10 +19,10 @@ Last updated: 2026-07-15
   →DynamoDB queue→worker(Claude)→DONE→Slack ping+done ($0.15/2.7K–6K tok). Serverless producer fires EC2-off. Then EC2 terminated → cost ≈ $0.
 - **Vercel dashboard live** on real DynamoDB (link + Team ID captured); `web/lib/ddb.ts` trims env + default region us-east-1.
   D15 GitHub OAuth and required allowlist are now deployed to Production; unauthenticated `/` redirects to `/login`.
-- diagnose/logs **agentic AWS API MCP** (D13) e2e: local (`handle_logs`/`handle_diagnose('checkout-service')` via real claude +
-  `uvx awslabs.aws-api-mcp-server@1.3.45`) AND **cloud via Slack on real EC2 using Instance Profile (zero stored keys)** — real
-  CloudWatch (streams/trace-ids quoted); write op → "denied by security policy". EC2 terminated after.
-  **D4 재검증(2026-07-06):** EC2 `i-080db608831f628c5` restart→`handle_diagnose("checkout-service")` 실 CloudWatch 읽기 성공(~90s, P1 진단 리포트 생성) + `delete_log_group`/`create_log_group` 시도 → MCP "denied by security policy" 즉시 거부. EC2 stop.
+- **D16 secure read-adapter hardening (2026-07-15):** logs/diagnose/detect no longer expose generic AWS API MCP to Claude.
+  Fixed boto3 read adapters collect only command-specific evidence, then sanitizer isolates it; model tool allowlists are empty.
+  Runtime drops the AWS MCP/uvx dependency, unused S3 access, broad SSM enumeration, and child Slack/dashboard secrets.
+  The prior D4 MCP CloudWatch proof is historical; the new adapter path needs its own real-EC2 rehearsal before presentation.
 - **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
   ⚠️ **예외(2026-07-10)**: 대시보드 리디자인에서 ARGS→Proposal 컬럼이 `rationale`을 노출 → 시드 mock rationale 2개(agent-2001/2002)가 한글이라 DOM에 한글 등장. 실제 prod agent 는 영어 생성이나 시드 mock 미번역 → 영어화 필요.
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
@@ -91,7 +91,7 @@ Last updated: 2026-07-15
 
 - **safe-autonomy loop + governance Detections (F1–F5, 2026-06-20)** — monitor resident (systemd `--loop`,
   dedupe guard) + Slack proposal notify (`proposal_notifier` thread in main) + dashboard 🔔 bell
-  (`/api/jobs/agent-pending`) + governance `detect` scan-as-job (agentic AWS MCP read-only; iam/config/ssm/incident,
+  (`/api/jobs/agent-pending`) + governance `detect` scan-as-job (fixed AWS read adapters; iam/config/ssm/incident,
   L0) + Detections menu (`/detections` ON/OFF + Scan now, toggles in `CONFIG#detections`). All gated (310 passed,
   next build green). Real scan findings = cloud-only (EC2+IAM). Reframe: triage/safe-response layer over existing signals.
 
@@ -107,8 +107,8 @@ Last updated: 2026-07-15
   SSM: bot/app/oauth + SLACK_NOTIFY_CHANNEL(+canvas 대상 채널) + DASHBOARD_URL. Canvas scope `canvases:write` 부여완료.
 
 ## Open Risks
-- untrusted input (git diff / kubectl) isolated in `<untrusted_data>`; **CloudWatch now enters via AWS MCP tool_result (D13) —
-  bypasses that isolation**. Boundary = IAM read-only + `READ_OPERATIONS_ONLY` + `--strict-mcp-config` + read-only-tool allowlist.
+- Slack/log/CloudWatch/kubectl/git/adapter-error input now enters through one `<untrusted_data>` boundary. The remaining
+  risk is semantic prompt injection within that data, mitigated by tool-less L0 analysis and the permission/output gates.
 - Never use credentials other than IAM Instance Profile (.env commits example only).
 - EC2 always-on cost — verify EventBridge schedule stop/start.
 - Non-goals (out of scope): public HTTPS endpoint, EC2 always-on, Level 2 (Execute), Production/deploy/IAM/DB changes,

@@ -10,9 +10,10 @@ subprocess 실행기는 주입 가능(`runner` 인자) — 단위 테스트는 m
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -25,10 +26,51 @@ DEFAULT_TIMEOUT_S = 300
 # 저장 전 여기서 제거 — web/Slack 등 모든 소비자가 깨끗한 텍스트를 받는다(렌더링은 표시만 담당).
 _CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
+# Claude와 Claude가 기동하는 MCP subprocess에 전달해도 되는 환경만 명시한다. Slack
+# Socket/App token, dashboard secret 등 서비스 자체에만 필요한 값은 절대 상속하지 않는다.
+# AWS credential 값은 로컬 개발 경로를 위해서만 허용하며, EC2에서는 비어 있어 Instance
+# Profile을 기본 credential chain으로 사용한다.
+_AGENT_ENV_NAMES: frozenset[str] = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "TZ",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "UV_CACHE_DIR",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_PROFILE",
+        "AWS_EC2_METADATA_SERVICE_ENDPOINT",
+        "DDB_ENDPOINT",
+        "DDB_TABLE",
+    }
+)
+
 
 def _strip_ansi(text: str) -> str:
     """ANSI CSI 이스케이프 시퀀스 제거(색상/커서 등). 일반 텍스트는 그대로."""
     return _CSI_RE.sub("", text)
+
+
+def _agent_subprocess_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Claude/MCP 자식 프로세스에 최소 환경만 전달한다.
+
+    Agent가 shell 도구나 취약한 MCP dependency를 통해 환경을 읽더라도 Slack bot/app
+    token, OAuth callback secret 등 control-plane 비밀을 얻지 못하게 한다. 인증에 필요한
+    Claude OAuth와 AWS credential chain 관련 값만 명시적으로 전달한다.
+    """
+    source = os.environ if environ is None else environ
+    return {key: value for key in _AGENT_ENV_NAMES if (value := source.get(key))}
 
 
 # 실행기 시그니처: (cmd, timeout_s) → (exit_code, stdout, stderr).
@@ -95,7 +137,12 @@ def build_command(
 def _default_runner(cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
     """기본 실행기 — 실 subprocess 호출(테스트에서는 사용 금지, mock 주입)."""
     proc = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout_s, check=False
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout_s,
+        check=False,
+        env=_agent_subprocess_env(),
     )
     return proc.returncode, proc.stdout, proc.stderr
 
@@ -180,7 +227,11 @@ def build_stream_command(
 def _default_stream_runner(cmd: list[str], timeout_s: int) -> Iterator[str]:
     """기본 스트리밍 실행기 — Popen 으로 stdout 을 줄단위로 흘린다(테스트는 mock 주입)."""
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        env=_agent_subprocess_env(),
     )
     assert proc.stdout is not None
     try:

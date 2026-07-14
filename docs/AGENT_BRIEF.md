@@ -33,7 +33,7 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified. (Also includes web result Markdown render, Quarkify, worker entry.)
 - **Verification:** 3-layer gate — `python3 -m pytest tests/ -q` (278 passed, 1 skipped) + ruff + mypy (strict).
   web/ is `next build` + `docker compose up` e2e green. **`make demo`** runs the full local stack (web+DB+chat_agent+worker) in one shot.
-- **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). diagnose/logs → agentic AWS API MCP (D13, local-verified). Next: redeploy MCP path + Vercel/submission.
+- **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect now use fixed AWS read adapters → sanitizer isolation (generic AWS MCP retired); next cloud rehearsal must re-verify this path.
 
 ## Guardrails summary (details in CORE_MANDATES)
 - Socket Mode only (no inbound port). IAM Instance Profile only (no Access Key).

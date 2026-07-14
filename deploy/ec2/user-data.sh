@@ -29,11 +29,6 @@ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 |
 dnf install -y nodejs20
 npm install -g @anthropic-ai/claude-code
 
-# --- uv / uvx — AWS API MCP 서버 런처(diagnose/logs 의 agentic CloudWatch 접근) ---
-# claude 가 mcp_config 의 `uvx awslabs.aws-api-mcp-server@<ver>`(read-only 모드)를 띄운다.
-# /usr/local/bin 에 설치(systemd PATH 에 포함). 버전은 src/app/mcp_config.py 의 pin 과 일치.
-curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
-
 # --- 서비스 사용자 + 앱 배치 ---
 useradd --system --create-home --shell /sbin/nologin devopsagent || true
 APP_DIR=/opt/slackops-devops-agent
@@ -44,14 +39,6 @@ git clone ${REPO_BRANCH:+--branch "$REPO_BRANCH"} "$REPO_URL" "$APP_DIR" || true
 python3.11 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR"
 chown -R devopsagent:devopsagent "$APP_DIR"
-
-# AWS API MCP 서버 캐시(devopsagent 쓰기 가능) + 패키지 pre-warm(첫 호출 콜드스타트 방지).
-# stdin=/dev/null → stdio 서버가 즉시 EOF 종료, timeout 으로 상한. 효과=uvx 가 패키지 캐시.
-UV_CACHE_DIR=/opt/slackops-devops-agent/.uv-cache
-mkdir -p "$UV_CACHE_DIR"
-chown -R devopsagent:devopsagent "$UV_CACHE_DIR"
-sudo -u devopsagent env UV_CACHE_DIR="$UV_CACHE_DIR" PATH=/usr/local/bin:/usr/bin:/bin \
-  timeout 240 uvx awslabs.aws-api-mcp-server@1.3.45 </dev/null >/dev/null 2>&1 || true
 
 # --- Slack 토큰: SSM SecureString → 환경 파일 (디스크 평문 최소화, root 600) ---
 IMDS_TOKEN="$(curl -fsSL -X PUT http://169.254.169.254/latest/api/token \
@@ -66,9 +53,7 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   echo "AWS_REGION=$REGION"
   # botocore 는 region 을 AWS_DEFAULT_REGION 에서 읽는다(AWS_REGION 만으로는 NoRegionError) — boto3 fallback + MCP 서버용.
   echo "AWS_DEFAULT_REGION=$REGION"
-  # claude→uvx(AWS API MCP) 가 PATH 에서 uvx 를 찾고 캐시를 쓸 수 있게.
   echo "PATH=/usr/local/bin:/usr/bin:/bin"
-  echo "UV_CACHE_DIR=/opt/slackops-devops-agent/.uv-cache"
   # PR execution is confined to this canonical repository root. The worker
   # refuses an approved change if the root/diff/path checks no longer match.
   echo "SLACKOPS_WORKSPACE_ROOT=/opt/slackops-devops-agent"
@@ -96,6 +81,15 @@ EnvironmentFile=/etc/slackops-devops-agent.env
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.main
 Restart=on-failure
 RestartSec=5
+# The Slack process can launch Claude/MCP for Assistant turns. Give it the
+# same host boundary as the worker; child processes also receive a scrubbed
+# environment in app.claude_runner.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/opt/slackops-devops-agent
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
@@ -117,7 +111,7 @@ WorkingDirectory=/opt/slackops-devops-agent
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.worker
 Restart=always
 RestartSec=5
-# Runtime boundary for the only service that can create a PR. Source writes
+# Runtime boundary for every service that can launch Claude/MCP. Source writes
 # remain limited to the verified worktree; system files, home secrets and
 # privilege escalation are unavailable to Claude/git/gh subprocesses.
 NoNewPrivileges=true
@@ -145,6 +139,12 @@ EnvironmentFile=/etc/slackops-devops-agent.env
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.chat_agent
 Restart=always
 RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/opt/slackops-devops-agent
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
@@ -165,6 +165,12 @@ EnvironmentFile=/etc/slackops-devops-agent.env
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.agent_monitor --loop 300
 Restart=always
 RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/opt/slackops-devops-agent
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

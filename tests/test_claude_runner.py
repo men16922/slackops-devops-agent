@@ -12,6 +12,7 @@ from app.claude_runner import (
     ClaudeRunnerError,
     ClaudeTimeoutError,
     RunResult,
+    _agent_subprocess_env,
     _strip_ansi,
     build_command,
     build_stream_command,
@@ -79,6 +80,24 @@ def test_build_command_is_arg_list_no_shell() -> None:
     cmd = build_command("x; rm -rf / && echo $(pwd)", ["Read"])
     assert isinstance(cmd, list)
     assert "x; rm -rf / && echo $(pwd)" in cmd
+
+
+def test_agent_subprocess_env_excludes_control_plane_secrets() -> None:
+    env = _agent_subprocess_env(
+        {
+            "PATH": "/usr/bin",
+            "CLAUDE_CODE_OAUTH_TOKEN": "claude-token",
+            "AWS_REGION": "us-east-1",
+            "SLACK_BOT_TOKEN": "xoxb-secret",
+            "SLACK_APP_TOKEN": "xapp-secret",
+            "AUTH_SECRET": "dashboard-secret",
+        }
+    )
+    assert env == {
+        "PATH": "/usr/bin",
+        "CLAUDE_CODE_OAUTH_TOKEN": "claude-token",
+        "AWS_REGION": "us-east-1",
+    }
 
 
 # ── run_headless 성공 ────────────────────────────────────────────

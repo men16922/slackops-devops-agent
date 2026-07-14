@@ -1,4 +1,4 @@
-"""detect 명령 테스트 — 카테고리 검증 + agentic 프롬프트/도구 조립(실 claude 없음)."""
+"""detect 명령 테스트 — category별 adapter + 격리된 분석(실 AWS/Claude 없음)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from app.commands.detect import (
     handle_detect,
     validated_category,
 )
-from app.mcp_config import AWS_MCP_TOOLS
+from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
 from tests._helpers import RecordingRunner, result_json
 
 
@@ -35,15 +35,16 @@ def test_build_prompt_per_category_differs() -> None:
     assert "alarms" in build_detect_prompt("incident").lower()
 
 
-def test_handle_detect_runs_agentic_with_aws_mcp() -> None:
+def test_handle_detect_uses_injected_adapter_and_has_no_model_tools() -> None:
     runner = RecordingRunner(stdout=result_json("2 non-compliant resources"))
-    out = handle_detect("config", runner=runner)
+    out = handle_detect("config", runner=runner, fetcher=lambda _category: "non-compliant")
     assert out == "2 non-compliant resources"
     (cmd, _timeout) = runner.calls[0]
-    assert "--mcp-config" in cmd
-    assert "--strict-mcp-config" in cmd
-    idx = cmd.index("--allowedTools")
-    assert cmd[idx + 1 : idx + 1 + len(AWS_MCP_TOOLS)] == list(AWS_MCP_TOOLS)
+    prompt = cmd[2]
+    assert "non-compliant" in prompt
+    assert UNTRUSTED_OPEN in prompt and UNTRUSTED_CLOSE in prompt
+    assert "--mcp-config" not in cmd
+    assert "--allowedTools" not in cmd
 
 
 def test_handle_detect_invalid_category_no_run() -> None:
