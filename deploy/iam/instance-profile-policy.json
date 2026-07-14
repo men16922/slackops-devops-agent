@@ -2,93 +2,29 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "CloudWatchReadOnly",
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:Describe*",
-        "cloudwatch:Get*",
-        "cloudwatch:List*"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "LogsReadOnly",
-      "Effect": "Allow",
-      "Action": [
-        "logs:Describe*",
-        "logs:Get*",
-        "logs:List*",
-        "logs:FilterLogEvents",
-        "logs:StartQuery",
-        "logs:StopQuery"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "EksDescribeOnly",
-      "Effect": "Allow",
-      "Action": [
-        "eks:Describe*",
-        "eks:List*"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "SsmRead",
+      "Sid": "BootstrapSecretRead",
       "Effect": "Allow",
       "Action": [
         "ssm:GetParameter"
       ],
       "Resource": [
-        "arn:aws:ssm:*:*:parameter/slackops/SLACK_BOT_TOKEN",
-        "arn:aws:ssm:*:*:parameter/slackops/SLACK_APP_TOKEN",
-        "arn:aws:ssm:*:*:parameter/slackops/CLAUDE_CODE_OAUTH_TOKEN",
-        "arn:aws:ssm:*:*:parameter/slackops/SLACK_NOTIFY_CHANNEL",
-        "arn:aws:ssm:*:*:parameter/slackops/SLACK_APPROVER_IDS",
-        "arn:aws:ssm:*:*:parameter/slackops/DASHBOARD_URL"
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/SLACK_BOT_TOKEN",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/SLACK_APP_TOKEN",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/CLAUDE_CODE_OAUTH_TOKEN",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/SLACK_NOTIFY_CHANNEL",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/SLACK_APPROVER_IDS",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/DASHBOARD_URL"
       ]
     },
     {
-      "Sid": "GovernanceDetectionsReadOnly",
+      "Sid": "AssumeOnlySlackOpsRuntimeRoles",
       "Effect": "Allow",
       "Action": [
-        "access-analyzer:List*",
-        "access-analyzer:Get*",
-        "config:Describe*",
-        "config:Get*",
-        "config:List*",
-        "ssm:DescribeInstancePatchStates",
-        "ssm:DescribeInstanceInformation",
-        "ssm:ListComplianceItems",
-        "ssm:ListResourceComplianceSummaries"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "OtelExport",
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:PutMetricData",
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "xray:PutTraceSegments",
-        "xray:PutTelemetryRecords"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "DynamoDbControlPlane",
-      "Effect": "Allow",
-      "Action": [
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:UpdateItem",
-        "dynamodb:Query"
+        "sts:AssumeRole"
       ],
       "Resource": [
-        "arn:aws:dynamodb:*:*:table/slackops-agent",
-        "arn:aws:dynamodb:*:*:table/slackops-agent/index/*"
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-runtime-role",
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-mcp-role"
       ]
     }
   ]

@@ -82,12 +82,18 @@ def test_build_command_is_arg_list_no_shell() -> None:
     assert "x; rm -rf / && echo $(pwd)" in cmd
 
 
-def test_agent_subprocess_env_excludes_control_plane_secrets() -> None:
+def test_agent_subprocess_env_excludes_control_plane_and_aws_credentials() -> None:
     env = _agent_subprocess_env(
         {
             "PATH": "/usr/bin",
             "CLAUDE_CODE_OAUTH_TOKEN": "claude-token",
             "AWS_REGION": "us-east-1",
+            "AWS_ACCESS_KEY_ID": "instance-or-local-key",
+            "AWS_SECRET_ACCESS_KEY": "instance-or-local-secret",
+            "AWS_SESSION_TOKEN": "instance-or-local-session",
+            "AWS_PROFILE": "admin",
+            "DDB_ENDPOINT": "http://localhost:8931",
+            "DDB_TABLE": "slackops-agent",
             "SLACK_BOT_TOKEN": "xoxb-secret",
             "SLACK_APP_TOKEN": "xapp-secret",
             "AUTH_SECRET": "dashboard-secret",
@@ -96,7 +102,7 @@ def test_agent_subprocess_env_excludes_control_plane_secrets() -> None:
     assert env == {
         "PATH": "/usr/bin",
         "CLAUDE_CODE_OAUTH_TOKEN": "claude-token",
-        "AWS_REGION": "us-east-1",
+        "AWS_EC2_METADATA_DISABLED": "true",
     }
 
 

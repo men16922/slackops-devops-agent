@@ -26,10 +26,11 @@ DEFAULT_TIMEOUT_S = 300
 # 저장 전 여기서 제거 — web/Slack 등 모든 소비자가 깨끗한 텍스트를 받는다(렌더링은 표시만 담당).
 _CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
-# Claude와 Claude가 기동하는 MCP subprocess에 전달해도 되는 환경만 명시한다. Slack
-# Socket/App token, dashboard secret 등 서비스 자체에만 필요한 값은 절대 상속하지 않는다.
-# AWS credential 값은 로컬 개발 경로를 위해서만 허용하며, EC2에서는 비어 있어 Instance
-# Profile을 기본 credential chain으로 사용한다.
+# Claude 프로세스에 전달해도 되는 환경만 명시한다. Slack Socket/App token, dashboard
+# secret, AWS credential chain, DynamoDB 연결값은 절대 상속하지 않는다. 내부 SlackOps MCP
+# 서버가 필요한 DynamoDB 연결값은 `agent_monitor.mcp_config_json()`의 해당 stdio 서버에만
+# 별도로 전달한다. 모델 본체가 IMDS에서 Instance Profile credential을 재획득하지 못하도록
+# AWS SDK의 metadata provider도 명시적으로 끈다.
 _AGENT_ENV_NAMES: frozenset[str] = frozenset(
     {
         "PATH",
@@ -44,15 +45,6 @@ _AGENT_ENV_NAMES: frozenset[str] = frozenset(
         "XDG_CONFIG_HOME",
         "UV_CACHE_DIR",
         "CLAUDE_CODE_OAUTH_TOKEN",
-        "AWS_REGION",
-        "AWS_DEFAULT_REGION",
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_SESSION_TOKEN",
-        "AWS_PROFILE",
-        "AWS_EC2_METADATA_SERVICE_ENDPOINT",
-        "DDB_ENDPOINT",
-        "DDB_TABLE",
     }
 )
 
@@ -66,11 +58,16 @@ def _agent_subprocess_env(environ: Mapping[str, str] | None = None) -> dict[str,
     """Claude/MCP 자식 프로세스에 최소 환경만 전달한다.
 
     Agent가 shell 도구나 취약한 MCP dependency를 통해 환경을 읽더라도 Slack bot/app
-    token, OAuth callback secret 등 control-plane 비밀을 얻지 못하게 한다. 인증에 필요한
-    Claude OAuth와 AWS credential chain 관련 값만 명시적으로 전달한다.
+    token, OAuth callback secret, AWS credential chain, DynamoDB endpoint를 얻지 못하게
+    한다. 내부 MCP 서버의 control-plane 연결은 mcp_config의 per-server env로만 준다.
     """
     source = os.environ if environ is None else environ
-    return {key: value for key in _AGENT_ENV_NAMES if (value := source.get(key))}
+    env = {key: value for key in _AGENT_ENV_NAMES if (value := source.get(key))}
+    # boto3/AWS CLI 등 표준 SDK가 EC2 metadata endpoint로 instance-profile credential을
+    # 다시 찾는 경로를 차단한다. mcp_config의 SlackOps stdio 서버만 이를 false로 override
+    # 하며, 그 서버는 allowlisted propose/list control-plane 도구만 노출한다.
+    env["AWS_EC2_METADATA_DISABLED"] = "true"
+    return env
 
 
 # 실행기 시그니처: (cmd, timeout_s) → (exit_code, stdout, stderr).

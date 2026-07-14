@@ -68,6 +68,13 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
 } > /etc/slackops-devops-agent.env
 chmod 600 /etc/slackops-devops-agent.env
 
+# --- 단기 runtime credential: bootstrap role → runtime/MCP 전용 role ---
+# 서비스와 Claude 자식 프로세스는 IMDS를 직접 읽지 않는다. root refresher만 bootstrap
+# credential으로 두 target role을 assume하고, root-only 환경 파일에 단기 값을 기록한다.
+install -m 700 "$APP_DIR/deploy/ec2/refresh-runtime-credentials.sh" \
+  /usr/local/sbin/slackops-refresh-runtime-credentials
+/usr/local/sbin/slackops-refresh-runtime-credentials --force
+
 # --- systemd unit: Slack Socket Mode 앱(app.main) ---
 cat > /etc/systemd/system/slackops-devops-agent.service <<'UNIT'
 [Unit]
@@ -78,6 +85,8 @@ Wants=network-online.target
 [Service]
 User=devopsagent
 EnvironmentFile=/etc/slackops-devops-agent.env
+EnvironmentFile=/etc/slackops-devops-agent.runtime.env
+ExecStartPre=+/usr/local/sbin/slackops-refresh-runtime-credentials
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.main
 Restart=on-failure
 RestartSec=5
@@ -90,6 +99,17 @@ ProtectHome=read-only
 ProtectSystem=strict
 ReadWritePaths=/opt/slackops-devops-agent
 UMask=0077
+PrivateDevices=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectProc=invisible
+ProcSubset=pid
+IPAddressDeny=169.254.169.254/32
 
 [Install]
 WantedBy=multi-user.target
@@ -107,7 +127,9 @@ Wants=network-online.target
 [Service]
 User=devopsagent
 EnvironmentFile=/etc/slackops-devops-agent.env
+EnvironmentFile=/etc/slackops-devops-agent.runtime.env
 WorkingDirectory=/opt/slackops-devops-agent
+ExecStartPre=+/usr/local/sbin/slackops-refresh-runtime-credentials
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.worker
 Restart=always
 RestartSec=5
@@ -120,6 +142,17 @@ ProtectHome=read-only
 ProtectSystem=strict
 ReadWritePaths=/opt/slackops-devops-agent
 UMask=0077
+PrivateDevices=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectProc=invisible
+ProcSubset=pid
+IPAddressDeny=169.254.169.254/32
 
 [Install]
 WantedBy=multi-user.target
@@ -136,6 +169,8 @@ Wants=network-online.target
 [Service]
 User=devopsagent
 EnvironmentFile=/etc/slackops-devops-agent.env
+EnvironmentFile=/etc/slackops-devops-agent.runtime.env
+ExecStartPre=+/usr/local/sbin/slackops-refresh-runtime-credentials
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.chat_agent
 Restart=always
 RestartSec=5
@@ -145,6 +180,17 @@ ProtectHome=read-only
 ProtectSystem=strict
 ReadWritePaths=/opt/slackops-devops-agent
 UMask=0077
+PrivateDevices=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectProc=invisible
+ProcSubset=pid
+IPAddressDeny=169.254.169.254/32
 
 [Install]
 WantedBy=multi-user.target
@@ -162,6 +208,8 @@ Wants=network-online.target
 [Service]
 User=devopsagent
 EnvironmentFile=/etc/slackops-devops-agent.env
+EnvironmentFile=/etc/slackops-devops-agent.runtime.env
+ExecStartPre=+/usr/local/sbin/slackops-refresh-runtime-credentials
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.agent_monitor --loop 300
 Restart=always
 RestartSec=5
@@ -171,9 +219,50 @@ ProtectHome=read-only
 ProtectSystem=strict
 ReadWritePaths=/opt/slackops-devops-agent
 UMask=0077
+PrivateDevices=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectProc=invisible
+ProcSubset=pid
+IPAddressDeny=169.254.169.254/32
 
 [Install]
 WantedBy=multi-user.target
+UNIT
+
+# --- credential rotation timer ---
+# STS target role session은 1시간이다. 45분마다 root가 새 값을 발급하고 서비스를
+# 재시작해 만료 credential을 사용하지 않게 한다. 서비스 프로세스에는 IMDS deny가 계속
+# 적용되므로, restart 이후에도 metadata에서 bootstrap credential을 직접 얻을 수 없다.
+cat > /etc/systemd/system/slackops-runtime-credentials-refresh.service <<'UNIT'
+[Unit]
+Description=Refresh SlackOps short-lived runtime credentials
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/slackops-refresh-runtime-credentials --force
+ExecStartPost=/usr/bin/systemctl try-restart slackops-devops-agent.service slackops-devops-agent-worker.service slackops-devops-agent-chat-agent.service slackops-devops-agent-monitor.service
+UNIT
+
+cat > /etc/systemd/system/slackops-runtime-credentials-refresh.timer <<'UNIT'
+[Unit]
+Description=Refresh SlackOps runtime credentials before STS expiry
+
+[Timer]
+OnBootSec=45min
+OnUnitActiveSec=45min
+Persistent=true
+Unit=slackops-runtime-credentials-refresh.service
+
+[Install]
+WantedBy=timers.target
 UNIT
 
 systemctl daemon-reload
@@ -181,4 +270,5 @@ systemctl enable --now \
   slackops-devops-agent.service \
   slackops-devops-agent-worker.service \
   slackops-devops-agent-chat-agent.service \
-  slackops-devops-agent-monitor.service
+  slackops-devops-agent-monitor.service \
+  slackops-runtime-credentials-refresh.timer

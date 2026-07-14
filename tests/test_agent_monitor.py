@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.agent_monitor import (
@@ -9,6 +11,7 @@ from app.agent_monitor import (
     build_monitor_prompt,
     detect,
     enqueue_due_scans,
+    mcp_config_json,
     run_monitor_headless,
     simulate_detection,
 )
@@ -85,6 +88,36 @@ def test_build_monitor_prompt_isolates_untrusted() -> None:
     # 내부 위조 태그는 escape 되어 블록 종료로 오인되지 않는다.
     assert "&lt;" in prompt
     assert "{untrusted_data}" not in prompt  # placeholder 미치환 잔여 없음
+
+
+def test_mcp_config_gives_dynamodb_connection_only_to_internal_server(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DDB_ENDPOINT", "http://localhost:8931")
+    monkeypatch.setenv("DDB_TABLE", "slackops-agent")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "local-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "local-secret")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "local-session")
+    monkeypatch.setenv("SLACKOPS_MCP_AWS_ACCESS_KEY_ID", "mcp-key")
+    monkeypatch.setenv("SLACKOPS_MCP_AWS_SECRET_ACCESS_KEY", "mcp-secret")
+    monkeypatch.setenv("SLACKOPS_MCP_AWS_SESSION_TOKEN", "mcp-session")
+
+    payload = json.loads(mcp_config_json())
+    server = payload["mcpServers"]["slackops"]
+    assert server["command"] == "python"
+    assert server["args"] == ["-m", "app.mcp_server"]
+    assert server["env"] == {
+        "AWS_EC2_METADATA_DISABLED": "true",
+        "DDB_ENDPOINT": "http://localhost:8931",
+        "DDB_TABLE": "slackops-agent",
+        "AWS_REGION": "us-east-1",
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "AWS_ACCESS_KEY_ID": "mcp-key",
+        "AWS_SECRET_ACCESS_KEY": "mcp-secret",
+        "AWS_SESSION_TOKEN": "mcp-session",
+    }
 
 
 # ── Tier2 인자 조립(실 claude 호출 없음, mock 주입) ──────────

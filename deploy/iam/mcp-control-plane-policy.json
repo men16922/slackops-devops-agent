@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDbProposalQueueOnly",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb::__ACCOUNT_ID__:table/slackops-agent",
+        "arn:aws:dynamodb::__ACCOUNT_ID__:table/slackops-agent/index/*"
+      ]
+    }
+  ]
+}

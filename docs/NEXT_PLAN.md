@@ -30,6 +30,9 @@ Last updated: 2026-07-15
 - [x] `deploy/ec2/launch-instance.sh` (repo public-transitioned for unauth clone; 3 systemd services active) → `/devops ping` pong verified → EC2 terminated.
 - [ ] `[manual]` `deploy/eventbridge/create-schedules.sh <id>` — skipped (terminate instead of schedule; revisit on redeploy).
 - [ ] `[manual]` On redeploy: confirm 4 `systemctl status` active (slack/worker/chat-agent/monitor) + web chat responds.
+- [ ] `[manual]` D17 split-role deployment: run `deploy/iam/create-role.sh`, launch a **new** EC2 (new user-data required),
+      then verify 4 services + `slackops-runtime-credentials-refresh.timer`, runtime-role AWS read success, MCP proposal-queue
+      write, and absence of direct service IMDS access. Stop the instance after evidence capture.
 
 ## Day 6–7 — tf-review + pr remaining
 - [ ] `[manual]` GitHub App minimal scope + branch protection (block auto-merge) setup.

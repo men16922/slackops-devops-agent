@@ -13,7 +13,7 @@ Last updated: 2026-07-15
   `make vercel-deploy` syncs the four OAuth values from root `.env`; Vercel build, redirect/login page, and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `make check` → **367 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- 3-layer gate: `make check` → **374 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
   `cd web && npm run build` and `git diff --check` also pass for D15.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge rule→Lambda(`alarm_lambda`, detect→propose)
   →DynamoDB queue→worker(Claude)→DONE→Slack ping+done ($0.15/2.7K–6K tok). Serverless producer fires EC2-off. Then EC2 terminated → cost ≈ $0.
@@ -22,7 +22,10 @@ Last updated: 2026-07-15
 - **D16 secure read-adapter hardening (2026-07-15):** logs/diagnose/detect no longer expose generic AWS API MCP to Claude.
   Fixed boto3 read adapters collect only command-specific evidence, then sanitizer isolates it; model tool allowlists are empty.
   Runtime drops the AWS MCP/uvx dependency, unused S3 access, broad SSM enumeration, and child Slack/dashboard secrets.
-  The prior D4 MCP CloudWatch proof is historical; the new adapter path needs its own real-EC2 rehearsal before presentation.
+- **D17 role/metadata hardening (code-ready, not deployed):** Instance Profile becomes bootstrap-only (six SSM secrets +
+  two named same-account role switches); runtime and internal MCP use separate 1-hour STS credentials refreshed every
+  45 minutes. All four services deny IMDS, and Claude receives neither credential nor DDB environment values. New EC2
+  rehearsal must prove role identities, credential refresh timer, and fixed-adapter read success. The prior D4 MCP proof is historical.
 - **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
   ⚠️ **예외(2026-07-10)**: 대시보드 리디자인에서 ARGS→Proposal 컬럼이 `rationale`을 노출 → 시드 mock rationale 2개(agent-2001/2002)가 한글이라 DOM에 한글 등장. 실제 prod agent 는 영어 생성이나 시드 mock 미번역 → 영어화 필요.
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics

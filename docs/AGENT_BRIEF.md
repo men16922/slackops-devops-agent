@@ -1,9 +1,10 @@
 # AGENT_BRIEF — slackops-devops-agent
 Last updated: 2026-07-15
 
-> ▶ NEXT SESSION (**v2 AWSKRUG demo**): first review/commit the completed D15 secure-runtime bundle, then follow
->   plan `docs/plans/2026-06-25-awskrug-demo.md` for **slide finalization → live-demo rehearsal**. D4 real AWS
->   verification, D15 production OAuth, and real login are complete; Slack approver setup remains manual. Presentation:
+> ▶ NEXT SESSION (**v2 AWSKRUG demo**): commit/push the D16–D17 secure-runtime bundle, then run the new-EC2
+>   rehearsal (fixed read adapters + split runtime/MCP roles + 4 services/timer) before **slide finalization →
+>   live-demo rehearsal**. D4 real AWS verification, D15 production OAuth, and real login are complete; Slack
+>   approver setup remains manual. Presentation:
 >   `docs/presentation/PRESENTATION.md` + `docs/presentation/SlackOps DevOps Agent (Standalone).html`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
@@ -33,7 +34,7 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified. (Also includes web result Markdown render, Quarkify, worker entry.)
 - **Verification:** 3-layer gate — `python3 -m pytest tests/ -q` (278 passed, 1 skipped) + ruff + mypy (strict).
   web/ is `next build` + `docker compose up` e2e green. **`make demo`** runs the full local stack (web+DB+chat_agent+worker) in one shot.
-- **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect now use fixed AWS read adapters → sanitizer isolation (generic AWS MCP retired); next cloud rehearsal must re-verify this path.
+- **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect now use fixed AWS read adapters → sanitizer isolation (generic AWS MCP retired). D17 adds bootstrap/runtime/MCP role separation, short-lived credentials, and service IMDS denial; the next cloud rehearsal must verify both paths.
 
 ## Guardrails summary (details in CORE_MANDATES)
 - Socket Mode only (no inbound port). IAM Instance Profile only (no Access Key).

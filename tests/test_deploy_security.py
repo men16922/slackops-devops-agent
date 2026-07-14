@@ -8,11 +8,24 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
 _USER_DATA = (_ROOT / "deploy/ec2/user-data.sh").read_text()
+_REFRESH_SCRIPT = (_ROOT / "deploy/ec2/refresh-runtime-credentials.sh").read_text()
 
 
 def _unit_body(unit_name: str) -> str:
     marker = f"cat > /etc/systemd/system/{unit_name} <<'UNIT'\n"
     return _USER_DATA.split(marker, 1)[1].split("\nUNIT", 1)[0]
+
+
+def _policy(name: str) -> dict[str, object]:
+    return json.loads((_ROOT / "deploy/iam" / name).read_text())
+
+
+def _actions(policy: dict[str, object]) -> set[str]:
+    return {
+        action
+        for statement in policy["Statement"]  # type: ignore[index]
+        for action in statement.get("Action", [])  # type: ignore[union-attr]
+    }
 
 
 def test_every_agent_service_has_the_host_runtime_boundary() -> None:
@@ -23,6 +36,19 @@ def test_every_agent_service_has_the_host_runtime_boundary() -> None:
         "ProtectSystem=strict",
         "ReadWritePaths=/opt/slackops-devops-agent",
         "UMask=0077",
+        "PrivateDevices=true",
+        "ProtectClock=true",
+        "ProtectControlGroups=true",
+        "ProtectHostname=true",
+        "ProtectKernelModules=true",
+        "ProtectKernelTunables=true",
+        "RestrictSUIDSGID=true",
+        "LockPersonality=true",
+        "ProtectProc=invisible",
+        "ProcSubset=pid",
+        "IPAddressDeny=169.254.169.254/32",
+        "EnvironmentFile=/etc/slackops-devops-agent.runtime.env",
+        "ExecStartPre=+/usr/local/sbin/slackops-refresh-runtime-credentials",
     }
     units = (
         "slackops-devops-agent.service",
@@ -34,18 +60,55 @@ def test_every_agent_service_has_the_host_runtime_boundary() -> None:
         assert expected <= set(_unit_body(unit).splitlines()), unit
 
 
-def test_instance_profile_has_no_unused_s3_read_access() -> None:
-    policy = json.loads((_ROOT / "deploy/iam/instance-profile-policy.json").read_text())
-    actions = {
-        action
-        for statement in policy["Statement"]
-        for action in statement.get("Action", [])
+def test_bootstrap_policy_only_reads_boot_secrets_and_assumes_named_roles() -> None:
+    policy = _policy("instance-profile-policy.json")
+    assert _actions(policy) == {"ssm:GetParameter", "sts:AssumeRole"}
+    statements = policy["Statement"]  # type: ignore[index]
+    secret_read = next(item for item in statements if item["Sid"] == "BootstrapSecretRead")
+    assert secret_read["Action"] == ["ssm:GetParameter"]
+    assert all(
+        resource.startswith("arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/")
+        for resource in secret_read["Resource"]
+    )
+    assume = next(item for item in statements if item["Sid"] == "AssumeOnlySlackOpsRuntimeRoles")
+    assert assume["Resource"] == [
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-runtime-role",
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-mcp-role",
+    ]
+
+
+def test_runtime_policy_has_no_bootstrap_secret_access() -> None:
+    policy = _policy("runtime-role-policy.json")
+    actions = _actions(policy)
+    assert "ssm:GetParameter" not in actions
+    assert {"logs:FilterLogEvents", "dynamodb:PutItem"} <= actions
+    assert "sts:AssumeRole" not in actions
+    rendered = json.dumps(policy)
+    assert "/slackops/SLACK_BOT_TOKEN" not in rendered
+    assert "slackops-devops-agent-mcp-role" not in rendered
+
+
+def test_mcp_control_plane_policy_is_dynamodb_queue_only() -> None:
+    policy = _policy("mcp-control-plane-policy.json")
+    assert _actions(policy) == {
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query",
     }
-    assert not any(action.startswith("s3:") for action in actions)
+    assert "slackops-agent" in json.dumps(policy)
 
 
-def test_bootstrap_ssm_access_cannot_enumerate_or_read_arbitrary_parameters() -> None:
-    policy = json.loads((_ROOT / "deploy/iam/instance-profile-policy.json").read_text())
-    statement = next(item for item in policy["Statement"] if item["Sid"] == "SsmRead")
-    assert statement["Action"] == ["ssm:GetParameter"]
-    assert all(resource.startswith("arn:aws:ssm:*:*:parameter/slackops/") for resource in statement["Resource"])
+def test_refresh_script_uses_short_lived_roles_and_writes_root_only_env() -> None:
+    assert "aws sts assume-role" in _REFRESH_SCRIPT
+    assert "--duration-seconds 3600" in _REFRESH_SCRIPT
+    assert "AWS_EC2_METADATA_DISABLED=true" in _REFRESH_SCRIPT
+    assert "SLACKOPS_MCP_AWS_ACCESS_KEY_ID" in _REFRESH_SCRIPT
+    assert "chmod 600" in _REFRESH_SCRIPT
+    assert "chown root:root" in _REFRESH_SCRIPT
+
+
+def test_credential_refresh_timer_restarts_services_before_expiry() -> None:
+    assert "OnUnitActiveSec=45min" in _USER_DATA
+    assert "slackops-runtime-credentials-refresh.timer" in _USER_DATA
+    assert "try-restart slackops-devops-agent.service" in _USER_DATA

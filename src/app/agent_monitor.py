@@ -122,23 +122,36 @@ def build_monitor_prompt(signals: str) -> str:
 
 
 def mcp_config_json() -> str:
-    """propose_job MCP 서버(stdio) 등록용 인라인 JSON — DDB 연결 env 를 전달한다.
+    """propose_job MCP 서버(stdio) 등록용 인라인 JSON — DDB 연결 env만 전달한다.
 
-    DynamoDB Local(로컬 데모)에는 더미 AWS 자격증명도 넘긴다 — 없으면 MCP 서브프로세스가
-    DynamoDB 쓰기에서 자격증명을 못 찾는다. 실 DynamoDB(EC2)는 자격증명 env 가 없고 IAM
-    Instance Profile 로 해석되므로(env 부재 = 그대로 통과), 양쪽 모두 안전하다.
+    DynamoDB Local(로컬 데모)에는 더미 AWS 자격증명을 넘긴다 — 없으면 MCP 서브프로세스가
+    DynamoDB 쓰기에서 자격증명을 못 찾는다. EC2에서는 root credential refresher가 발급한
+    `SLACKOPS_MCP_*`의 DynamoDB proposal-queue 전용 단기 credential만 이 stdio 서버에
+    전달한다. Claude 본체와 MCP 서버 모두 IMDS credential provider는 사용하지 않는다.
     """
-    env: dict[str, str] = {}
+    env: dict[str, str] = {"AWS_EC2_METADATA_DISABLED": "true"}
     for key in (
         "DDB_ENDPOINT",
         "DDB_TABLE",
         "AWS_REGION",
+        "AWS_DEFAULT_REGION",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
     ):
         value = os.environ.get(key)
         if value:
             env[key] = value
+    # EC2 production path: runtime role과 분리된 MCP control-plane credential을 AWS 표준
+    # 키로 매핑한다. 개발 환경에 이 값이 없으면 위의 로컬 static credential만 사용한다.
+    for source, target in (
+        ("SLACKOPS_MCP_AWS_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+        ("SLACKOPS_MCP_AWS_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
+        ("SLACKOPS_MCP_AWS_SESSION_TOKEN", "AWS_SESSION_TOKEN"),
+    ):
+        value = os.environ.get(source)
+        if value:
+            env[target] = value
     return json.dumps(
         {
             "mcpServers": {
