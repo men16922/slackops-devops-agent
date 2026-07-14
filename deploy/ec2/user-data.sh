@@ -69,10 +69,15 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   # claude→uvx(AWS API MCP) 가 PATH 에서 uvx 를 찾고 캐시를 쓸 수 있게.
   echo "PATH=/usr/local/bin:/usr/bin:/bin"
   echo "UV_CACHE_DIR=/opt/slackops-devops-agent/.uv-cache"
+  # PR execution is confined to this canonical repository root. The worker
+  # refuses an approved change if the root/diff/path checks no longer match.
+  echo "SLACKOPS_WORKSPACE_ROOT=/opt/slackops-devops-agent"
   echo "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317"
   echo "OTEL_SERVICE_NAME=slackops-devops-agent"
   # 제안 알림(선택) — 채널 미설정 시 notifier 는 no-op. SSM 파라미터 부재 시 빈 값(부팅 실패 방지).
   echo "SLACK_NOTIFY_CHANNEL=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_NOTIFY_CHANNEL --query Parameter.Value --output text 2>/dev/null || true)"
+  # Slack 버튼 승인자는 user ID allowlist가 비어 있으면 전부 거부(fail closed).
+  echo "SLACK_APPROVER_IDS=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_APPROVER_IDS --query Parameter.Value --output text 2>/dev/null || true)"
   # 대시보드 deep-link 용(예: https://<app>.vercel.app). 부재 시 링크 대신 (job <id>) 텍스트.
   echo "DASHBOARD_URL=$(aws ssm get-parameter --region "$REGION" --name /slackops/DASHBOARD_URL --query Parameter.Value --output text 2>/dev/null || true)"
 } > /etc/slackops-devops-agent.env
@@ -108,9 +113,19 @@ Wants=network-online.target
 [Service]
 User=devopsagent
 EnvironmentFile=/etc/slackops-devops-agent.env
+WorkingDirectory=/opt/slackops-devops-agent
 ExecStart=/opt/slackops-devops-agent/.venv/bin/python -m app.worker
 Restart=always
 RestartSec=5
+# Runtime boundary for the only service that can create a PR. Source writes
+# remain limited to the verified worktree; system files, home secrets and
+# privilege escalation are unavailable to Claude/git/gh subprocesses.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/opt/slackops-devops-agent
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

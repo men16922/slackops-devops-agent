@@ -67,6 +67,12 @@ export default async function JobDetailPage({
               </dd>
             </>
           )}
+          {job.execution_plan_hash && (
+            <>
+              <dt>Execution plan</dt>
+              <dd className="mono">{job.execution_plan_hash}</dd>
+            </>
+          )}
           {job.error && (
             <>
               <dt>Error</dt>

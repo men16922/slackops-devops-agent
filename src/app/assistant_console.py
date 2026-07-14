@@ -185,7 +185,14 @@ def build_mock_turn(
     if _looks_like_pr(text):
         job = jobs.enqueue("pr", MOCK_PR_ARGS, source=JobSource.AGENT, requested_by=CONSOLE_USER)
         jobs.claim()
-        jobs.await_approval(job.id, MOCK_PR_DIFF)
+        # Console mock does not execute a real git worktree, but still models
+        # the production invariant that every approval binds a plan hash.
+        jobs.await_approval(
+            job.id,
+            MOCK_PR_DIFF,
+            execution_plan='{"mode":"console-mock"}',
+            execution_plan_hash="console-mock-plan",
+        )
         command, args, chunks = "pr", MOCK_PR_ARGS, MOCK_PR_CHUNKS
     else:
         job = jobs.enqueue(

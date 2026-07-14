@@ -1,7 +1,7 @@
-# Vercel 배포 가이드 — 대시보드 공개 링크 (H0 제출 필수)
+# Vercel 배포 가이드 — GitHub 인증 대시보드
 
 목표: web/ 대시보드를 **실 DynamoDB(`slackops-agent`, us-east-1)** 에 연결해 Vercel 에 배포 →
-**Published Link + Team ID** 확보. (제출 항목: "Published Vercel Project Link & Team ID")
+**GitHub OAuth로 보호된 링크 + Team ID** 확보. (제출 항목: "Published Vercel Project Link & Team ID")
 
 > 구조: 브라우저 → Vercel(Next.js 서버) → AWS SDK + **읽기/승인 키** → DynamoDB.
 > EC2 가 아니라 Vercel 이므로 Instance Profile 불가 → **여기서만** 최소권한 Access Key 사용(테이블 스코프).
@@ -37,7 +37,16 @@ READONLY=1 make cloud-vercel-key
 
 ---
 
-## 3. 환경변수 (Settings → Environment Variables)
+## 3. GitHub OAuth App + 환경변수 (Settings → Environment Variables)
+
+GitHub → **Settings → Developer settings → OAuth Apps → New OAuth App**에서 앱을 만든다.
+
+| OAuth App field | Value |
+| --- | --- |
+| Homepage URL | 배포할 Vercel URL (예: `https://slackops-devops-agent.vercel.app`) |
+| Authorization callback URL | `https://<Vercel domain>/api/auth/callback/github` |
+
+생성 후 Client ID와 Client secret을 Vercel에만 저장한다. `AUTH_SECRET`은 `openssl rand -base64 32`로 생성한다.
 
 | Key | Value | 비고 |
 | --- | --- | --- |
@@ -45,9 +54,26 @@ READONLY=1 make cloud-vercel-key
 | `AWS_REGION` | `us-east-1` | 테이블 생성 리전과 동일 |
 | `AWS_ACCESS_KEY_ID` | `AKIA…` | 1단계 출력 |
 | `AWS_SECRET_ACCESS_KEY` | `…` | 1단계 출력(Secret) |
-| `DASHBOARD_APPROVER` | 표시할 승인자명(예: `men16922`) | 감사 로그용 |
+| `AUTH_GITHUB_ID` | GitHub OAuth Client ID | GitHub OAuth App |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth Client secret | GitHub OAuth App |
+| `AUTH_SECRET` | `openssl rand -base64 32` 출력 | 세션 서명 키 |
+| `GITHUB_ALLOWED_USERS` | `login1,login2` | 승인된 GitHub login allowlist; 빈 값은 로그인 거부 |
+
+### Makefile로 `.env` 동기화 후 배포
+
+루트 `.env`에 `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_ORG_ID`와 위 네 인증
+변수를 설정한 뒤 다음 명령을 실행한다.
+
+```bash
+make vercel-deploy
+```
+
+이 명령은 `.env`의 네 인증 변수만 Vercel **Production** 환경에 동기화한 뒤
+Vercel 프로젝트 설정의 Root Directory=`web`을 사용해 배포한다. `VERCEL_*` 값은 로컬 CLI 인증용이므로 Vercel 런타임 환경에는
+올리지 않는다. Git 연동 배포도 마지막으로 이 명령이 동기화한 원격 값을 사용한다.
 
 > ⚠️ **`DDB_ENDPOINT` 는 절대 설정하지 않는다** — 미설정 시 실 DynamoDB 연결(설정하면 로컬 모드 → 빈 대시보드).
+> ⚠️ `AUTH_BYPASS_FOR_LOCAL_DEVELOPMENT`도 절대 설정하지 않는다. local DynamoDB endpoint와 함께 있을 때만 개발용 우회가 동작한다.
 
 ---
 
@@ -64,9 +90,11 @@ READONLY=1 make cloud-vercel-key
 
 ## 5. 검증 체크 (배포 후)
 
-- [ ] `/` jobs 피드에 실 작업 보임(diagnose api/checkout-service, done/pending)
+- [ ] 로그아웃 상태에서 `/` 접속 → `/login`으로 redirect
+- [ ] allowlist에 없는 GitHub 계정 로그인 → 접근 거부
+- [ ] allowlist의 GitHub 계정 로그인 → `/` jobs 피드에 실 작업 표시
 - [ ] job 상세 → Output Gate(diff) + Approve/Reject 버튼 렌더
-- [ ] (승인 키 포함 시) Approve 클릭 → 상태 전이 + audit 추가(optimistic lock)
+- [ ] (승인 키 포함 시) Approve 클릭 → GitHub login을 actor로 상태 전이 + approval hash audit 추가(optimistic lock)
 - [ ] metrics 페이지에 비용/토큰 집계
 - [ ] DOM 에 한글 없음(영어 UI — H0)
 
@@ -89,3 +117,4 @@ READONLY=1 make cloud-vercel-key
 | `AccessDenied` | 키 정책 Resource/Action + 리전(`us-east-1`) 일치 |
 | 일부만 보임 | GSI 쿼리 권한(`…/index/*`) 포함됐는지 |
 | Approve 실패 | 읽기전용 키면 정상(승인하려면 UpdateItem/PutItem 추가 재발급) |
+| GitHub 로그인 뒤 접근 거부 | `GITHUB_ALLOWED_USERS`에 GitHub **login**(표시 이름 아님)이 포함됐는지 확인 |

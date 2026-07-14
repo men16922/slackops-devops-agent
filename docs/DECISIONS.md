@@ -1,5 +1,5 @@
 # DECISIONS — slackops-devops-agent
-Last updated: 2026-06-17
+Last updated: 2026-07-15
 
 > Hard-to-reverse decisions only. Format: Decision / Reason / Impact. Updated via /checkpoint.
 
@@ -148,3 +148,21 @@ Last updated: 2026-06-17
 - Impact: new AWS resources (`slackops-alarm-producer` Lambda + `slackops-alarm-to-agent` rule + IAM role, table-scoped) —
   free-tier ~$0, kept during judging. Live-verified end-to-end 2026-06-20 (Lambda invocation in CloudWatch logs →
   proposal → worker → Slack). Submission differentiator: "event-driven autonomous detection, not a timer".
+
+## D15 — secure runtime binding: GitHub-authenticated dashboard + immutable PR plans
+- Decision: protect every non-auth dashboard route, API route and server action with GitHub OAuth (`next-auth`) and a
+  required `GITHUB_ALLOWED_USERS` login allowlist (empty = deny). The GitHub login, not a deploy-time constant, becomes
+  the requester/approver audit actor. The Docker-only local DynamoDB demo may opt in to a tightly-scoped local bypass;
+  Vercel cannot use it without a local endpoint.
+  For write jobs, persist a canonical `ExecutionPlan` with request/diff hashes, changed paths, workspace root and policy
+  version plus the complete execution tool chain and its aggregated capabilities. Approval stores that exact plan hash;
+  the worker rejects a missing/mismatched hash, tool-chain/capability expansion, path traversal, symlink, untracked-file
+  or post-approval diff change before executing. The execute phase has no Edit/Write/add/checkout tools,
+  and a remote PR diff equality check must pass before DONE.
+- Reason: a displayed diff and a natural-language instruction do not prevent TOCTOU between approval and execution.
+  Identity must be authenticated at the dashboard boundary, while the runtime must enforce the approved plan independently
+  of model behavior.
+- Impact: `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`, `AUTH_SECRET`, `GITHUB_ALLOWED_USERS` are required Vercel environment
+  variables; `SLACK_APPROVER_IDS` is an explicit fail-closed Slack button allowlist. EC2 worker uses a configured
+  canonical worktree and systemd filesystem hardening. Audit events carry hash-chain links plus structured policy/plan
+  context; append writes are conditional to avoid overwrite.

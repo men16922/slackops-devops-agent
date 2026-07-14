@@ -1,8 +1,15 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-06
+Last updated: 2026-07-15
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
+
+## 2026-07-15 — D15 보안 런타임: GitHub 인증 + 불변 PR 실행계획
+- Status: Production deployed; review/commit remains.
+- Changed: dashboard GitHub OAuth/allowlist, Slack approver allowlist, canonical execution-plan/approval hash, workspace·tool-chain·remote-PR-diff verification, append-only audit hash chain, EC2 systemd hardening; `make vercel-deploy` syncs the four OAuth values from root `.env`.
+- Verified: `make check` (367 passed, Ruff, mypy, doc budget), `cd web && npm run build`, `git diff --check`, Docker dashboard build/seed + API smoke; Vercel Production build READY, `/`→`/login` 307, login page 200, real GitHub login succeeded.
+- Blockers: `SLACK_APPROVER_IDS` is synced to SSM; the stopped existing EC2 needs runtime-env refresh and approval-button verification during the next rehearsal.
+- Next: commit this scoped bundle, then AWSKRUG slide/rehearsal. Details: `docs/reports/2026-07-15-secure-runtime-report.md`.
 
 ## 2026-07-10 — web 대시보드 리디자인 (AWS/Datadog 스타일 라이트 테마 + 관측성 컴포넌트)
 - Status: Done. 다크(GitHub풍) → AWS 콘솔/Datadog 감성 라이트 테마 전면 리디자인. 커밋 `35f4b38` (feature/dashboard-aws-theme, 7 files, +613/-148).

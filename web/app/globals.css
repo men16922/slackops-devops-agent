@@ -933,6 +933,39 @@ button.btn.reject:hover:not(:disabled) {
   align-items: center;
   gap: 16px;
 }
+
+.auth-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.auth-signout {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.login-page {
+  min-height: 58vh;
+  display: grid;
+  place-items: center;
+}
+
+.login-panel {
+  width: min(460px, 100%);
+  text-align: center;
+  padding: 42px;
+}
+
+.login-panel h1 {
+  margin: 14px 0 8px;
+}
 .topbar-right .src {
   margin-left: 0;
 }

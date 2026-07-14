@@ -20,7 +20,8 @@ from app.store.base import (
 
 _COLUMNS = (
     "id, command, args, source, status, requested_by, channel, created_at, updated_at, "
-    "diff, result, cost_usd, tokens, error, approved_by, approved_at, trace_id, rationale"
+    "diff, result, cost_usd, tokens, error, approved_by, approved_at, trace_id, rationale, "
+    "execution_plan, execution_plan_hash, approval_hash"
 )
 
 _SCHEMA = """
@@ -42,7 +43,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     approved_by  TEXT,
     approved_at  TEXT,
     trace_id     TEXT,
-    rationale    TEXT
+    rationale    TEXT,
+    execution_plan TEXT,
+    execution_plan_hash TEXT,
+    approval_hash TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at);
 """
@@ -95,7 +99,8 @@ class SqliteJobStore:
             f"INSERT INTO jobs ({_COLUMNS}) VALUES "
             "(:id, :command, :args, :source, :status, :requested_by, :channel, "
             ":created_at, :updated_at, :diff, :result, :cost_usd, :tokens, :error, "
-            ":approved_by, :approved_at, :trace_id, :rationale)",
+            ":approved_by, :approved_at, :trace_id, :rationale, :execution_plan, "
+            ":execution_plan_hash, :approval_hash)",
             _to_row(job),
         )
         return job
@@ -141,20 +146,38 @@ class SqliteJobStore:
         return self.get(row["id"])
 
     # ── 출력 게이트 / 종료 ─────────────────────────────────────
-    def await_approval(self, job_id: str, diff: str) -> Job | None:
+    def await_approval(
+        self,
+        job_id: str,
+        diff: str,
+        *,
+        execution_plan: str | None = None,
+        execution_plan_hash: str | None = None,
+    ) -> Job | None:
         return self._transition(
             job_id,
             expected=JobStatus.RUNNING,
             new=JobStatus.AWAITING_APPROVAL,
-            extra={"diff": diff},
+            extra={
+                "diff": diff,
+                "execution_plan": execution_plan,
+                "execution_plan_hash": execution_plan_hash,
+            },
         )
 
     def approve(self, job_id: str, approver: str) -> Job | None:
+        job = self.get(job_id)
+        if job is None or not job.execution_plan_hash:
+            return None
         return self._transition(
             job_id,
             expected=JobStatus.AWAITING_APPROVAL,
             new=JobStatus.APPROVED,
-            extra={"approved_by": approver, "approved_at": self._clock()},
+            extra={
+                "approved_by": approver,
+                "approved_at": self._clock(),
+                "approval_hash": job.execution_plan_hash,
+            },
         )
 
     def reject(self, job_id: str, approver: str) -> Job | None:
@@ -237,6 +260,9 @@ def _to_row(job: Job) -> dict[str, object]:
         "approved_at": job.approved_at,
         "trace_id": job.trace_id,
         "rationale": job.rationale,
+        "execution_plan": job.execution_plan,
+        "execution_plan_hash": job.execution_plan_hash,
+        "approval_hash": job.approval_hash,
     }
 
 
@@ -260,4 +286,7 @@ def _from_row(row: sqlite3.Row) -> Job:
         approved_at=row["approved_at"],
         trace_id=row["trace_id"],
         rationale=row["rationale"],
+        execution_plan=row["execution_plan"],
+        execution_plan_hash=row["execution_plan_hash"],
+        approval_hash=row["approval_hash"],
     )

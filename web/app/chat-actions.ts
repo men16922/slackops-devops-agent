@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { TABLE, doc } from "../lib/ddb";
 import { utcnowIso } from "../lib/time";
+import { getDashboardUser } from "../lib/auth";
 
 const CONTENT_MAX = 2000;
 
@@ -15,7 +16,9 @@ function msgSk(seq: number): string {
   return `MSG#${String(seq).padStart(6, "0")}`;
 }
 
-export async function createConversation(): Promise<{ convId: string }> {
+export async function createConversation(): Promise<{ convId: string } | { error: string }> {
+  const user = await getDashboardUser();
+  if (!user) return { error: "Authentication required." };
   const id = randomUUID();
   const now = utcnowIso();
   await doc.send(
@@ -33,6 +36,7 @@ export async function createConversation(): Promise<{ convId: string }> {
         created_at: now,
         updated_at: now,
         msg_count: 0,
+        requested_by: user.login,
       },
     }),
   );
@@ -51,6 +55,8 @@ export async function sendUserMessage(
   convId: string,
   rawContent: string,
 ): Promise<SendResult> {
+  const user = await getDashboardUser();
+  if (!user) return { ok: false, message: "Authentication required." };
   const content = rawContent.trim();
   if (content.length === 0) return { ok: false, message: "Message is empty." };
   if (content.length > CONTENT_MAX) {
@@ -67,7 +73,7 @@ export async function sendUserMessage(
         Key: { PK: `CHAT#${convId}`, SK: "META" },
         UpdateExpression:
           "ADD msg_count :one SET #s = :await, GSI1PK = :gpk, updated_at = :now",
-        ConditionExpression: "attribute_exists(PK) AND #s <> :streaming",
+        ConditionExpression: "attribute_exists(PK) AND #s <> :streaming AND requested_by = :requester",
         ExpressionAttributeNames: { "#s": "status" },
         ExpressionAttributeValues: {
           ":one": 1,
@@ -75,6 +81,7 @@ export async function sendUserMessage(
           ":gpk": "CHATSTATUS#awaiting_agent",
           ":now": now,
           ":streaming": "streaming",
+          ":requester": user.login,
         },
         ReturnValues: "UPDATED_NEW",
       }),
@@ -89,6 +96,9 @@ export async function sendUserMessage(
       );
       if (!got.Item) {
         return { ok: false, code: "gone", message: "Conversation not found — starting a new one." };
+      }
+      if (got.Item.requested_by !== user.login) {
+        return { ok: false, message: "Conversation access denied." };
       }
       return { ok: false, code: "busy", message: "The agent is responding right now. Try again shortly." };
     }

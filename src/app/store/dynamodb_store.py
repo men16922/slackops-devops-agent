@@ -112,20 +112,39 @@ class DynamoDbJobStore:
         return None
 
     # ── 출력 게이트 / 종료 ─────────────────────────────────────
-    def await_approval(self, job_id: str, diff: str) -> Job | None:
+    def await_approval(
+        self,
+        job_id: str,
+        diff: str,
+        *,
+        execution_plan: str | None = None,
+        execution_plan_hash: str | None = None,
+    ) -> Job | None:
         return self._conditional_set(
             job_id,
             expected=JobStatus.RUNNING,
             new=JobStatus.AWAITING_APPROVAL,
-            extra={"diff": diff},
+            extra={
+                "diff": diff,
+                "execution_plan": execution_plan,
+                "execution_plan_hash": execution_plan_hash,
+            },
         )
 
     def approve(self, job_id: str, approver: str) -> Job | None:
+        job = self.get(job_id)
+        if job is None or not job.execution_plan_hash:
+            return None
         return self._conditional_set(
             job_id,
             expected=JobStatus.AWAITING_APPROVAL,
             new=JobStatus.APPROVED,
-            extra={"approved_by": approver, "approved_at": self._clock()},
+            extra={
+                "approved_by": approver,
+                "approved_at": self._clock(),
+                "approval_hash": job.execution_plan_hash,
+            },
+            required_execution_plan_hash=job.execution_plan_hash,
         )
 
     def reject(self, job_id: str, approver: str) -> Job | None:
@@ -166,6 +185,7 @@ class DynamoDbJobStore:
         expected: JobStatus,
         new: JobStatus,
         extra: dict[str, object],
+        required_execution_plan_hash: str | None = None,
     ) -> Job | None:
         """status==expected 일 때만 new 로 전이(+GSI1PK 동기화, extra 갱신). 불일치면 None."""
         from botocore.exceptions import ClientError  # lazy
@@ -186,11 +206,16 @@ class DynamoDbJobStore:
             names[name_ref] = key
             set_parts.append(f"{name_ref} = {value_ref}")
             values[value_ref] = _encode(value)
+        condition = "#s = :expected"
+        if required_execution_plan_hash is not None:
+            names["#plan_hash"] = "execution_plan_hash"
+            values[":expected_plan_hash"] = required_execution_plan_hash
+            condition += " AND #plan_hash = :expected_plan_hash"
         try:
             resp = self._table.update_item(
                 Key={"PK": f"JOB#{job_id}", "SK": META_SK},
                 UpdateExpression="SET " + ", ".join(set_parts),
-                ConditionExpression="#s = :expected",
+                ConditionExpression=condition,
                 ExpressionAttributeNames=names,
                 ExpressionAttributeValues=values,
                 ReturnValues="ALL_NEW",
@@ -230,6 +255,9 @@ def _to_item(job: Job) -> dict[str, Any]:
         "approved_at": job.approved_at,
         "trace_id": job.trace_id,
         "rationale": job.rationale,
+        "execution_plan": job.execution_plan,
+        "execution_plan_hash": job.execution_plan_hash,
+        "approval_hash": job.approval_hash,
     }
     for key, value in optional.items():
         if value is not None:
@@ -259,4 +287,7 @@ def _from_item(item: dict[str, Any]) -> Job:
         approved_at=item.get("approved_at"),
         trace_id=item.get("trace_id"),
         rationale=item.get("rationale"),
+        execution_plan=item.get("execution_plan"),
+        execution_plan_hash=item.get("execution_plan_hash"),
+        approval_hash=item.get("approval_hash"),
     )

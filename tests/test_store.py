@@ -19,6 +19,8 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 TABLE_NAME = "slackops-agent-test"
+TEST_PLAN = "{\"test\":true}"
+TEST_PLAN_HASH = "test-plan-hash"
 
 
 @pytest.fixture
@@ -117,7 +119,12 @@ def test_claim_prioritizes_approved_over_pending(store: object) -> None:
     """승인된 쓰기 이어가기가 신규 PENDING 보다 우선."""
     approved = store.enqueue("pr", "fix")
     store.claim()  # approved → RUNNING
-    store.await_approval(approved.id, diff="--- diff ---")
+    store.await_approval(
+        approved.id,
+        diff="--- diff ---",
+        execution_plan=TEST_PLAN,
+        execution_plan_hash=TEST_PLAN_HASH,
+    )
     store.approve(approved.id, approver="boss")
     store.enqueue("logs", "later")  # PENDING
 
@@ -133,7 +140,12 @@ def test_claim_prioritizes_approved_over_pending(store: object) -> None:
 def test_output_gate_full_flow(store: object) -> None:
     job = store.enqueue("pr", "add feature", source=JobSource.SLACK)
     store.claim()  # RUNNING
-    gated = store.await_approval(job.id, diff="patch")
+    gated = store.await_approval(
+        job.id,
+        diff="patch",
+        execution_plan=TEST_PLAN,
+        execution_plan_hash=TEST_PLAN_HASH,
+    )
     assert gated.status is JobStatus.AWAITING_APPROVAL
     assert gated.diff == "patch"
 
@@ -158,7 +170,12 @@ def test_approve_wrong_state_is_noop(store: object) -> None:
 def test_reject_makes_job_unclaimable(store: object) -> None:
     job = store.enqueue("pr", "x")
     store.claim()
-    store.await_approval(job.id, diff="d")
+    store.await_approval(
+        job.id,
+        diff="d",
+        execution_plan=TEST_PLAN,
+        execution_plan_hash=TEST_PLAN_HASH,
+    )
     rejected = store.reject(job.id, approver="a")
     assert rejected.status is JobStatus.REJECTED
     assert store.claim() is None  # REJECTED 는 claim 대상 아님

@@ -31,6 +31,8 @@ export interface Job {
   approved_at?: string;
   trace_id?: string;
   rationale?: string;
+  execution_plan_hash?: string;
+  approval_hash?: string;
 }
 
 export interface AuditEvent {
@@ -75,6 +77,7 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   msg_count: number;
+  requested_by?: string;
   proposed_job_id?: string;
 }
 

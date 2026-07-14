@@ -85,6 +85,9 @@ class Job:
     approved_at: str | None = None
     trace_id: str | None = None
     rationale: str | None = None
+    execution_plan: str | None = None
+    execution_plan_hash: str | None = None
+    approval_hash: str | None = None
     extra: dict[str, object] = field(default_factory=dict)
 
 
@@ -119,8 +122,15 @@ class JobStore(Protocol):
         """claim 가능한 가장 오래된 job 을 원자적으로 RUNNING 으로 전이 후 반환(없으면 None)."""
         ...
 
-    def await_approval(self, job_id: str, diff: str) -> Job | None:
-        """RUNNING job 을 diff 와 함께 AWAITING_APPROVAL 로 전이(출력 게이트)."""
+    def await_approval(
+        self,
+        job_id: str,
+        diff: str,
+        *,
+        execution_plan: str | None = None,
+        execution_plan_hash: str | None = None,
+    ) -> Job | None:
+        """RUNNING job 을 hash-addressed plan/diff 와 함께 승인 대기로 전이."""
         ...
 
     def approve(self, job_id: str, approver: str) -> Job | None:

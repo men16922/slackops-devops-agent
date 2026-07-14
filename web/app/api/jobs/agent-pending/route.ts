@@ -3,10 +3,14 @@
 
 import { NextResponse } from "next/server";
 import { listPendingAgentJobs } from "../../../../lib/ddb";
+import { getDashboardUser } from "../../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!(await getDashboardUser())) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
   const jobs = await listPendingAgentJobs();
   return NextResponse.json({ jobs });
 }

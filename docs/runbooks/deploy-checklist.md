@@ -34,7 +34,7 @@
 
 **검증 전략(중요):** 기능 검증은 **로컬에서 전부 가능** — Slack(Socket Mode)→EC2→DynamoDB→worker 풀루프 +
 로컬 web 대시보드(DASHBOARD_GUIDE §1~§6, `make demo`/docker compose). **Vercel 은 검증용이 아니라 제출물**
-(공개 링크+Team ID 가 H0 필수) → **로컬 검증을 다 끝낸 뒤 제출 직전에 1회 배포**한다.
+(GitHub OAuth로 보호된 링크+Team ID 가 H0 필수) → **로컬 검증을 다 끝낸 뒤 제출 직전에 1회 배포**한다.
 비용: Vercel **Hobby 무료**(100GB/월·비상업 — 추가 비용 0). AWS 비용 추정 = 부록 2.
 
 ---
@@ -162,7 +162,7 @@ EC2 stop/start(상시 가동 금지 불변). 기본 평일 09:00 start / 19:00 s
 
 ---
 
-## [D] Vercel 배포 — 대시보드 공개 링크 (제출 필수, **로컬 검증 후 마지막에**)
+## [D] Vercel 배포 — GitHub 인증 대시보드 링크 (제출 필수, **로컬 검증 후 마지막에**)
 
 > 결과물: 실 DynamoDB 를 읽는 Next.js 대시보드 + **Published Vercel Link + Team ID**.
 > **이 단계는 기능 검증이 아니라 제출 아티팩트 확보용** — 로컬 web 대시보드로 검증을 끝낸 뒤 제출 직전에 1회 배포.
@@ -190,8 +190,12 @@ IAM → Users → Create user(콘솔 OFF, 프로그래매틱 전용) → 인라�
       | `AWS_REGION` | `us-east-1` (테이블 생성 리전과 일치) |
       | `AWS_ACCESS_KEY_ID` | `AKIA...` |
       | `AWS_SECRET_ACCESS_KEY` | `...` |
-      | `DASHBOARD_APPROVER` | 표시할 승인자명 |
+      | `AUTH_GITHUB_ID` | GitHub OAuth Client ID |
+      | `AUTH_GITHUB_SECRET` | GitHub OAuth Client secret |
+      | `AUTH_SECRET` | `openssl rand -base64 32` 출력 |
+      | `GITHUB_ALLOWED_USERS` | 허용 GitHub login 쉼표 목록(빈 값=전체 거부) |
 - [ ] ⚠️ **`DDB_ENDPOINT` 는 설정하지 않는다** — 미설정 시 실 DynamoDB 로 연결(설정 시 로컬 모드).
+- [ ] GitHub OAuth App callback URL을 `https://<Vercel domain>/api/auth/callback/github`로 설정하고, `AUTH_BYPASS_FOR_LOCAL_DEVELOPMENT`는 Vercel에 설정하지 않는다.
 - [ ] Deploy → **배포 URL + Team ID 기록**(제출물).
 
 ---

@@ -48,6 +48,13 @@ export function Chat() {
     async function tick() {
       try {
         const r = await fetch(`/api/chat/${convId}`, { cache: "no-store" });
+        if (r.status === 404) {
+          // A conversation belongs to the authenticated GitHub login. Clear a
+          // stale localStorage ID after account switching or local DB reseed.
+          window.localStorage.removeItem(STORAGE_KEY);
+          setConvId(null);
+          return;
+        }
         if (!r.ok || stop) return;
         const data = (await r.json()) as {
           conversation: Conversation | null;
@@ -89,14 +96,24 @@ export function Chat() {
     try {
       let id = convId;
       if (!id) {
-        id = (await createConversation()).convId;
+        const created = await createConversation();
+        if ("error" in created) {
+          setErr(created.error);
+          return;
+        }
+        id = created.convId;
         setConvId(id);
       }
       let res = await sendUserMessage(id, text);
       // 스테일 convId(소멸된 대화) → 새 대화를 만들어 1회 재시도(스트리밍 중 "busy" 는 재시도 안 함).
       if (!res.ok && res.code === "gone") {
         window.localStorage.removeItem(STORAGE_KEY);
-        const fresh = (await createConversation()).convId;
+        const created = await createConversation();
+        if ("error" in created) {
+          setErr(created.error);
+          return;
+        }
+        const fresh = created.convId;
         setConvId(fresh);
         setMessages([]);
         setConv(null);

@@ -16,6 +16,7 @@ from app.approval_actions import (
     AUDIT_APPROVED,
     AUDIT_REJECTED,
     DIFF_PREVIEW_MAX,
+    NOT_AUTHORIZED,
     apply_decision,
     decision_blocks,
     register_approval_actions,
@@ -29,7 +30,12 @@ def _awaiting_job(store: SqliteJobStore, *, command: str = "pr", diff: str = "di
     """PENDING → claim(RUNNING) → await_approval(AWAITING_APPROVAL) job 을 만들고 id 반환."""
     job = store.enqueue(command, "bump memory", source=JobSource.AGENT, requested_by="agent")
     store.claim()
-    store.await_approval(job.id, diff)
+    store.await_approval(
+        job.id,
+        diff,
+        execution_plan="{\"test\":true}",
+        execution_plan_hash="test-plan-hash",
+    )
     return job.id
 
 
@@ -145,7 +151,7 @@ def test_binding_approve_transitions_and_updates_message() -> None:
     audit = SqliteAuditStore()
     job_id = _awaiting_job(store)
     app = _FakeApp()
-    register_approval_actions(app, jobs=store, audit=audit)
+    register_approval_actions(app, jobs=store, audit=audit, allowed_approvers=frozenset({"U777"}))
     client = _FakeClient()
 
     app.handlers[ACTION_APPROVE](ack=lambda: None, body=_body(job_id), client=client)
@@ -163,7 +169,7 @@ def test_binding_reject_routes_to_reject() -> None:
     store = SqliteJobStore()
     job_id = _awaiting_job(store)
     app = _FakeApp()
-    register_approval_actions(app, jobs=store)
+    register_approval_actions(app, jobs=store, allowed_approvers=frozenset({"U777"}))
     client = _FakeClient()
 
     app.handlers[ACTION_REJECT](ack=lambda: None, body=_body(job_id), client=client)
@@ -175,6 +181,19 @@ def test_binding_registers_both_action_ids() -> None:
     app = _FakeApp()
     register_approval_actions(app, jobs=SqliteJobStore())
     assert set(app.handlers) == {ACTION_APPROVE, ACTION_REJECT}
+
+
+def test_binding_denies_user_outside_approver_allowlist() -> None:
+    store = SqliteJobStore()
+    job_id = _awaiting_job(store)
+    app = _FakeApp()
+    register_approval_actions(app, jobs=store, allowed_approvers=frozenset({"U1"}))
+    client = _FakeClient()
+
+    app.handlers[ACTION_APPROVE](ack=lambda: None, body=_body(job_id), client=client)
+
+    assert store.get(job_id).status is JobStatus.AWAITING_APPROVAL  # type: ignore[union-attr]
+    assert client.updates[0]["text"] == NOT_AUTHORIZED
 
 
 def test_audit_labels_match_dashboard_feed_contract() -> None:

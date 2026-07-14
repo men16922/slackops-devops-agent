@@ -39,4 +39,4 @@ echo "── 아래 키를 Vercel 환경변수에 입력(Secret 안전 보관) �
 aws iam create-access-key --user-name "$USER" \
   --query 'AccessKey.{AWS_ACCESS_KEY_ID:AccessKeyId,AWS_SECRET_ACCESS_KEY:SecretAccessKey}' \
   --output table
-echo "Vercel env: 위 2개 + DDB_TABLE=$TABLE / AWS_REGION=$AWS_REGION / DASHBOARD_APPROVER=<name>  (DDB_ENDPOINT 미설정!)"
+echo "Vercel env: 위 2개 + DDB_TABLE=$TABLE / AWS_REGION=$AWS_REGION + AUTH_GITHUB_ID/AUTH_GITHUB_SECRET/AUTH_SECRET/GITHUB_ALLOWED_USERS  (DDB_ENDPOINT 미설정!)"

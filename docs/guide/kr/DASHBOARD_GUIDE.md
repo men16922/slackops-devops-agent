@@ -110,8 +110,12 @@ IAM → Users → Create user(콘솔 OFF, 프로그래매틱 전용) → 인라�
   | `AWS_REGION` | `us-east-1` (테이블 생성 리전과 일치) |
   | `AWS_ACCESS_KEY_ID` | `AKIA...` |
   | `AWS_SECRET_ACCESS_KEY` | `...` |
-  | `DASHBOARD_APPROVER` | 표시할 승인자명 |
+  | `AUTH_GITHUB_ID` | GitHub OAuth Client ID |
+  | `AUTH_GITHUB_SECRET` | GitHub OAuth Client secret |
+  | `AUTH_SECRET` | `openssl rand -base64 32` 출력 |
+  | `GITHUB_ALLOWED_USERS` | 허용 GitHub login을 쉼표로 구분 |
 - ⚠️ **`DDB_ENDPOINT` 는 설정하지 않는다** — 미설정 시 실 DynamoDB 로 연결(설정 시 로컬 모드).
+- GitHub OAuth App callback URL은 `https://<Vercel domain>/api/auth/callback/github`로 설정한다. allowlist가 비어 있으면 fail-closed로 모든 로그인이 거부된다.
 - Deploy → **배포 URL + Team ID 기록**(제출물).
 
 > **로컬에서 실 DynamoDB 확인:** `web/.env.local.example` → `web/.env.local` 복사 후 모드 B 블록 채움(`DDB_ENDPOINT` 줄 삭제/주석). `.env.local` 은 커밋되지 않는다.

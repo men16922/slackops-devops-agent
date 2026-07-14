@@ -54,7 +54,12 @@ def test_failed_notifies_error(store: SqliteJobStore) -> None:
 def test_awaiting_approval_notifies(store: SqliteJobStore) -> None:
     job = store.enqueue("pr", "bump timeout")
     store.claim()
-    store.await_approval(job.id, "diff --git ...")
+    store.await_approval(
+        job.id,
+        "diff --git ...",
+        execution_plan="{\"test\":true}",
+        execution_plan_hash="test-plan-hash",
+    )
     posts: list[str] = []
     notify_job_events(store, posts.append, {})
     assert any("Awaiting approval" in p for p in posts)

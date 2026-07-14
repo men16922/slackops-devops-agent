@@ -116,7 +116,12 @@ def test_flow_pr_awaiting_posts_approval_buttons_then_click_transitions() -> Non
     job = store.enqueue("pr", "bump memory", source=JobSource.AGENT, requested_by="agent")
     # worker 시뮬레이트: claim → diff 와 함께 출력 게이트(AWAITING_APPROVAL).
     store.claim()
-    store.await_approval(job.id, "diff --git a/x b/x")
+    store.await_approval(
+        job.id,
+        "diff --git a/x b/x",
+        execution_plan="{\"test\":true}",
+        execution_plan_hash="test-plan-hash",
+    )
 
     say, client = _Say(), _Client()
     run_user_message(
@@ -141,7 +146,9 @@ def test_flow_pr_awaiting_posts_approval_buttons_then_click_transitions() -> Non
 
     # 버튼 클릭(register_approval_actions 핸들러) → store 전이.
     app = _FakeApp()
-    register_approval_actions(app, jobs=store, audit=audit)
+    register_approval_actions(
+        app, jobs=store, audit=audit, allowed_approvers=frozenset({"U42"})
+    )
     btn_client = _Client()
     app.handlers[ACTION_APPROVE](
         ack=lambda: None,

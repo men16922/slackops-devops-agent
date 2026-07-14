@@ -19,6 +19,7 @@ from app.store import (
     SqliteAuditStore,
     SqliteTelemetryStore,
 )
+from app.store.audit_store import verify_event_chain
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
@@ -105,6 +106,17 @@ def test_audit_list_for_job_chronological_and_scoped(audit_store: object) -> Non
     audit_store.append("job-1", "done")
     actions = [e.action for e in audit_store.list_for_job("job-1")]
     assert actions == ["enqueued", "claimed", "done"]
+    assert verify_event_chain(audit_store.list_for_job("job-1"))
+
+
+@_both_audit
+def test_audit_hash_chain_detects_mutation(audit_store: object) -> None:
+    audit_store.append("job-1", "enqueued", context={"request_hash": "abc"})
+    audit_store.append("job-1", "claimed", context={"policy": "v1"})
+    events = audit_store.list_for_job("job-1")
+    assert verify_event_chain(events)
+    events[1].detail = "tampered"
+    assert not verify_event_chain(events)
 
 
 @_both_audit

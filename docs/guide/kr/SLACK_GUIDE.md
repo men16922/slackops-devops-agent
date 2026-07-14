@@ -37,6 +37,7 @@ Slack 자연어 명령 → EC2의 Claude Code Headless 가 안전 게이트를 �
 | `SLACK_BOT_TOKEN` (`xoxb-…`) | Slack Bot | **SSM** `/slackops/SLACK_BOT_TOKEN` | Slack App → OAuth |
 | `SLACK_APP_TOKEN` (`xapp-…`) | Socket Mode | **SSM** `/slackops/SLACK_APP_TOKEN` | Slack App → App-Level Token |
 | `CLAUDE_CODE_OAUTH_TOKEN` (`sk-ant-oat…`) | Claude 추론(구독) | **SSM** `/slackops/CLAUDE_CODE_OAUTH_TOKEN` | `claude setup-token` |
+| `SLACK_APPROVER_IDS` | Slack 승인 가능 사용자 ID의 쉼표 목록 | **SSM** `/slackops/SLACK_APPROVER_IDS` | Slack 프로필의 member ID |
 | AWS 자격증명 (EC2 런타임) | AWS/DynamoDB 접근 | **없음** — IAM Instance Profile | `deploy/iam/create-role.sh` |
 
 ### 2.1 Slack 토큰 (SSM)
@@ -54,6 +55,16 @@ claude setup-token                                  # 구독 로그인 → sk-an
 aws ssm put-parameter --name /slackops/CLAUDE_CODE_OAUTH_TOKEN --type SecureString --value 'sk-ant-oat...'
 ```
 - 만료/인증 실패 시: 재발급 → SSM 갱신 → `sudo systemctl restart slackops-devops-agent`.
+
+Slack 승인 버튼은 `SLACK_APPROVER_IDS`가 비어 있으면 모든 사용자를 거부한다. 예를 들어 `U0123,U0456`을 저장한다.
+
+루트 `.env`를 기준으로 SSM 값을 동기화하려면 다음을 실행한다. **새로 생성하는 EC2**는
+user-data 단계에서 이 값을 자동으로 읽는다. 기존 인스턴스는 부팅만으로 user-data를 다시 실행하지 않으므로,
+SSM 세션에서 `/etc/slackops-devops-agent.env`를 갱신한 뒤 Slack 앱 서비스를 재시작해야 한다.
+
+```bash
+make cloud-slack-approvers
+```
 
 ---
 

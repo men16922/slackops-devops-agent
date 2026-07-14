@@ -37,6 +37,6 @@ services:
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
-      DASHBOARD_APPROVER: web-operator
+      AUTH_BYPASS_FOR_LOCAL_DEVELOPMENT: "true"
     ports:
       - "8930:3000"

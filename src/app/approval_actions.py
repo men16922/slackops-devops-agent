@@ -13,6 +13,7 @@ web 대시보드 Approve/Reject(`web/app/actions.ts:transition`)와 **동일한 
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -33,6 +34,7 @@ DIFF_PREVIEW_MAX = 2800
 
 # 상태 불일치(이미 처리됨) 시 사용자 메시지 — web 의 문구와 동일.
 ALREADY_HANDLED = "Job already handled (not awaiting approval)."
+NOT_AUTHORIZED = "You are not authorized to approve or reject this job."
 
 
 @dataclass
@@ -48,6 +50,15 @@ class Decision:
     ok: bool
     status: str | None
     message: str
+
+
+def configured_approvers() -> frozenset[str]:
+    """Return the explicit Slack user-ID approval allowlist (empty = deny all)."""
+    return frozenset(
+        value.strip()
+        for value in os.environ.get("SLACK_APPROVER_IDS", "").split(",")
+        if value.strip()
+    )
 
 
 def _preview(diff: str | None) -> str:
@@ -123,7 +134,13 @@ def apply_decision(
 
     action = AUDIT_APPROVED if approve else AUDIT_REJECTED
     if audit is not None:
-        audit.append(job_id, action, actor=approver, detail=AUDIT_DETAIL)
+        audit.append(
+            job_id,
+            action,
+            actor=approver,
+            detail=AUDIT_DETAIL,
+            context={"approval_hash": job.approval_hash or ""},
+        )
 
     if approve:
         message = f":white_check_mark: `{job.command}` approved by <@{approver}> — running now."
@@ -138,12 +155,15 @@ def register_approval_actions(
     jobs: JobStore,
     audit: AuditStore | None = None,
     log: Any | None = None,
+    allowed_approvers: frozenset[str] | None = None,
 ) -> None:
     """Bolt App 에 Approve/Reject 버튼 핸들러를 등록(slash command·Assistant 와 공존).
 
     버튼 클릭 → ack() → apply_decision → 버튼이 있던 메시지를 결과 텍스트로 chat.update
     (버튼 제거). 실 Slack 연결에서만 동작 — 순수 코어(apply_decision 등)는 별도 단위 테스트.
     """
+
+    approvers = allowed_approvers if allowed_approvers is not None else configured_approvers()
 
     def _handle(ack: Callable[[], None], body: dict[str, Any], client: Any, *, approve: bool) -> None:
         ack()
@@ -152,7 +172,12 @@ def register_approval_actions(
         user = body.get("user") or {}
         approver = str(user.get("id") or user.get("username") or "unknown")
 
-        decision = apply_decision(jobs, job_id=job_id, approver=approver, approve=approve, audit=audit)
+        if approver not in approvers:
+            decision = Decision(ok=False, status=None, message=NOT_AUTHORIZED)
+        else:
+            decision = apply_decision(
+                jobs, job_id=job_id, approver=approver, approve=approve, audit=audit
+            )
         if log is not None:
             log.info("approval.decided", job_id=job_id, approve=approve, ok=decision.ok)
 

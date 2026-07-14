@@ -13,6 +13,7 @@ from app.commands.pr import (
     DIFF_END_MARKER,
     MAX_DESCRIPTION_CHARS,
     PR_GATED_TOOLS,
+    PR_EXECUTE_EXCLUDED_TOOLS,
     extract_diff,
     handle_pr,
 )
@@ -98,7 +99,7 @@ def test_prepare_exec_failure_returns_warning() -> None:
 # ── execute 단계(승인 후) ─────────────────────────────────────
 
 
-def test_execute_uses_full_allowlist_with_pr_tools() -> None:
+def test_execute_uses_narrowed_non_editing_allowlist_with_pr_tools() -> None:
     runner = RecordingRunner(stdout=result_json("PR created: #42"))
 
     result = handle_pr("fix typo", approved_diff=DIFF, runner=runner)
@@ -108,7 +109,10 @@ def test_execute_uses_full_allowlist_with_pr_tools() -> None:
     tools = _allowed_tools_of(runner)
     assert "Bash(gh pr create:*)" in tools
     assert "Bash(git push:*)" in tools
-    assert tools == allowed_tools("pr")
+    assert tools == [t for t in allowed_tools("pr") if t not in PR_EXECUTE_EXCLUDED_TOOLS]
+    assert "Edit" not in tools
+    assert "Write" not in tools
+    assert "Bash(git add:*)" not in tools
 
 
 def test_execute_isolates_approved_diff_in_untrusted_block() -> None:

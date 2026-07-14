@@ -12,9 +12,11 @@ boto3 는 lazy import 로 미설치 환경에서도 모듈 import-safe. seq 는 
 from __future__ import annotations
 
 import itertools
+import hashlib
+import json
 import sqlite3
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from app.store._util import day_of as _day_of, utcnow_iso as _utcnow_iso
@@ -41,13 +43,22 @@ class AuditEvent:
     action: str
     actor: str = ""
     detail: str = ""
+    context: dict[str, str] = field(default_factory=dict)
+    prev_event_hash: str = ""
+    event_hash: str = ""
 
 
 class AuditStore(Protocol):
     """감사 이벤트 append-only 저장소 인터페이스 (수정/삭제 없음)."""
 
     def append(
-        self, job_id: str, action: str, *, actor: str = "", detail: str = ""
+        self,
+        job_id: str,
+        action: str,
+        *,
+        actor: str = "",
+        detail: str = "",
+        context: dict[str, str] | None = None,
     ) -> AuditEvent:
         """이벤트 1건 추가."""
         ...
@@ -72,6 +83,9 @@ CREATE TABLE IF NOT EXISTS audit_events (
     action TEXT NOT NULL,
     actor  TEXT NOT NULL DEFAULT '',
     detail TEXT NOT NULL DEFAULT '',
+    context TEXT NOT NULL DEFAULT '{}',
+    prev_event_hash TEXT NOT NULL DEFAULT '',
+    event_hash TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (job_id, ts, seq)
 );
 CREATE INDEX IF NOT EXISTS idx_audit_day_ts ON audit_events(day, ts);
@@ -92,13 +106,34 @@ class SqliteAuditStore:
         self._conn = sqlite3.connect(db_path, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SQLITE_SCHEMA)
+        self._ensure_hash_columns()
 
     def close(self) -> None:
         self._conn.close()
 
+    def _ensure_hash_columns(self) -> None:
+        existing = {row["name"] for row in self._conn.execute("PRAGMA table_info(audit_events)")}
+        for name, definition in (
+            ("context", "TEXT NOT NULL DEFAULT '{}'") ,
+            ("prev_event_hash", "TEXT NOT NULL DEFAULT ''"),
+            ("event_hash", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if name not in existing:
+                self._conn.execute(f"ALTER TABLE audit_events ADD COLUMN {name} {definition}")
+
     def append(
-        self, job_id: str, action: str, *, actor: str = "", detail: str = ""
+        self,
+        job_id: str,
+        action: str,
+        *,
+        actor: str = "",
+        detail: str = "",
+        context: dict[str, str] | None = None,
     ) -> AuditEvent:
+        previous = self._conn.execute(
+            "SELECT event_hash FROM audit_events WHERE job_id = ? ORDER BY ts DESC, seq DESC LIMIT 1",
+            (job_id,),
+        ).fetchone()
         event = AuditEvent(
             job_id=job_id,
             ts=self._clock(),
@@ -106,17 +141,31 @@ class SqliteAuditStore:
             action=action,
             actor=actor,
             detail=detail,
+            context=dict(context or {}),
+            prev_event_hash=str(previous["event_hash"]) if previous else "",
         )
+        event.event_hash = event_hash(event)
         self._conn.execute(
-            "INSERT OR REPLACE INTO audit_events (job_id, ts, seq, day, action, actor, detail) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (event.job_id, event.ts, event.seq, _day_of(event.ts), event.action, event.actor, event.detail),
+            "INSERT INTO audit_events (job_id, ts, seq, day, action, actor, detail, context, prev_event_hash, event_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                event.job_id,
+                event.ts,
+                event.seq,
+                _day_of(event.ts),
+                event.action,
+                event.actor,
+                event.detail,
+                json.dumps(event.context, sort_keys=True, separators=(",", ":")),
+                event.prev_event_hash,
+                event.event_hash,
+            ),
         )
         return event
 
     def list_for_job(self, job_id: str, limit: int = 100) -> list[AuditEvent]:
         rows = self._conn.execute(
-            "SELECT job_id, ts, seq, action, actor, detail FROM audit_events "
+            "SELECT job_id, ts, seq, action, actor, detail, context, prev_event_hash, event_hash FROM audit_events "
             "WHERE job_id = ? ORDER BY ts, seq LIMIT ?",
             (job_id, limit),
         ).fetchall()
@@ -125,7 +174,7 @@ class SqliteAuditStore:
     def list_feed(self, day: str | None = None, limit: int = 50) -> list[AuditEvent]:
         day = day or _day_of(self._clock())
         rows = self._conn.execute(
-            "SELECT job_id, ts, seq, action, actor, detail FROM audit_events "
+            "SELECT job_id, ts, seq, action, actor, detail, context, prev_event_hash, event_hash FROM audit_events "
             "WHERE day = ? ORDER BY ts DESC, seq DESC LIMIT ?",
             (day, limit),
         ).fetchall()
@@ -140,6 +189,9 @@ def _from_sqlite_row(row: sqlite3.Row) -> AuditEvent:
         action=row["action"],
         actor=row["actor"],
         detail=row["detail"],
+        context=_context_from_json(row["context"]),
+        prev_event_hash=row["prev_event_hash"],
+        event_hash=row["event_hash"],
     )
 
 
@@ -165,8 +217,23 @@ class DynamoDbAuditStore:
         self._table = dynamodb.Table(table_name)
 
     def append(
-        self, job_id: str, action: str, *, actor: str = "", detail: str = ""
+        self,
+        job_id: str,
+        action: str,
+        *,
+        actor: str = "",
+        detail: str = "",
+        context: dict[str, str] | None = None,
     ) -> AuditEvent:
+        from boto3.dynamodb.conditions import Key  # lazy
+
+        previous = self._table.query(
+            KeyConditionExpression=(
+                Key("PK").eq(f"JOB#{job_id}") & Key("SK").begins_with("AUDIT#")
+            ),
+            ScanIndexForward=False,
+            Limit=1,
+        ).get("Items", [])
         event = AuditEvent(
             job_id=job_id,
             ts=self._clock(),
@@ -174,7 +241,10 @@ class DynamoDbAuditStore:
             action=action,
             actor=actor,
             detail=detail,
+            context=dict(context or {}),
+            prev_event_hash=str(previous[0].get("event_hash", "")) if previous else "",
         )
+        event.event_hash = event_hash(event)
         self._table.put_item(
             Item={
                 "PK": f"JOB#{event.job_id}",
@@ -187,7 +257,11 @@ class DynamoDbAuditStore:
                 "action": event.action,
                 "actor": event.actor,
                 "detail": event.detail,
-            }
+                "context": event.context,
+                "prev_event_hash": event.prev_event_hash,
+                "event_hash": event.event_hash,
+            },
+            ConditionExpression="attribute_not_exists(PK) AND attribute_not_exists(SK)",
         )
         return event
 
@@ -224,4 +298,43 @@ def _from_item(item: dict[str, Any]) -> AuditEvent:
         action=item["action"],
         actor=item.get("actor", ""),
         detail=item.get("detail", ""),
+        context={str(key): str(value) for key, value in item.get("context", {}).items()},
+        prev_event_hash=item.get("prev_event_hash", ""),
+        event_hash=item.get("event_hash", ""),
     )
+
+
+def _context_from_json(value: str) -> dict[str, str]:
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {str(key): str(item) for key, item in parsed.items()}
+
+
+def event_hash(event: AuditEvent) -> str:
+    """Return a stable hash over one event and its predecessor link."""
+    payload = {
+        "job_id": event.job_id,
+        "ts": event.ts,
+        "seq": event.seq,
+        "action": event.action,
+        "actor": event.actor,
+        "detail": event.detail,
+        "context": event.context,
+        "prev_event_hash": event.prev_event_hash,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def verify_event_chain(events: list[AuditEvent]) -> bool:
+    """Check chronological audit events for hash integrity and predecessor linkage."""
+    previous = ""
+    for event in events:
+        if event.prev_event_hash != previous or event.event_hash != event_hash(event):
+            return False
+        previous = event.event_hash
+    return True

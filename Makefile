@@ -3,7 +3,7 @@
 
 .PHONY: check test lint typecheck check-doc-budget smoke-local demo demo-assistant demo-assistant-mock mcp-server agent-monitor worker chat-agent
 .PHONY: cloud-whoami cloud-iam cloud-ddb cloud-up cloud-deploy cloud-status cloud-console cloud-ssm cloud-schedule cloud-start cloud-stop cloud-down
-.PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean cloud-vercel-key cloud-vercel-key-clean
+.PHONY: cloud-lambda-deploy cloud-lambda-clean cloud-alarm cloud-alarm-clean cloud-vercel-key cloud-vercel-key-clean cloud-slack-approvers vercel-deploy
 
 check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
 
@@ -56,6 +56,10 @@ cloud-vercel-key: ## (클라우드) Vercel 대시보드용 최소권한 IAM 키 
 	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/vercel/create-key.sh
 cloud-vercel-key-clean: ## (클라우드) Vercel IAM 사용자/키 정리(노출 의심·제출 후).
 	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/vercel/delete-key.sh
+cloud-slack-approvers: ## 루트 .env의 SLACK_APPROVER_IDS를 EC2가 읽는 SSM 허용목록으로 동기화.
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/ec2/sync-slack-approvers-from-env.sh
+vercel-deploy: ## 루트 .env → Vercel Production 인증변수 동기화 후 web/ 프로덕션 배포.
+	@bash deploy/vercel/deploy-from-env.sh
 
 # ===== cloud 배포 라이프사이클 (실 AWS) — deploy/*.sh 래퍼. 실 자격증명 필요(aws sts get-caller-identity) =====
 # 인프라 순서 고정: IAM → DynamoDB → EC2 (deploy-checklist.md [B]). EC2 인스턴스 ID 는 ID_FILE 에 기록 →

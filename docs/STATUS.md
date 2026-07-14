@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-10
+Last updated: 2026-07-15
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -8,12 +8,17 @@ Last updated: 2026-07-10
   + FastAPI health/metrics. deploy/ artifacts (IAM/EC2/EventBridge/ADOT) ready-to-run.
 - AWS/Slack **cloud deploy A–C verified once** (2026-06-20): Slack App + SSM tokens + IAM + DynamoDB(us-east-1) + EC2 →
   `/devops ping` pong from `ip-…ec2.internal`. EC2 then terminated (cost ~$0). Runbook docs/runbooks/deploy-checklist.md.
+- **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth dashboard boundary, immutable PR execution-plan/approval hash,
+  workspace/tool-chain/postcondition validation, Slack approver allowlist, audit hash chain, and EC2 filesystem hardening.
+  `make vercel-deploy` syncs the four OAuth values from root `.env`; Vercel build, redirect/login page, and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `python3 -m pytest tests/ -q` → **316 passed** (+ alarm_lambda) · `ruff` · `mypy src`(32, strict) all green.
+- 3-layer gate: `make check` → **367 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+  `cd web && npm run build` and `git diff --check` also pass for D15.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge rule→Lambda(`alarm_lambda`, detect→propose)
   →DynamoDB queue→worker(Claude)→DONE→Slack ping+done ($0.15/2.7K–6K tok). Serverless producer fires EC2-off. Then EC2 terminated → cost ≈ $0.
 - **Vercel dashboard live** on real DynamoDB (link + Team ID captured); `web/lib/ddb.ts` trims env + default region us-east-1.
+  D15 GitHub OAuth and required allowlist are now deployed to Production; unauthenticated `/` redirects to `/login`.
 - diagnose/logs **agentic AWS API MCP** (D13) e2e: local (`handle_logs`/`handle_diagnose('checkout-service')` via real claude +
   `uvx awslabs.aws-api-mcp-server@1.3.45`) AND **cloud via Slack on real EC2 using Instance Profile (zero stored keys)** — real
   CloudWatch (streams/trace-ids quoted); write op → "denied by security policy". EC2 terminated after.

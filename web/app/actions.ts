@@ -9,13 +9,15 @@ import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { revalidatePath } from "next/cache";
 import { TABLE, doc } from "../lib/ddb";
 import { dayOf, utcnowIso } from "../lib/time";
-
-const APPROVER = process.env.DASHBOARD_APPROVER ?? "web-operator";
-const REQUESTER = process.env.DASHBOARD_APPROVER ?? "web-operator";
+import { getDashboardUser } from "../lib/auth";
 
 export interface ActionResult {
   ok: boolean;
   message?: string;
+}
+
+async function authenticatedActor(): Promise<string | null> {
+  return (await getDashboardUser())?.login ?? null;
 }
 
 // 웹 producer 가 큐에 넣을 수 있는 명령 — allowlist.py:_COMMAND_TOOLS 와 동일 집합(+ping).
@@ -44,25 +46,33 @@ async function transition(
   id: string,
   newStatus: "approved" | "rejected",
 ): Promise<ActionResult> {
+  const approver = await authenticatedActor();
+  if (!approver) return { ok: false, message: "Authentication required." };
   const now = utcnowIso();
+  let approvedPlanHash: string | undefined;
   try {
-    await doc.send(
+    const updated = await doc.send(
       new UpdateCommand({
         TableName: TABLE,
         Key: { PK: `JOB#${id}`, SK: "META" },
         UpdateExpression:
-          "SET #s = :new, GSI1PK = :gpk, updated_at = :now, approved_by = :by, approved_at = :now",
-        ConditionExpression: "#s = :expected",
+          "SET #s = :new, GSI1PK = :gpk, updated_at = :now, approved_by = :by, approved_at = :now, approval_hash = execution_plan_hash",
+        ConditionExpression:
+          newStatus === "approved"
+            ? "#s = :expected AND attribute_exists(execution_plan_hash)"
+            : "#s = :expected",
         ExpressionAttributeNames: { "#s": "status" },
         ExpressionAttributeValues: {
           ":new": newStatus,
           ":gpk": `STATUS#${newStatus}`,
           ":now": now,
-          ":by": APPROVER,
+          ":by": approver,
           ":expected": "awaiting_approval",
         },
+        ReturnValues: "ALL_NEW",
       }),
     );
+    approvedPlanHash = updated.Attributes?.execution_plan_hash as string | undefined;
   } catch (e: unknown) {
     if (e instanceof Error && e.name === "ConditionalCheckFailedException") {
       return { ok: false, message: "Job already handled (not awaiting approval)." };
@@ -85,8 +95,11 @@ async function transition(
         ts,
         seq,
         action: newStatus,
-        actor: APPROVER,
-        detail: "via web dashboard",
+        actor: approver,
+        detail:
+          newStatus === "approved"
+            ? `via GitHub dashboard; approval_hash=${approvedPlanHash ?? "missing"}`
+            : "via GitHub dashboard",
       },
     }),
   );
@@ -110,6 +123,8 @@ export async function enqueueJob(
   rawCommand: string,
   rawArgs: string,
 ): Promise<ActionResult> {
+  const requester = await authenticatedActor();
+  if (!requester) return { ok: false, message: "Authentication required." };
   const command = rawCommand.trim();
   const args = rawArgs.trim();
 
@@ -141,7 +156,7 @@ export async function enqueueJob(
         args,
         source: "web",
         status: "pending",
-        requested_by: REQUESTER,
+        requested_by: requester,
         created_at: now,
         updated_at: now,
       },
@@ -161,6 +176,7 @@ export async function setDetectionEnabled(
   enabled: boolean,
   mode: "on-demand" | "scheduled" = "on-demand",
 ): Promise<ActionResult> {
+  if (!(await authenticatedActor())) return { ok: false, message: "Authentication required." };
   const now = utcnowIso();
   await doc.send(
     new PutCommand({

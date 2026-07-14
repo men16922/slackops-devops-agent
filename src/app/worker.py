@@ -19,6 +19,13 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from app.claude_runner import SubprocessRunner
+from app.execution_plan import (
+    ExecutionPlan,
+    ExecutionPlanError,
+    build_pr_plan,
+    verify_pr_workspace,
+    verify_remote_pr_diff,
+)
 from app.store import (
     AuditStore,
     Job,
@@ -39,6 +46,7 @@ AUDIT_CLAIMED = "claimed"
 AUDIT_AWAITING_APPROVAL = "awaiting_approval"
 AUDIT_DONE = "done"
 AUDIT_FAILED = "failed"
+AUDIT_POSTCONDITION_VERIFIED = "postcondition_verified"
 
 
 @dataclass
@@ -61,6 +69,43 @@ class CommandOutcome:
 
 # 명령 실행기 시그니처: (job) → CommandOutcome. 예외는 worker 가 FAILED 로 기록한다.
 CommandExecutor = Callable[[Job], CommandOutcome]
+PlanBuilder = Callable[[Job, str], ExecutionPlan]
+ExecutionVerifier = Callable[[Job], ExecutionPlan]
+PostconditionVerifier = Callable[[Job, CommandOutcome, ExecutionPlan], None]
+
+
+def _build_pr_plan(job: Job, diff: str) -> ExecutionPlan:
+    return build_pr_plan(job.args, diff, execution_tools=_pr_execution_tools())
+
+
+def _pr_execution_tools() -> tuple[str, ...]:
+    from app.allowlist import allowed_tools
+    from app.commands.pr import PR_EXECUTE_EXCLUDED_TOOLS
+
+    return tuple(tool for tool in allowed_tools("pr") if tool not in PR_EXECUTE_EXCLUDED_TOOLS)
+
+
+def _verify_approved_pr(job: Job) -> ExecutionPlan:
+    if (
+        job.diff is None
+        or job.execution_plan is None
+        or job.execution_plan_hash is None
+        or job.approval_hash != job.execution_plan_hash
+    ):
+        raise ExecutionPlanError("approved PR has no matching execution-plan hash")
+    return verify_pr_workspace(
+        job.args,
+        job.diff,
+        job.execution_plan,
+        job.execution_plan_hash,
+        expected_execution_tools=_pr_execution_tools(),
+    )
+
+
+def _verify_pr_postcondition(
+    _job: Job, outcome: CommandOutcome, plan: ExecutionPlan
+) -> None:
+    verify_remote_pr_diff(outcome.result, plan)
 
 
 def default_executors(
@@ -151,6 +196,9 @@ class Worker:
         runner: SubprocessRunner | None = None,
         monotonic: Callable[[], float] | None = None,
         tracer: Any | None = None,
+        plan_builder: PlanBuilder | None = None,
+        execution_verifier: ExecutionVerifier | None = None,
+        postcondition_verifier: PostconditionVerifier | None = None,
     ) -> None:
         """worker 구성 — 모든 협력자는 주입 가능.
 
@@ -164,6 +212,9 @@ class Worker:
             monotonic: duration_ms 계측용 단조 시계(테스트 주입점).
             tracer: telemetry.setup_telemetry 가 돌려준 OTel tracer. None 이면
                 store 기록만 하고 OTel emit 은 생략한다.
+            plan_builder: PR prepare diff 를 immutable execution plan 으로 만드는 함수.
+            execution_verifier: 승인 후 실제 workspace/diff 를 재검증하는 함수.
+            postcondition_verifier: 원격 PR 결과가 승인 plan 과 같은지 검증하는 함수.
         """
         self._jobs = job_store
         self._audit = audit_store
@@ -173,6 +224,15 @@ class Worker:
         )
         self._monotonic = monotonic if monotonic is not None else time.monotonic
         self._tracer = tracer
+        self._plan_builder = plan_builder if plan_builder is not None else _build_pr_plan
+        self._execution_verifier = (
+            execution_verifier if execution_verifier is not None else _verify_approved_pr
+        )
+        self._postcondition_verifier = (
+            postcondition_verifier
+            if postcondition_verifier is not None
+            else _verify_pr_postcondition
+        )
 
     def process_one(self) -> Job | None:
         """claim 가능한 job 1건을 소비 — 실행 → 게이트/종료 전이 + audit/metric.
@@ -188,7 +248,11 @@ class Worker:
         if job is None:
             return None
         self._audit.append(
-            job.id, AUDIT_CLAIMED, actor=WORKER_ACTOR, detail=f"command={job.command}"
+            job.id,
+            AUDIT_CLAIMED,
+            actor=WORKER_ACTOR,
+            detail=f"command={job.command}",
+            context={"command": job.command},
         )
 
         started = self._monotonic()
@@ -198,7 +262,14 @@ class Worker:
                 raise LookupError(
                     f"no executor for command (default deny): {job.command!r}"
                 )
+            plan = (
+                self._execution_verifier(job)
+                if job.command == "pr" and job.approved_by is not None
+                else None
+            )
             outcome = executor(job)
+            if plan is not None:
+                self._postcondition_verifier(job, outcome, plan)
         except Exception as exc:  # noqa: BLE001 — 실행 실패를 FAILED 로 기록(루프 생존)
             return self._fail(job, started, exc)
 
@@ -208,16 +279,46 @@ class Worker:
         # 게이트를 거치는 job(pr)은 prepare/execute 각 1회씩 metric 이 2건 기록된다 —
         # 실행(Claude 호출)이 실제로 2회이므로 의도된 동작(대시보드는 job 단위 집계).
         if outcome.diff is not None and job.approved_by is None:
-            updated = self._jobs.await_approval(job.id, outcome.diff)
+            if job.command != "pr":
+                return self._fail(
+                    job,
+                    started,
+                    ExecutionPlanError("write output gate is only defined for PR execution plans"),
+                )
+            try:
+                plan = self._plan_builder(job, outcome.diff)
+            except Exception as exc:  # noqa: BLE001 — unsafe plan must fail closed
+                return self._fail(job, started, exc)
+            updated = self._jobs.await_approval(
+                job.id,
+                outcome.diff,
+                execution_plan=plan.canonical_json(),
+                execution_plan_hash=plan.digest(),
+            )
             self._audit.append(
                 job.id,
                 AUDIT_AWAITING_APPROVAL,
                 actor=WORKER_ACTOR,
-                detail=f"diff {len(outcome.diff)} chars",
+                detail=f"diff {len(outcome.diff)} chars; plan={plan.digest()}",
+                context={
+                    "execution_plan_hash": plan.digest(),
+                    "policy_version": plan.policy_version,
+                },
             )
             self._record(job, duration_ms, outcome, success=True)
             return updated
 
+        if job.command == "pr" and job.approved_by is not None:
+            self._audit.append(
+                job.id,
+                AUDIT_POSTCONDITION_VERIFIED,
+                actor=WORKER_ACTOR,
+                detail=f"approval_hash={job.approval_hash}",
+                context={
+                    "approval_hash": job.approval_hash or "",
+                    "check": "remote_pr_diff",
+                },
+            )
         updated = self._jobs.complete(
             job.id,
             status=JobStatus.DONE,

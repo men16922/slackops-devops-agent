@@ -3,6 +3,7 @@
 
 import { NextResponse } from "next/server";
 import { getConversation, listChatMessages } from "../../../../lib/ddb";
+import { getDashboardUser } from "../../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,14 @@ export async function GET(
   _req: Request,
   { params }: { params: { conv: string } },
 ) {
-  const [conversation, messages] = await Promise.all([
-    getConversation(params.conv),
+  const user = await getDashboardUser();
+  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const conversation = await getConversation(params.conv);
+  if (!conversation || conversation.requested_by !== user.login) {
+    return NextResponse.json({ conversation: null, messages: [] }, { status: 404 });
+  }
+  const [, messages] = await Promise.all([
+    Promise.resolve(conversation),
     listChatMessages(params.conv),
   ]);
   return NextResponse.json({ conversation, messages });

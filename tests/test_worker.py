@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.commands import logs
+from app.execution_plan import ExecutionPlan
 from app.store import (
     Job,
     JobSource,
@@ -21,6 +22,7 @@ from app.worker import (
     AUDIT_CLAIMED,
     AUDIT_DONE,
     AUDIT_FAILED,
+    AUDIT_POSTCONDITION_VERIFIED,
     WORKER_ACTOR,
     CommandOutcome,
     Worker,
@@ -49,6 +51,31 @@ def make_worker(
     **kwargs: object,
 ) -> Worker:
     jobs, audit, metrics = stores
+    # Worker unit tests exercise state transitions with fake executors, not a
+    # real git worktree. Production uses the strict default validators.
+    kwargs.setdefault(
+        "plan_builder",
+        lambda job, diff: ExecutionPlan(
+            command="pr",
+            args_sha256="test-args",
+            diff_sha256="test-diff",
+            paths=("x.py",),
+            policy_version="secure-runtime-v1",
+            workspace_root="/test/workspace",
+        ),
+    )
+    kwargs.setdefault(
+        "execution_verifier",
+        lambda _job: ExecutionPlan(
+            command="pr",
+            args_sha256="test-args",
+            diff_sha256="test-diff",
+            paths=("x.py",),
+            policy_version="secure-runtime-v1",
+            workspace_root="/test/workspace",
+        ),
+    )
+    kwargs.setdefault("postcondition_verifier", lambda _job, _outcome, _plan: None)
     return Worker(jobs, audit, metrics, **kwargs)  # type: ignore[arg-type]
 
 
@@ -191,6 +218,7 @@ def test_approved_pr_job_completes_without_regating(stores) -> None:
         AUDIT_CLAIMED,
         AUDIT_AWAITING_APPROVAL,
         AUDIT_CLAIMED,
+        AUDIT_POSTCONDITION_VERIFIED,
         AUDIT_DONE,
     ]
 

@@ -97,6 +97,7 @@ IAM → Users → Create user (Console OFF, programmatic access only) → Inline
 
 ### 7-2. Vercel Project + Environment Variables
 - New Project → Link repository → **Root Directory = `web`**.
+- Create a GitHub OAuth App with callback URL `https://<Vercel domain>/api/auth/callback/github`.
 - Settings → Environment Variables:
   | Key | Value |
   | --- | --- |
@@ -104,8 +105,12 @@ IAM → Users → Create user (Console OFF, programmatic access only) → Inline
   | `AWS_REGION` | `us-east-1` (Must match the table creation region) |
   | `AWS_ACCESS_KEY_ID` | `AKIA...` |
   | `AWS_SECRET_ACCESS_KEY` | `...` |
-  | `DASHBOARD_APPROVER` | Name of the approver to display |
+  | `AUTH_GITHUB_ID` | GitHub OAuth Client ID |
+  | `AUTH_GITHUB_SECRET` | GitHub OAuth Client secret |
+  | `AUTH_SECRET` | Output of `openssl rand -base64 32` |
+  | `GITHUB_ALLOWED_USERS` | Comma-separated GitHub login allowlist (empty denies all) |
 - ⚠️ **Do NOT set `DDB_ENDPOINT`** — if left unset, it connects to the real DynamoDB (setting it targets local mode).
+- Do not set `AUTH_BYPASS_FOR_LOCAL_DEVELOPMENT` in Vercel.
 - Deploy → **Record deployment URL + Team ID** (submission details).
 
 > **Verifying real DynamoDB locally:** Copy `web/.env.local.example` → `web/.env.local` and fill in Mode B blocks (remove/comment out `DDB_ENDPOINT`). `.env.local` is never committed.
