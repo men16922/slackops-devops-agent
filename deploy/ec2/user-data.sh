@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # --- 기본 도구 ---
-dnf install -y git jq python3.11 python3.11-pip
+dnf install -y git jq python3.11 python3.11-pip squid
 
 # --- kubectl ---
 curl -fsSLo /usr/local/bin/kubectl \
@@ -40,6 +40,13 @@ python3.11 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR"
 chown -R devopsagent:devopsagent "$APP_DIR"
 
+# --- allowlist egress proxy ---
+# Agent systemd units deny every non-loopback IP. Squid alone may leave the host and
+# accepts only localhost callers whose CONNECT host matches this reviewed list.
+install -o root -g squid -m 640 "$APP_DIR/deploy/ec2/egress-proxy.conf" /etc/squid/squid.conf
+/usr/sbin/squid -k parse
+systemctl enable --now squid
+
 # --- Slack 토큰: SSM SecureString → 환경 파일 (디스크 평문 최소화, root 600) ---
 IMDS_TOKEN="$(curl -fsSL -X PUT http://169.254.169.254/latest/api/token \
   -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')"
@@ -54,6 +61,16 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   # botocore 는 region 을 AWS_DEFAULT_REGION 에서 읽는다(AWS_REGION 만으로는 NoRegionError) — boto3 fallback + MCP 서버용.
   echo "AWS_DEFAULT_REGION=$REGION"
   echo "PATH=/usr/local/bin:/usr/bin:/bin"
+  # Agent service egress is forced through the localhost Squid allowlist. Keep IMDS
+  # outside NO_PROXY; systemd also blocks service access to it at IP level.
+  echo "HTTP_PROXY=http://127.0.0.1:3128"
+  echo "HTTPS_PROXY=http://127.0.0.1:3128"
+  echo "ALL_PROXY=http://127.0.0.1:3128"
+  echo "NO_PROXY=127.0.0.1,localhost,::1,169.254.169.254"
+  echo "http_proxy=http://127.0.0.1:3128"
+  echo "https_proxy=http://127.0.0.1:3128"
+  echo "all_proxy=http://127.0.0.1:3128"
+  echo "no_proxy=127.0.0.1,localhost,::1,169.254.169.254"
   # PR execution is confined to this canonical repository root. The worker
   # refuses an approved change if the root/diff/path checks no longer match.
   echo "SLACKOPS_WORKSPACE_ROOT=/opt/slackops-devops-agent"
@@ -110,6 +127,9 @@ LockPersonality=true
 ProtectProc=invisible
 ProcSubset=pid
 IPAddressDeny=169.254.169.254/32
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1
+IPAddressAllow=::1
 
 [Install]
 WantedBy=multi-user.target
@@ -153,6 +173,9 @@ LockPersonality=true
 ProtectProc=invisible
 ProcSubset=pid
 IPAddressDeny=169.254.169.254/32
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1
+IPAddressAllow=::1
 
 [Install]
 WantedBy=multi-user.target
@@ -191,6 +214,9 @@ LockPersonality=true
 ProtectProc=invisible
 ProcSubset=pid
 IPAddressDeny=169.254.169.254/32
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1
+IPAddressAllow=::1
 
 [Install]
 WantedBy=multi-user.target
@@ -230,6 +256,9 @@ LockPersonality=true
 ProtectProc=invisible
 ProcSubset=pid
 IPAddressDeny=169.254.169.254/32
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1
+IPAddressAllow=::1
 
 [Install]
 WantedBy=multi-user.target

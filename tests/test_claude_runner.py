@@ -87,6 +87,7 @@ def test_agent_subprocess_env_excludes_control_plane_and_aws_credentials() -> No
         {
             "PATH": "/usr/bin",
             "CLAUDE_CODE_OAUTH_TOKEN": "claude-token",
+            "HTTPS_PROXY": "http://127.0.0.1:3128",
             "AWS_REGION": "us-east-1",
             "AWS_ACCESS_KEY_ID": "instance-or-local-key",
             "AWS_SECRET_ACCESS_KEY": "instance-or-local-secret",
@@ -102,6 +103,7 @@ def test_agent_subprocess_env_excludes_control_plane_and_aws_credentials() -> No
     assert env == {
         "PATH": "/usr/bin",
         "CLAUDE_CODE_OAUTH_TOKEN": "claude-token",
+        "HTTPS_PROXY": "http://127.0.0.1:3128",
         "AWS_EC2_METADATA_DISABLED": "true",
     }
 

@@ -45,6 +45,16 @@ _AGENT_ENV_NAMES: frozenset[str] = frozenset(
         "XDG_CONFIG_HOME",
         "UV_CACHE_DIR",
         "CLAUDE_CODE_OAUTH_TOKEN",
+        # systemd service egress is localhost-only; Claude and its internal MCP
+        # process must therefore inherit the reviewed localhost proxy route.
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
     }
 )
 

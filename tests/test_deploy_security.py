@@ -9,6 +9,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 _USER_DATA = (_ROOT / "deploy/ec2/user-data.sh").read_text()
 _REFRESH_SCRIPT = (_ROOT / "deploy/ec2/refresh-runtime-credentials.sh").read_text()
+_EGRESS_PROXY = (_ROOT / "deploy/ec2/egress-proxy.conf").read_text()
 
 
 def _unit_body(unit_name: str) -> str:
@@ -47,6 +48,9 @@ def test_every_agent_service_has_the_host_runtime_boundary() -> None:
         "ProtectProc=invisible",
         "ProcSubset=pid",
         "IPAddressDeny=169.254.169.254/32",
+        "IPAddressDeny=any",
+        "IPAddressAllow=127.0.0.1",
+        "IPAddressAllow=::1",
         "EnvironmentFile=/etc/slackops-devops-agent.runtime.env",
         "ExecStartPre=+/usr/local/sbin/slackops-refresh-runtime-credentials",
     }
@@ -112,3 +116,17 @@ def test_credential_refresh_timer_restarts_services_before_expiry() -> None:
     assert "OnUnitActiveSec=45min" in _USER_DATA
     assert "slackops-runtime-credentials-refresh.timer" in _USER_DATA
     assert "try-restart slackops-devops-agent.service" in _USER_DATA
+
+
+def test_agent_egress_is_forced_through_localhost_allowlist_proxy() -> None:
+    assert "dnf install -y git jq python3.11 python3.11-pip squid" in _USER_DATA
+    assert "HTTP_PROXY=http://127.0.0.1:3128" in _USER_DATA
+    assert "HTTPS_PROXY=http://127.0.0.1:3128" in _USER_DATA
+    assert "systemctl enable --now squid" in _USER_DATA
+    assert "http_port 127.0.0.1:3128" in _EGRESS_PROXY
+    assert "http_access deny to_localhost" in _EGRESS_PROXY
+    assert "http_access deny to_linklocal" in _EGRESS_PROXY
+    assert "http_access allow localhost slackops_allowed" in _EGRESS_PROXY
+    assert "http_access deny all" in _EGRESS_PROXY
+    for domain in (".slack.com", ".anthropic.com", ".github.com", ".amazonaws.com"):
+        assert domain in _EGRESS_PROXY

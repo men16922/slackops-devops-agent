@@ -40,6 +40,8 @@
      폴링만 한다(인바운드 0 유지). **이들이 없으면 웹 승인 실행·채팅 응답·자동 제안이 멈춘다.**
    - 4개 서비스는 IMDS metadata endpoint를 차단한다. root-only credential refresher timer가
      45분마다 단기 runtime/MCP credential을 회전하고 서비스를 재시작한다.
+   - 4개 서비스의 direct IP egress는 차단된다. localhost Squid가 Slack·Claude·GitHub·AWS·Terraform
+     도메인만 proxy하며, proxy 자신도 localhost/link-local 목적지를 거부한다.
    - `REPO_URL` 의 `CHANGE_ME` 를 실제 GitHub repo 로 교체 필요.
 5. **EventBridge 스케줄**: `eventbridge/create-schedules.sh <instance-id>`
    - 기본 평일 09:00 start / 19:00 stop (Asia/Seoul). 상시 가동 금지 불변.
@@ -48,6 +50,8 @@
 ## 검증
 - EC2 부팅 후 서비스 4개와 credential timer가 active인지 확인:
   `systemctl status slackops-devops-agent slackops-devops-agent-worker slackops-devops-agent-chat-agent slackops-devops-agent-monitor slackops-runtime-credentials-refresh.timer`.
+- `systemctl status squid`가 active인지 확인하고, D17 리허설에서는 systemd sandbox에서 allowlisted
+  `https://api.github.com`은 성공하고 unlisted HTTPS domain은 proxy가 거부하는지 확인한다.
 - Slack 채널에서 `/devops ping` → `:white_check_mark: pong ...` 응답.
 - `curl 127.0.0.1:8080/health` (EC2 내부) → `{"status":"ok"}`.
 - 웹 대시보드/채팅 데모 직전: EventBridge stop 스케줄로 인스턴스가 꺼져 있으면 승인 실행·채팅 응답이 멈추므로

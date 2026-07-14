@@ -32,7 +32,8 @@ Last updated: 2026-07-15
 - [ ] `[manual]` On redeploy: confirm 4 `systemctl status` active (slack/worker/chat-agent/monitor) + web chat responds.
 - [ ] `[manual]` D17 split-role deployment: run `deploy/iam/create-role.sh`, launch a **new** EC2 (new user-data required),
       then verify 4 services + `slackops-runtime-credentials-refresh.timer`, runtime-role AWS read success, MCP proposal-queue
-      write, and absence of direct service IMDS access. Stop the instance after evidence capture.
+      write, service IMDS denial, and egress proxy behavior (allow `api.github.com`, deny an unlisted HTTPS domain). Stop the
+      instance after evidence capture.
 
 ## Day 6–7 — tf-review + pr remaining
 - [ ] `[manual]` GitHub App minimal scope + branch protection (block auto-merge) setup.
