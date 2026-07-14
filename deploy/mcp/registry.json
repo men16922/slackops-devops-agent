@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "name": "slackops",
+      "transport": "stdio",
+      "command": ["python", "-m", "app.mcp_server"],
+      "tools": ["propose_job", "list_pending"],
+      "source": "src/app/mcp_server.py",
+      "sha256": "009ff1a25922335a48e9cbb272a1e2cace822d783f64b291e159da8283072e1c",
+      "credential_scope": "DynamoDB slackops-agent proposal queue only",
+      "owner": "SlackOps platform",
+      "reviewed_at": "2026-07-15"
+    }
+  ]
+}

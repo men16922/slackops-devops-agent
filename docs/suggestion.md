@@ -246,6 +246,8 @@ AWS의 agent 보안 원칙도 모델 밖에서 최소 권한 인가와 high-cons
   환경 파일로 45분마다 회전하며, 4개 서비스는 IMDS에 연결할 수 없다.
 - 4개 서비스는 non-loopback IP egress를 거부하고, localhost Squid의 Slack·Claude·GitHub·AWS·Terraform
   도메인 allowlist를 통해서만 외부 통신한다. proxy도 localhost/link-local 목적지를 거부한다.
+- 내부 SlackOps MCP는 source hash·stdio command·허용 도구·credential scope·owner·검토일을 registry로
+  잠그고, 코드나 tool inventory 드리프트를 CI에서 거부한다.
 - instance profile의 불필요한 S3 read를 제거하고 SSM 읽기를 여섯 parameter로 좁혔다.
 - Slack main/worker/chat agent/monitor에 동일한 systemd privilege·filesystem·device·kernel
   hardening을 적용했다.
@@ -256,7 +258,6 @@ AWS의 agent 보안 원칙도 모델 밖에서 최소 권한 인가와 high-cons
 | 우선 | 작업 | 완료 기준 |
 | --- | --- | --- |
 | P0 | 실제 EC2에서 고정형 CloudWatch 어댑터 e2e 검증 | 읽기 성공과 4개 서비스 active 증거를 남긴다. |
-| P1 | MCP 공급망 registry | MCP package/image digest, schema, owner, review date 변경을 CI가 검증한다. |
 | P2 | 정책-as-code interceptor와 보안 telemetry | tool/리소스/계정별 deny와 원인을 audit event로 남긴다. |
 | P2 | injection·TOCTOU 회귀 평가 | 공격 corpus가 CI에서 fail-closed를 검증한다. |
 
