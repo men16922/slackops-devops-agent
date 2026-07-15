@@ -13,7 +13,11 @@
         "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/CLAUDE_CODE_OAUTH_TOKEN",
         "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/SLACK_NOTIFY_CHANNEL",
         "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/SLACK_APPROVER_IDS",
-        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/DASHBOARD_URL"
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/DASHBOARD_URL",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/PR_REPOSITORY",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/GITHUB_APP_ID",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/GITHUB_INSTALLATION_ID",
+        "arn:aws:ssm::__ACCOUNT_ID__:parameter/slackops/GITHUB_APP_PRIVATE_KEY_B64"
       ]
     },
     {

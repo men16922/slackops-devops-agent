@@ -18,6 +18,7 @@ from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
 from app.telemetry import RunMetricsHook
 from app.commands._replies import exec_failed_reply, no_data_reply
 from app.sanitizer import build_prompt
+from app.policy_boundary import PolicyDenied, authorize_command
 
 # plan fetcher 시그니처: () → terraform plan raw 출력. 비어 있으면 "" 반환.
 PlanFetcher = Callable[[], str]
@@ -108,6 +109,10 @@ def handle_tf_review(
     Returns:
         Slack 에 게시할 리뷰 요약(또는 수집/실행 오류 안내).
     """
+    try:
+        scope = authorize_command("tf-review")
+    except PolicyDenied:
+        return ":no_entry: Request is outside the configured security scope."
     active_fetcher: PlanFetcher = (
         fetcher if fetcher is not None else fetch_terraform_plan
     )
@@ -116,7 +121,8 @@ def handle_tf_review(
         return no_data_reply(_TARGET_LABEL, "plan output")
     prompt = build_tf_review_prompt(raw_plan)
     result = run_for_command(
-        "tf-review", prompt, timeout_s=timeout_s, runner=runner, on_metrics=on_metrics
+        "tf-review", prompt, timeout_s=timeout_s, runner=runner, on_metrics=on_metrics,
+        policy_scope=scope,
     )
     if result.exit_code != 0:
         return exec_failed_reply(

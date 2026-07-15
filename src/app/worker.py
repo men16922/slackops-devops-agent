@@ -13,8 +13,12 @@ SqliteJobStore + mock 으로 실 AWS/Claude 호출 없이 e2e 를 검증한다.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import os
 import time
+from collections.abc import Generator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -26,14 +30,22 @@ from app.execution_plan import (
     verify_pr_workspace,
     verify_remote_pr_diff,
 )
+from app.policy_boundary import CommandScope, PolicyDenied, authorize_command
 from app.store import (
     AuditStore,
     Job,
     JobStatus,
     JobStore,
     TelemetryStore,
+    result_digest,
 )
 from app.telemetry import RunMetrics, record_run_metrics
+from app.write_credentials import (
+    GitHubAppGrantIssuer,
+    GrantIssuer,
+    WriteGrant,
+    pr_write_grant,
+)
 
 # 폴링 간격 기본값(초) — 큐가 비었을 때만 대기한다.
 POLL_INTERVAL_S = 2.0
@@ -49,6 +61,15 @@ AUDIT_FAILED = "failed"
 AUDIT_POSTCONDITION_VERIFIED = "postcondition_verified"
 AUDIT_PLAN_BINDING_REJECTED = "plan_binding_rejected"
 AUDIT_POLICY_DENIED = "policy_denied"
+AUDIT_WRITE_CREDENTIALS_ISSUED = "write_credentials_issued"
+
+# 승인된 PR execute 단계가 push 할 저장소(owner/name). 미설정이면 write credential 을
+# 발급하지 않는다 — 자격 없이 실행되어 push 가 실패한다(fail closed, 로컬/데모 기본값).
+PR_REPOSITORY_ENV = "SLACKOPS_PR_REPOSITORY"
+_GITHUB_APP_ID_ENV = "SLACKOPS_GITHUB_APP_ID"
+_GITHUB_INSTALLATION_ID_ENV = "SLACKOPS_GITHUB_INSTALLATION_ID"
+# PEM 은 여러 줄이라 systemd EnvironmentFile 로 그대로 전달할 수 없다 — base64 로 받는다.
+_GITHUB_PRIVATE_KEY_ENV = "SLACKOPS_GITHUB_APP_PRIVATE_KEY_B64"
 
 
 @dataclass
@@ -74,10 +95,57 @@ CommandExecutor = Callable[[Job], CommandOutcome]
 PlanBuilder = Callable[[Job, str], ExecutionPlan]
 ExecutionVerifier = Callable[[Job], ExecutionPlan]
 PostconditionVerifier = Callable[[Job, CommandOutcome, ExecutionPlan], None]
+ScopeAuthorizer = Callable[[str, str], CommandScope]
+# (job, 재검증된 plan) → write credential 을 그 단계 동안만 여는 컨텍스트.
+# 컨텍스트를 벗어나면 자격은 회수된다. 미구성 환경은 None 을 내보낸다(fail closed).
+GrantProvider = Callable[[Job, ExecutionPlan], AbstractContextManager[WriteGrant | None]]
+
+
+def grant_issuer_from_env() -> tuple[str, GrantIssuer] | None:
+    """환경이 완전히 구성된 경우에만 (repository, issuer) 를 반환한다.
+
+    부분 구성은 조용히 비활성화하지 않고 실패시킨다 — "설정한 줄 알았는데 자격이 없어
+    push 가 실패" 하는 상태와 "의도적으로 미구성" 을 구분한다.
+    """
+    repository = os.environ.get(PR_REPOSITORY_ENV, "").strip()
+    app_id = os.environ.get(_GITHUB_APP_ID_ENV, "").strip()
+    installation_id = os.environ.get(_GITHUB_INSTALLATION_ID_ENV, "").strip()
+    private_key_b64 = os.environ.get(_GITHUB_PRIVATE_KEY_ENV, "").strip()
+    configured = [repository, app_id, installation_id, private_key_b64]
+    if not any(configured):
+        return None
+    if not all(configured):
+        raise ValueError(
+            "write credential configuration is incomplete: "
+            f"{PR_REPOSITORY_ENV}/{_GITHUB_APP_ID_ENV}/{_GITHUB_INSTALLATION_ID_ENV}/"
+            f"{_GITHUB_PRIVATE_KEY_ENV} must all be set together"
+        )
+    try:
+        private_key = base64.b64decode(private_key_b64, validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError) as exc:
+        raise ValueError(f"{_GITHUB_PRIVATE_KEY_ENV} is not valid base64 PEM: {exc}") from None
+    return repository, GitHubAppGrantIssuer(app_id, installation_id, private_key)
+
+
+def _env_grant_provider(
+    job: Job, plan: ExecutionPlan
+) -> AbstractContextManager[WriteGrant | None]:
+    configured = grant_issuer_from_env()
+    if configured is None:
+        return nullcontext(None)
+    repository, issuer = configured
+    return pr_write_grant(job, plan, repository=repository, issuer=issuer)
 
 
 def _build_pr_plan(job: Job, diff: str) -> ExecutionPlan:
-    return build_pr_plan(job.args, diff, execution_tools=_pr_execution_tools())
+    scope = authorize_command("pr")
+    return build_pr_plan(
+        job.args,
+        diff,
+        execution_tools=_pr_execution_tools(),
+        account_id=scope.account_id,
+        region=scope.region,
+    )
 
 
 def _pr_execution_tools() -> tuple[str, ...]:
@@ -95,12 +163,15 @@ def _verify_approved_pr(job: Job) -> ExecutionPlan:
         or job.approval_hash != job.execution_plan_hash
     ):
         raise ExecutionPlanError("approved PR has no matching execution-plan hash")
+    scope = authorize_command("pr")
     return verify_pr_workspace(
         job.args,
         job.diff,
         job.execution_plan,
         job.execution_plan_hash,
         expected_execution_tools=_pr_execution_tools(),
+        account_id=scope.account_id,
+        region=scope.region,
     )
 
 
@@ -112,6 +183,8 @@ def _verify_pr_postcondition(
 
 def default_executors(
     runner: SubprocessRunner | None = None,
+    *,
+    grant_provider: GrantProvider | None = None,
 ) -> dict[str, CommandExecutor]:
     """permissions 레지스트리의 MVP 명령에 대한 기본 실행기 매핑 생성.
 
@@ -121,6 +194,8 @@ def default_executors(
 
     Args:
         runner: claude-backed 핸들러에 전달할 subprocess 실행기(테스트 주입점).
+        grant_provider: 승인된 pr execute 단계에만 단기 write credential 을 여는 컨텍스트
+            제공자. None 이면 자격 없이 실행된다(로컬/데모 — push 는 실패).
     """
     from app.commands import detect, diagnose, logs, ping, pr, tf_review
 
@@ -161,12 +236,28 @@ def default_executors(
         # 승인된 job(approved_by 기록)만 execute 단계 — job.diff 가 승인된 diff 다.
         approved_diff = job.diff if job.approved_by is not None else None
         captured: list[RunMetrics] = []
-        pr_result = pr.handle_pr(
-            job.args,
-            approved_diff=approved_diff,
-            runner=runner,
-            on_metrics=captured.append,
-        )
+        # prepare 단계에는 grant 컨텍스트 자체가 열리지 않는다 — 자격이 없으니 push 도 없다.
+        if approved_diff is None or grant_provider is None:
+            pr_result = pr.handle_pr(
+                job.args,
+                approved_diff=approved_diff,
+                runner=runner,
+                on_metrics=captured.append,
+            )
+            return _merge_metrics(
+                CommandOutcome(result=pr_result.summary, diff=pr_result.diff), captured
+            )
+        # 승인 plan 을 실 workspace 에 대해 다시 검증한 **직후**에 자격을 발급한다.
+        # 검증과 발급 사이에 창이 없어야 승인된 것과 실행되는 것이 갈라지지 않는다.
+        plan = _verify_approved_pr(job)
+        with grant_provider(job, plan) as grant:
+            pr_result = pr.handle_pr(
+                job.args,
+                approved_diff=approved_diff,
+                runner=runner,
+                on_metrics=captured.append,
+                write_grant=grant,
+            )
         return _merge_metrics(
             CommandOutcome(result=pr_result.summary, diff=pr_result.diff), captured
         )
@@ -201,6 +292,8 @@ class Worker:
         plan_builder: PlanBuilder | None = None,
         execution_verifier: ExecutionVerifier | None = None,
         postcondition_verifier: PostconditionVerifier | None = None,
+        scope_authorizer: ScopeAuthorizer | None = None,
+        grant_provider: GrantProvider | None = None,
     ) -> None:
         """worker 구성 — 모든 협력자는 주입 가능.
 
@@ -217,12 +310,21 @@ class Worker:
             plan_builder: PR prepare diff 를 immutable execution plan 으로 만드는 함수.
             execution_verifier: 승인 후 실제 workspace/diff 를 재검증하는 함수.
             postcondition_verifier: 원격 PR 결과가 승인 plan 과 같은지 검증하는 함수.
+            scope_authorizer: executor 전에 account/region/resource/time-window scope를
+                결정적으로 검증하는 함수. None 이면 production environment policy 사용.
+            grant_provider: 승인된 pr execute 단계의 단기 write credential 제공자.
+                None 이면 환경 구성(SLACKOPS_PR_REPOSITORY + GitHub App)에서 유도한다.
         """
         self._jobs = job_store
         self._audit = audit_store
         self._metrics = telemetry_store
+        self._grant_provider = (
+            grant_provider if grant_provider is not None else _env_grant_provider
+        )
         self._executors = (
-            executors if executors is not None else default_executors(runner)
+            executors
+            if executors is not None
+            else default_executors(runner, grant_provider=self._audited_grant)
         )
         self._monotonic = monotonic if monotonic is not None else time.monotonic
         self._tracer = tracer
@@ -234,6 +336,9 @@ class Worker:
             postcondition_verifier
             if postcondition_verifier is not None
             else _verify_pr_postcondition
+        )
+        self._scope_authorizer = (
+            scope_authorizer if scope_authorizer is not None else authorize_command
         )
 
     def process_one(self) -> Job | None:
@@ -249,13 +354,18 @@ class Worker:
         job = self._jobs.claim()
         if job is None:
             return None
-        self._audit.append(
+        # The claim is this job's root step; every later step descends from it, so the
+        # trail reads as one trajectory rather than a flat list of transitions.
+        claimed = self._audit.append(
             job.id,
             AUDIT_CLAIMED,
             actor=WORKER_ACTOR,
             detail=f"command={job.command}",
             context={"command": job.command},
+            tool_name=job.command,
         )
+        root_step = claimed.step_id
+        target_resource = ""
 
         started = self._monotonic()
         executor = self._executors.get(job.command)
@@ -264,6 +374,9 @@ class Worker:
                 raise LookupError(
                     f"no executor for command (default deny): {job.command!r}"
                 )
+            # Custom executors are also behind this gate, so a future handler
+            # cannot bypass the adapter-level scope check by worker wiring.
+            target_resource = self._scope_authorizer(job.command, job.args).resource
             plan = (
                 self._execution_verifier(job)
                 if job.command == "pr" and job.approved_by is not None
@@ -273,7 +386,7 @@ class Worker:
             if plan is not None:
                 self._postcondition_verifier(job, outcome, plan)
         except Exception as exc:  # noqa: BLE001 — 실행 실패를 FAILED 로 기록(루프 생존)
-            return self._fail(job, started, exc)
+            return self._fail(job, started, exc, root_step, target_resource)
 
         duration_ms = self._duration_ms(started)
         # 출력 게이트(주입 방어 3계층): diff 가 있는 L1 쓰기는 사람 승인 전에
@@ -286,11 +399,13 @@ class Worker:
                     job,
                     started,
                     ExecutionPlanError("write output gate is only defined for PR execution plans"),
+                    root_step,
+                    target_resource,
                 )
             try:
                 plan = self._plan_builder(job, outcome.diff)
             except Exception as exc:  # noqa: BLE001 — unsafe plan must fail closed
-                return self._fail(job, started, exc)
+                return self._fail(job, started, exc, root_step, target_resource)
             updated = self._jobs.await_approval(
                 job.id,
                 outcome.diff,
@@ -305,7 +420,16 @@ class Worker:
                 context={
                     "execution_plan_hash": plan.digest(),
                     "policy_version": plan.policy_version,
+                    "risk_score": str(plan.risk_score),
+                    "risk_ceiling": str(plan.risk_ceiling),
                 },
+                parent_step_id=root_step,
+                tool_name=job.command,
+                capabilities=plan.capabilities,
+                target_resource=target_resource,
+                # The gate holds the diff, so hash it here: an approver's decision and
+                # the artifact they saw stay linked even if the body is later trimmed.
+                result_hash=result_digest(outcome.diff),
             )
             self._record(job, duration_ms, outcome, success=True)
             return updated
@@ -320,6 +444,9 @@ class Worker:
                     "approval_hash": job.approval_hash or "",
                     "check": "remote_pr_diff",
                 },
+                parent_step_id=root_step,
+                tool_name="gh pr diff",
+                target_resource=target_resource,
             )
         updated = self._jobs.complete(
             job.id,
@@ -328,7 +455,15 @@ class Worker:
             cost_usd=outcome.cost_usd,
             tokens=outcome.tokens,
         )
-        self._audit.append(job.id, AUDIT_DONE, actor=WORKER_ACTOR)
+        self._audit.append(
+            job.id,
+            AUDIT_DONE,
+            actor=WORKER_ACTOR,
+            parent_step_id=root_step,
+            tool_name=job.command,
+            target_resource=target_resource,
+            result_hash=result_digest(outcome.result),
+        )
         self._record(job, duration_ms, outcome, success=True)
         return updated
 
@@ -361,10 +496,53 @@ class Worker:
         return processed
 
     # ── 내부 ──────────────────────────────────────────────────
+    @contextmanager
+    def _audited_grant(
+        self, job: Job, plan: ExecutionPlan
+    ) -> Generator[WriteGrant | None]:
+        """write credential 발급을 감사에 남긴다 — 토큰 자체는 절대 기록하지 않는다.
+
+        실 push 를 그것을 허가한 승인(jobId/approvalHash/policyVersion)으로 되짚을 수
+        있게 하는 연결고리다.
+        """
+        with self._grant_provider(job, plan) as grant:
+            if grant is not None:
+                # Parent = the approval step this credential answers to, so a real push
+                # can be walked back to the decision that authorized it.
+                approval_step = self._approval_step_id(job.id)
+                self._audit.append(
+                    job.id,
+                    AUDIT_WRITE_CREDENTIALS_ISSUED,
+                    actor=WORKER_ACTOR,
+                    detail=f"scoped write credential for {grant.repository}",
+                    context=grant.audit_context(),
+                    parent_step_id=approval_step,
+                    tool_name="sts:github-app-installation-token",
+                    capabilities=plan.capabilities,
+                    target_resource=f"repo:{grant.repository}",
+                )
+            yield grant
+
+    def _approval_step_id(self, job_id: str) -> str:
+        """The step where a human approved this job, if the trail records one."""
+        from app.approval_actions import AUDIT_APPROVED  # lazy: avoids an import cycle
+
+        for event in reversed(self._audit.list_for_job(job_id)):
+            if event.action in (AUDIT_APPROVED, AUDIT_AWAITING_APPROVAL) and event.step_id:
+                return event.step_id
+        return ""
+
     def _duration_ms(self, started: float) -> float:
         return (self._monotonic() - started) * 1000.0
 
-    def _fail(self, job: Job, started: float, exc: Exception) -> Job | None:
+    def _fail(
+        self,
+        job: Job,
+        started: float,
+        exc: Exception,
+        root_step: str = "",
+        target_resource: str = "",
+    ) -> Job | None:
         error = f"{type(exc).__name__}: {exc}"
         updated = self._jobs.complete(job.id, status=JobStatus.FAILED, error=error)
         if isinstance(exc, ExecutionPlanError):
@@ -373,7 +551,10 @@ class Worker:
                 AUDIT_PLAN_BINDING_REJECTED,
                 actor=WORKER_ACTOR,
                 detail="execution plan verification failed",
-                context={"error_type": type(exc).__name__},
+                context={"error_type": type(exc).__name__, "reason": str(exc)},
+                parent_step_id=root_step,
+                tool_name=job.command,
+                target_resource=target_resource,
             )
         elif isinstance(exc, LookupError):
             self._audit.append(
@@ -382,8 +563,31 @@ class Worker:
                 actor=WORKER_ACTOR,
                 detail="command rejected by default-deny executor gate",
                 context={"command": job.command, "reason": "default_deny"},
+                parent_step_id=root_step,
+                tool_name=job.command,
             )
-        self._audit.append(job.id, AUDIT_FAILED, actor=WORKER_ACTOR, detail=error)
+        elif isinstance(exc, PolicyDenied):
+            context = exc.scope.audit_context()
+            context["reason"] = exc.reason
+            self._audit.append(
+                job.id,
+                AUDIT_POLICY_DENIED,
+                actor=WORKER_ACTOR,
+                detail="command rejected by deterministic scope boundary",
+                context=context,
+                parent_step_id=root_step,
+                tool_name=job.command,
+                target_resource=exc.scope.resource,
+            )
+        self._audit.append(
+            job.id,
+            AUDIT_FAILED,
+            actor=WORKER_ACTOR,
+            detail=error,
+            parent_step_id=root_step,
+            tool_name=job.command,
+            target_resource=target_resource,
+        )
         record_run_metrics(
             self._metrics,
             job.id,

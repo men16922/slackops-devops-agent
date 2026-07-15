@@ -168,6 +168,8 @@ class _FakeApp:
     def __init__(self) -> None:
         self.handlers: dict[str, Any] = {}
         self.event_handlers: dict[str, Any] = {}
+        self.shortcut_handlers: dict[str, Any] = {}
+        self.view_handlers: dict[str, Any] = {}
 
     def action(self, action_id: str) -> Any:
         def _register(fn: Any) -> Any:
@@ -179,6 +181,20 @@ class _FakeApp:
     def event(self, event_type: str) -> Any:
         def _register(fn: Any) -> Any:
             self.event_handlers[event_type] = fn
+            return fn
+
+        return _register
+
+    def shortcut(self, callback_id: str) -> Any:
+        def _register(fn: Any) -> Any:
+            self.shortcut_handlers[callback_id] = fn
+            return fn
+
+        return _register
+
+    def view(self, callback_id: str) -> Any:
+        def _register(fn: Any) -> Any:
+            self.view_handlers[callback_id] = fn
             return fn
 
         return _register

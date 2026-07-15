@@ -12,6 +12,8 @@ dependencies = [
     "opentelemetry-sdk>=1.24",
     "opentelemetry-exporter-otlp>=1.24",
     "mcp>=1.0",  # propose_job MCP 서버(에이전트 control plane) — app.mcp_server 가 lazy import
+    # 승인 후 발급하는 GitHub App installation token 서명(RS256) — write_credentials 가 lazy import.
+    "pyjwt[crypto]>=2.8",
 ]
 
 [project.optional-dependencies]
@@ -50,7 +52,7 @@ mypy_path = "src"
 
 # 미설치(lazy import) / stub 부재 모듈 한정 완화 — overnight 게이트(mypy src) green 전제.
 [[tool.mypy.overrides]]
-module = ["boto3.*", "botocore.*", "slack_bolt.*", "fastapi.*", "opentelemetry.exporter.*", "mcp.*"]
+module = ["boto3.*", "botocore.*", "slack_bolt.*", "fastapi.*", "opentelemetry.exporter.*", "mcp.*", "jwt.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

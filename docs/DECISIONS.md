@@ -176,7 +176,7 @@ Last updated: 2026-07-15
 - Impact: EC2 user-data no longer installs/pre-warms `uvx`; unused S3 access is removed; SSM bootstrap access cannot bulk
   enumerate and is limited to named `/slackops/` parameters. New cloud proof is required because old D13/D4 MCP evidence is historical.
 
-## D17/P1 — enforce the agent boundary with split STS roles and a deployment-owned audit sink
+## D17/P1/P2 — enforce the agent boundary with split roles, a deployment-owned audit sink, and fixed scopes
 - Decision: the EC2 instance profile is bootstrap-only; agent services receive separate short-lived runtime and MCP credentials,
   while a root-only audit role can only inspect/create streams and append to the deployment-provisioned
   `/slackops/security-boundary-audit` CloudWatch group. The runtime role has an explicit deny for that sink; its 30-day retention
@@ -185,4 +185,70 @@ Last updated: 2026-07-15
   fabricating boundary evidence. IAM and systemd must enforce different identities and writable paths at runtime.
 - Impact: root refreshes credentials every 45 minutes; agent services cannot use IMDS or read the audit environment file.
   The exporter records only credential-refresh metadata and Squid denial status (never requested URLs). Fresh-EC2 rehearsal is
-  the deployment proof; remote-main production rollout remains separate until local commits are pushed.
+  the deployment proof; remote-main production rollout remains separate until local commits are pushed. Root-owned environment
+  fixes allowed account/region/log-prefix/workspace; adapters/executors/Claude recheck the same scope and Worker audits denial.
+
+## D18/P3 — managed AWS MCP is a separate-account, evidence-first pilot
+- Decision: do not add a managed AWS MCP endpoint or generic AWS API surface to the SlackOps EC2 runtime. A future managed MCP
+  use case starts with `deploy/mcp/managed-aws-pilot/`: a separate account, a pilot-only role, a three-action CloudWatch Logs
+  read policy conditioned on `aws:ViaAWSMCPService=true` and `aws:CalledViaAWSMCP=aws-mcp.amazonaws.com`, and a CloudTrail
+  violation query. VPC endpoint use is conditional on verified support for the selected server and Region.
+- Reason: the AWS MCP Server can reach a broad AWS API surface. IAM context keys and CloudTrail make it governable, but they
+  are not a reason to weaken the fixed-adapter default. A separate identity/account prevents a generic MCP experiment from
+  inheriting the SlackOps runtime, internal-MCP, or audit identities.
+- Impact: P3 scaffold is code-reviewed and CI-locked only; no AWS identity, endpoint, role trust, or managed MCP session exists.
+  The manual pilot cannot pass until the distinct-account boundary and an empty CloudTrail `AwsMcpEvent` violation query are retained.
+
+## D19 — the execution boundary is a self-parsed argv schema, and write credentials are minted per approval
+- Decision: every Bash call the model makes is normalized and matched against a per-command argument schema by
+  `app.command_guard`, installed as a `--settings` PreToolUse hook; `--allowedTools` is retained as narrowing, not as the
+  boundary. Separately, the PR execute step holds no standing write credential: a repository- and permission-scoped GitHub App
+  installation token is minted only after the approved plan hash is re-verified, injected into that one child environment,
+  revoked on every exit path, and audited with jobId/approvalHash/policyVersion (never the token).
+- Reason: measured, not assumed. On Claude Code 2.1.210 a real headless run with `--allowedTools 'Bash(echo:*)'` executed
+  `echo hi; whoami` and recorded zero denials — the pattern matches the head of a command line, so `Bash(git diff:*)` admitted
+  arbitrary chained, substituted and redirected commands. A PreToolUse deny overrides an allowedTools allow, which makes the
+  hook the only place this repo can decide execution deterministically. On credentials: a PAT or `gh auth` on disk would be
+  standing push access usable by the *prepare* step, which is exactly what the output gate exists to prevent; an installation
+  token is the only GitHub credential that is simultaneously short-lived, single-repository, and permission-narrowed.
+- Impact: adding a command requires both a tool allowlist entry and a guard schema — an import-time cross-check fails otherwise.
+  Commands whose AWS data comes from fixed read adapters (logs/diagnose/detect) have no shell surface at all. The guard's
+  deny path is verified end-to-end against the real runtime; the GitHub App token path is unverified until the App is
+  registered and rehearsed on EC2, and until then `pr` execute fails closed with no write credential.
+
+## D20 — capability is declared, and aggregate risk is scored against the ceiling in force at approval
+- Decision: every tool the allowlist can grant carries a *declared* capability from a five-class taxonomy
+  (read / sensitive-read / write-low / write-high / privileged); an unclassified tool or capability fails closed rather
+  than scoring zero. A plan's risk is the sum of its distinct capabilities across the whole tool chain, checked against
+  `RISK_CEILING = 10`. `risk_score`, `risk_ceiling`, `account_id` and `region` are pinned inside the hashed plan;
+  verification re-scores from the tool chain instead of trusting the stored number, and compares against the ceiling
+  recorded at approval, not today's.
+- Reason: the previous classifier matched substrings, so `git add`, `git checkout`, `python -m pytest`, `terraform plan`
+  and `terraform show` aggregated to no capability at all — the exact multi-tool composition case the threat model calls
+  out was scored as harmless. Summing across the chain (rather than taking the maximum) is what makes a combination of
+  modest tools legible. Pinning the ceiling prevents a later, looser policy from retroactively blessing an old approval,
+  and re-scoring prevents a tampered plan from lowering its own number to slip under the bar.
+- Impact: "Level 2 stays disabled" and "privileged is blocked" become one arithmetic rule — write-high (20) and
+  privileged (50) exceed the ceiling on their own — instead of a list of special cases. Adding a tool without
+  classifying it is an import error (`allowlist._cross_check_with_capabilities`). Over-ceiling plans are refused at
+  build time, so an operator is never asked to approve something the policy would refuse anyway. Today `pr` scores 6 and
+  `tf-review` scores 1. Limitation: aggregation still derives from the static allowlist, not observed per-step tool use,
+  and remains `pr`-scoped.
+
+## D21 — audit the trajectory, and never let a schema change invalidate an existing chain
+- Decision: audit events carry `step_id` (assigned by the store, not the caller), `parent_step_id`, `tool_name`,
+  `capabilities`, `target_resource` and `result_hash`. The worker emits a tree — `claimed` is the job root, and
+  `write_credentials_issued` descends from the approval step that authorized it — rather than a flat transition list.
+  Trajectory fields enter `event_hash` **only when non-empty**, so events written before the fields existed hash
+  exactly as they did.
+- Reason: storing only the final result cannot answer "what ran, with what capability, against what, and who allowed
+  it". Parenting the credential step to its approval is what links a real push back to a human decision. The store owns
+  `step_id` because a caller-chosen identifier could forge a parent link and rewrite the trail's shape. The
+  conditional-hash rule exists because tamper-evidence that breaks on every schema change is not evidence — records
+  already in DynamoDB must keep verifying, so back-compat is a security property here, not a convenience.
+- Impact: `build_step_tree` reconstructs a job's trajectory; `result_digest` pins what a step returned without storing
+  the body (secrets stay out of the trail). Sqlite and DynamoDB round-trip the fields identically (moto-verified), and
+  the web `AuditEvent` mirror carries them as optional so the dashboard renders pre-trajectory records instead of
+  crashing. Limitation, explicitly: the tree is **phase-level, not call-level** — `--output-format json` exposes no
+  per-tool-call data, so sub-steps under a single Claude call need stream-json parsing. Until then D20's capability
+  aggregation stays allowlist-derived rather than based on observed tool use.

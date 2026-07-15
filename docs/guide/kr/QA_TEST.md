@@ -30,7 +30,11 @@
 
 ## A2. Slack 플랫폼 BUY 기능 (D2.5)
 - [x] **mrkdwn / Markdown 블록** — A1 세션에서 헤딩/bold/불릿/인라인코드 렌더 확인. 2026-07-02.
-- ⚠️ **Modal diff 승인**(`views.open`)과 **Message Shortcut** 은 **아직 미구현**(코드 없음 — QA 항목이 아니라 `docs/NEXT_PLAN.md` 의 구현 과제). 구현 후에 여기서 검증.
+- [x] **Modal diff 승인 / Message Shortcut 구현** — full-diff modal, malformed-state 거부, 승인자 allowlist,
+  조건부 상태 전이, 원본 메시지 갱신, shortcut 추출을 로컬 테스트로 확인. 2026-07-15.
+- [ ] **실 Slack 검증** — Slack App에 Message Shortcut callback ID `review_slackops_job`을 등록한 뒤 SlackOps 승인
+  메시지에서 **Review diff**를 열어 승인/거부한다. 비허용 사용자는 modal을 열거나 상태를 바꾸지 못하고, 허용
+  사용자의 결정은 원본 메시지와 감사 피드에 남아야 한다.
 
 ## A3. 발표 산출물 (D5/D6)
 - [ ] **인젝션 방어 장면 — 라이브 시연으로 대체**(동작은 2026-07-02 검증 완료). 별도 캡처 불필요.

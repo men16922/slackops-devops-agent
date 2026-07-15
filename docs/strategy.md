@@ -48,6 +48,7 @@ SlackOps는 이 흐름을 다음 다섯 원칙으로 번역한다.
 | 영역 | 구현 내용 | 상태와 근거 |
 | --- | --- | --- |
 | 권한·승인 | L0/L1만 활성, production/deploy/IAM/DB hard deny, Slack 승인자 allowlist, GitHub OAuth, immutable execution plan/hash, workspace·도구·원격 PR diff 재검증 | **실환경 적용 확인:** D15 dashboard/OAuth. 코드와 기존 실증은 `docs/STATUS.md`. |
+| 결정적 scope | root-owned account/region/log-prefix/workspace와 명령별 고정 time window를 adapter·executor·Claude 직전에 확인 | **실 EC2 검증:** unreviewed log group은 fetch 전에 거부되고 Worker가 `policy_denied` reason/context를 기록. |
 | 입력 격리 | prompt template 강제, forged untrusted tag neutralization, Slack/log/Git/kubectl/adapter error 단일 untrusted boundary | **구현·CI 확인:** sanitizer와 command tests. |
 | AWS 읽기 경계 | `logs`·`diagnose`·`detect`가 범용 AWS API MCP 없이 command-specific boto3 read adapter로 evidence만 수집; L0 모델 tool allowlist는 비어 있음 | **실 EC2 검증:** runtime role의 fixed AWS read 성공. |
 | credential 격리 | bootstrap Instance Profile → runtime role/MCP role, 1시간 STS credential·45분 회전, Claude env에서 AWS/DDB credential 제거, IMDS 차단 | **실 EC2 검증:** role identities·forced refresh·timer·4 services. |
@@ -129,6 +130,7 @@ diff·영향·계획을 사람에게 표시
 | --- | --- |
 | 로그 속 지시가 모델을 속이면? | sanitizer + tool-less L0 + fixed read adapter + injection corpus |
 | 모델이 임의 AWS API를 호출하면? | generic AWS MCP 제거, command-specific read adapter, IAM role split |
+| 모델/요청이 범위를 넓히면? | account·region·resource·time-window 고정 scope; root-owned config 외 범위는 adapter 전 거부 |
 | credential이 subprocess/MCP로 새면? | env allowlist, IMDS deny, root-only short-lived credential file, MCP queue-only credential |
 | 공급망이 도구를 바꾸면? | MCP registry hash/command/tool inventory CI lock |
 | 승인 후 diff가 바뀌면? | execution plan hash, workspace·tool-chain·remote PR diff recheck, `plan_binding_rejected` audit event |
@@ -139,6 +141,9 @@ AWS managed MCP가 IAM context key와 감사·네트워크 통제를 제공하�
 긍정적이지만, 이 리포의 기본 경로를 범용 MCP로 되돌릴 근거는 아니다. AWS MCP Server는
 많은 AWS API를 다룰 수 있으므로, 향후 도입은 별도 전문가 환경에서 identity context,
 resource/action allowlist, write approval, CloudTrail evidence를 갖춘 경우에만 검토한다.
+P3는 이 원칙을 `deploy/mcp/managed-aws-pilot/`에 별도 계정 계약, 세 개의 Logs read action,
+AWS-managed-MCP context key, CloudTrail 위반 조회로 고정했다. 이는 scaffold일 뿐 AWS 역할·endpoint·세션을
+배포한 상태는 아니다. VPC endpoint는 선택한 서버와 Region에서 지원되는지 운영자가 확인한 뒤에만 요구한다.
 [AWS MCP IAM guidance](https://aws.amazon.com/blogs/security/understanding-iam-for-managed-aws-mcp-servers/)
 
 ## 7. 발표·도입 전략
@@ -149,7 +154,7 @@ resource/action allowlist, write approval, CloudTrail evidence를 갖춘 경우�
 2. **쉬운 흐름:** 자연어 질문 → evidence 요약 → 사람에게 제안.
 3. **멈추는 장면:** 로그 속 악성 지시, 직접 변경, 변경된 diff가 각각 거부된다.
 4. **전문가 증거:** fixed adapter, role split, egress, approval hash, registry/corpus.
-5. **전문가 증거:** D17/P1 fresh-EC2 rehearsal에서 runtime write deny와 중앙 `credential_refresh`/`proxy_denied`를 보여 준다.
+5. **전문가 증거:** D17/P1/P2 fresh-EC2 rehearsal에서 runtime write deny, 중앙 audit, pre-fetch scope deny를 보여 준다.
 
 ### 7.2 도입 단계
 
@@ -169,9 +174,7 @@ resource/action allowlist, write approval, CloudTrail evidence를 갖춘 경우�
 
 ## 8. 다음 30일 우선순위
 
-1. **P2 — 정책 세분화:** account/region/resource/time-window를 입력으로 하는 deterministic
-   policy interceptor를 tool boundary에 추가한다.
-2. **P3 — 조직 확장:** managed AWS MCP가 필요한 특정 업무만 별도 role·context key·VPC
+1. **P3 — 조직 확장:** managed AWS MCP가 필요한 특정 업무만 별도 role·context key·VPC
    endpoint·CloudTrail governance로 pilot한다.
 
 ## 9. 성공 기준

@@ -25,6 +25,7 @@ from app.commands.logs import (
     validated_service,
 )
 from app.sanitizer import build_prompt
+from app.policy_boundary import PolicyDenied, authorize_command
 
 _USAGE_HINT = "Usage: `/devops diagnose <service>`"
 
@@ -185,6 +186,10 @@ def handle_diagnose(
         validated = validated_service(service)
     except InvalidServiceName:
         return invalid_service_reply(_USAGE_HINT)
+    try:
+        scope = authorize_command("diagnose", validated)
+    except PolicyDenied:
+        return ":no_entry: Request is outside the configured security scope."
     active_fetchers = default_fetchers() if fetchers is None else fetchers
     sections = collect_sources(validated, active_fetchers)
     if all(not content.strip() for _, content in sections):
@@ -196,6 +201,7 @@ def handle_diagnose(
         timeout_s=timeout_s,
         runner=runner,
         on_metrics=on_metrics,
+        policy_scope=scope,
     )
     if result.exit_code != 0:
         return exec_failed_reply(validated, "Diagnosis", result.exit_code, result.output)

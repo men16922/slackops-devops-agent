@@ -21,8 +21,22 @@
      claude setup-token   # 구독 로그인 → sk-ant-oat... 토큰 출력
      aws ssm put-parameter --name /slackops/CLAUDE_CODE_OAUTH_TOKEN --type SecureString --value 'sk-ant-oat...'
      ```
+   - **PR write 자격 (GitHub App)**: 에이전트는 상시 push 권한을 갖지 않는다. 승인된 plan hash를
+     재검증한 직후에만 저장소·권한이 고정된 installation token(기본 10분)을 발급하고 단계가 끝나면
+     회수한다. GitHub App은 대상 저장소 하나에만 설치하고 `contents:write` + `pull_requests:write`만
+     부여한다(`administration`/`workflows`/`secrets` 금지). 넷 다 없으면 write 자격 없이 동작한다
+     (push 실패 = fail closed). 부분 설정은 부팅이 아니라 worker가 즉시 거부한다.
+     ```sh
+     aws ssm put-parameter --name /slackops/PR_REPOSITORY --value 'men16922/slackops-devops-agent'
+     aws ssm put-parameter --name /slackops/GITHUB_APP_ID --value '123456'
+     aws ssm put-parameter --name /slackops/GITHUB_INSTALLATION_ID --value '78901234'
+     # PEM 은 여러 줄이라 systemd EnvironmentFile 이 파싱하지 못한다 → base64 로 저장.
+     aws ssm put-parameter --name /slackops/GITHUB_APP_PRIVATE_KEY_B64 --type SecureString \
+       --value "$(base64 -w0 < slackops-agent.private-key.pem)"
+     ```
+     PR 머지는 branch protection이 막는다 — 이 자격으로도 자기 PR을 머지할 수 없다.
 2. **IAM Role + Instance Profile**: `iam/create-role.sh`
-   - **bootstrap role**은 여섯 `/slackops/` secret의 `GetParameter`와 같은 계정의
+   - **bootstrap role**은 열 개 `/slackops/` secret의 `GetParameter`와 같은 계정의
      runtime/MCP/audit role 전환만 허용한다. S3와 runtime AWS read 권한은 없다.
    - **runtime role**은 CloudWatch/Logs/EKS/거버넌스 읽기, OTel export, `slackops-agent`
      DynamoDB control plane만 가진다. SSM secret은 읽지 못한다.
@@ -44,6 +58,9 @@
    - 4개 서비스는 IMDS metadata endpoint를 차단한다. root-only credential refresher timer가
      45분마다 단기 runtime/MCP/audit credential을 회전하고 서비스를 재시작한다. 별도 root-only
      audit exporter가 credential rotation과 Squid `TCP_DENIED`를 중앙 로그 그룹에 남긴다.
+   - root-owned environment는 현재 account/region, `/aws/` log-group prefix, canonical workspace를 P2
+     deterministic scope policy에 전달한다. Slack/model 입력은 이 범위를 넓힐 수 없으며, 운영자는
+     `SLACKOPS_ALLOWED_LOG_GROUP_PREFIXES`를 더 좁혀야 한다.
    - 4개 서비스의 direct IP egress는 차단된다. localhost Squid가 Slack·Claude·GitHub·AWS·Terraform
      도메인만 proxy하며, proxy 자신도 localhost/link-local 목적지를 거부한다.
    - `REPO_URL` 의 `CHANGE_ME` 를 실제 GitHub repo 로 교체 필요.

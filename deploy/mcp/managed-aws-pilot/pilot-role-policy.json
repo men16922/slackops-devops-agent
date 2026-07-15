@@ -1,0 +1,46 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowApprovedLogsReadOnlyViaAwsManagedMcp",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:__PILOT_REGION__:__PILOT_ACCOUNT_ID__:log-group:__LOG_GROUP_PREFIX__*",
+        "arn:aws:logs:__PILOT_REGION__:__PILOT_ACCOUNT_ID__:log-group:__LOG_GROUP_PREFIX__*:log-stream:*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:ViaAWSMCPService": "true"
+        },
+        "StringEquals": {
+          "aws:CalledViaAWSMCP": "aws-mcp.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "DenyMutationInPilotEvenIfAnotherPolicyIsAdded",
+      "Effect": "Deny",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:DeleteLogGroup",
+        "logs:DeleteLogStream",
+        "logs:DeleteRetentionPolicy",
+        "logs:PutLogEvents",
+        "logs:PutRetentionPolicy",
+        "logs:PutResourcePolicy",
+        "logs:PutSubscriptionFilter",
+        "logs:StartLiveTail",
+        "logs:StopQuery",
+        "iam:*",
+        "sts:AssumeRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

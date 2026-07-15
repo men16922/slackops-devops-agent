@@ -103,3 +103,79 @@ def test_workspace_recheck_rejects_expanded_execution_tool_chain(
             plan.digest(),
             expected_execution_tools=(*planned_tools, "Write"),
         )
+
+
+# ── 재승인 트리거 ─────────────────────────────────────────────
+# 아래 각 케이스는 "승인한 것"과 "지금 실행되려는 것"이 갈라지는 지점이다.
+# 갈라지면 실행이 아니라 거부로 끝나야 한다.
+
+
+def _staged_plan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **kwargs: object):
+    from app.execution_plan import build_pr_plan as _build
+
+    root = _repository(tmp_path)
+    (root / "service.txt").write_text("after\n", encoding="utf-8")
+    _git(root, "add", "service.txt")
+    diff = _git(root, "diff", "HEAD", "--no-ext-diff", "--binary")
+    monkeypatch.setenv("SLACKOPS_WORKSPACE_ROOT", str(root))
+    plan = _build("update service", diff, execution_tools=("Read",), **kwargs)  # type: ignore[arg-type]
+    return plan, diff
+
+
+def test_reapproval_on_tool_chain_growth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    plan, diff = _staged_plan(monkeypatch, tmp_path)
+    with pytest.raises(ExecutionPlanError, match="tool chain changed"):
+        verify_pr_workspace(
+            "update service",
+            diff,
+            plan.canonical_json(),
+            plan.digest(),
+            expected_execution_tools=("Read", "Bash(git push:*)"),
+        )
+
+
+def test_reapproval_on_read_to_write_escalation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # 읽기만 승인받은 계획이 실행 직전 쓰기로 올라가면 그 사실을 이름으로 말해야 한다.
+    plan, diff = _staged_plan(monkeypatch, tmp_path)
+    tampered = plan.canonical_json().replace('"execution_tools":["Read"]', '"execution_tools":["Write"]')
+    from app.execution_plan import ExecutionPlan
+
+    swapped = ExecutionPlan.from_json(tampered)
+    with pytest.raises(ExecutionPlanError, match="escalated to write capability"):
+        verify_pr_workspace(
+            "update service",
+            diff,
+            swapped.canonical_json(),
+            swapped.digest(),
+            expected_execution_tools=("Write",),
+        )
+
+
+def test_reapproval_on_account_or_region_change(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    plan, diff = _staged_plan(
+        monkeypatch, tmp_path, account_id="111122223333", region="us-east-1"
+    )
+    with pytest.raises(ExecutionPlanError, match="account or region changed"):
+        verify_pr_workspace(
+            "update service",
+            diff,
+            plan.canonical_json(),
+            plan.digest(),
+            expected_execution_tools=("Read",),
+            account_id="999988887777",
+            region="us-east-1",
+        )
+    # 같은 대상이면 통과한다 — 트리거가 상시 거부로 퇴화하지 않았는지 확인.
+    verify_pr_workspace(
+        "update service",
+        diff,
+        plan.canonical_json(),
+        plan.digest(),
+        expected_execution_tools=("Read",),
+        account_id="111122223333",
+        region="us-east-1",
+    )

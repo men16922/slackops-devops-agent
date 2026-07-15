@@ -49,7 +49,7 @@ def test_handle_diagnose_assembles_multi_source_fetch_sanitize_run() -> None:
     assert "ERROR boom" in prompt
     assert "Replicas: 0/3" in prompt
     assert "abc123 fix" in prompt
-    assert cmd == build_command(prompt, [])
+    assert cmd == build_command(prompt, [], None, "diagnose")
 
 
 def test_handle_diagnose_all_sources_inside_one_untrusted_block() -> None:
@@ -247,7 +247,7 @@ def test_handle_diagnose_default_uses_all_fixed_adapters(
     assert "Replicas: 0/3" in prompt  # kubectl 선수집 + 격리
     assert UNTRUSTED_OPEN in prompt and UNTRUSTED_CLOSE in prompt
     assert "call_aws" not in prompt
-    assert cmd == build_command(prompt, [])
+    assert cmd == build_command(prompt, [], None, "diagnose")
     assert "--mcp-config" not in cmd
 
 

@@ -22,7 +22,9 @@ from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
 from app.commands._replies import exec_failed_reply
 from app.sanitizer import build_prompt
+from app.policy_boundary import CommandScope, PolicyDenied, authorize_command
 from app.telemetry import RunMetricsHook
+from app.write_credentials import WriteGrant
 
 _USAGE_HINT = "Usage: `/devops pr <description>`"
 
@@ -148,6 +150,7 @@ def handle_pr(
     runner: SubprocessRunner | None = None,
     timeout_s: int = DEFAULT_TIMEOUT_S,
     on_metrics: RunMetricsHook | None = None,
+    write_grant: WriteGrant | None = None,
 ) -> PrResult:
     """설명을 받아 PR 을 2단계(prepare → 승인 → execute)로 진행.
 
@@ -158,6 +161,10 @@ def handle_pr(
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
         timeout_s: Claude 실행 타임아웃(초).
         on_metrics: Claude 호출 계측 hook(run_for_command 로 전달).
+        write_grant: 승인 plan hash 재검증 후 발급된 단기 write credential.
+            prepare 단계는 이 값을 **받지 않는다** — 그래서 prepare 프로세스 환경에는
+            push 자격 자체가 존재하지 않는다(도구 제거에만 의존하지 않는 2중 경계).
+            None 이면 execute 도 자격 없이 실행되어 push 가 실패한다(fail closed).
 
     Returns:
         PrResult — prepare 성공 시 diff 가 채워져 worker 출력 게이트로 분기한다.
@@ -171,9 +178,13 @@ def handle_pr(
                 f"(최대 {MAX_DESCRIPTION_CHARS}자). " + _USAGE_HINT
             )
         )
+    try:
+        scope = authorize_command("pr")
+    except PolicyDenied:
+        return PrResult(summary=":no_entry: Request is outside the configured security scope.")
     if approved_diff is None:
-        return _prepare(desc, runner, timeout_s, on_metrics)
-    return _execute(desc, approved_diff, runner, timeout_s, on_metrics)
+        return _prepare(desc, runner, timeout_s, on_metrics, scope)
+    return _execute(desc, approved_diff, runner, timeout_s, on_metrics, scope, write_grant)
 
 
 def _prepare(
@@ -181,6 +192,7 @@ def _prepare(
     runner: SubprocessRunner | None,
     timeout_s: int,
     on_metrics: RunMetricsHook | None,
+    scope: CommandScope,
 ) -> PrResult:
     """prepare 단계 — 게이트 도구(push/PR) 없이 branch→수정→test + diff 생성."""
     prompt = build_prompt(PR_PREPARE_PROMPT_TEMPLATE, desc)
@@ -191,6 +203,7 @@ def _prepare(
         runner=runner,
         exclude_tools=PR_GATED_TOOLS,
         on_metrics=on_metrics,
+        policy_scope=scope,
     )
     if result.exit_code != 0:
         return PrResult(
@@ -221,6 +234,8 @@ def _execute(
     runner: SubprocessRunner | None,
     timeout_s: int,
     on_metrics: RunMetricsHook | None,
+    scope: CommandScope,
+    write_grant: WriteGrant | None,
 ) -> PrResult:
     """execute 단계 — 승인된 diff 컨텍스트로 push + gh pr create(머지 금지)."""
     untrusted = (
@@ -228,12 +243,16 @@ def _execute(
     )
     prompt = build_prompt(PR_EXECUTE_PROMPT_TEMPLATE, untrusted)
     result = run_for_command(
-    "pr",
-    prompt,
-    timeout_s=timeout_s,
-    runner=runner,
-    exclude_tools=PR_EXECUTE_EXCLUDED_TOOLS,
-    on_metrics=on_metrics,
+        "pr",
+        prompt,
+        timeout_s=timeout_s,
+        runner=runner,
+        exclude_tools=PR_EXECUTE_EXCLUDED_TOOLS,
+        on_metrics=on_metrics,
+        policy_scope=scope,
+        # 승인 후 발급된 자격만 이 자식 프로세스에 존재한다. 상속 경로가 아니므로
+        # prepare/진단 호출에는 어떤 write credential 도 없다.
+        extra_env=write_grant.child_env() if write_grant is not None else None,
     )
     if result.exit_code != 0:
         return PrResult(

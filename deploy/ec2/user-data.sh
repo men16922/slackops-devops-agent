@@ -67,6 +67,7 @@ IMDS_TOKEN="$(curl -fsSL -X PUT http://169.254.169.254/latest/api/token \
   -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')"
 REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   http://169.254.169.254/latest/meta-data/placement/region)"
+ACCOUNT_ID="$(aws sts get-caller-identity --region "$REGION" --query Account --output text)"
 {
   echo "SLACK_BOT_TOKEN=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_BOT_TOKEN --with-decryption --query Parameter.Value --output text)"
   echo "SLACK_APP_TOKEN=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_APP_TOKEN --with-decryption --query Parameter.Value --output text)"
@@ -75,6 +76,15 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   echo "AWS_REGION=$REGION"
   # botocore 는 region 을 AWS_DEFAULT_REGION 에서 읽는다(AWS_REGION 만으로는 NoRegionError) — boto3 fallback + MCP 서버용.
   echo "AWS_DEFAULT_REGION=$REGION"
+  # P2 deterministic scope boundary. These values are written by root at boot;
+  # Slack/model input cannot select a different account, region, log group, or
+  # workspace. Operators may narrow the reviewed log-group prefixes further.
+  echo "AWS_ACCOUNT_ID=$ACCOUNT_ID"
+  echo "SLACKOPS_POLICY_ENFORCEMENT=true"
+  echo "SLACKOPS_ALLOWED_AWS_ACCOUNT_IDS=$ACCOUNT_ID"
+  echo "SLACKOPS_ALLOWED_AWS_REGIONS=$REGION"
+  echo "SLACKOPS_ALLOWED_LOG_GROUP_PREFIXES=/aws/"
+  echo "SLACKOPS_POLICY_WORKSPACE_ROOT=$APP_DIR"
   echo "PATH=/usr/local/bin:/usr/bin:/bin"
   # Agent service egress is forced through the localhost Squid allowlist. Keep IMDS
   # outside NO_PROXY; systemd also blocks service access to it at IP level.
@@ -97,6 +107,16 @@ REGION="$(curl -fsSL -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
   echo "SLACK_APPROVER_IDS=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_APPROVER_IDS --query Parameter.Value --output text 2>/dev/null || true)"
   # 대시보드 deep-link 용(예: https://<app>.vercel.app). 부재 시 링크 대신 (job <id>) 텍스트.
   echo "DASHBOARD_URL=$(aws ssm get-parameter --region "$REGION" --name /slackops/DASHBOARD_URL --query Parameter.Value --output text 2>/dev/null || true)"
+  # 승인 후 발급되는 단기 write credential(GitHub App). 상시 PAT 를 두지 않는다 —
+  # 승인된 plan hash 재검증 직후에만 저장소/권한이 고정된 installation token 을 발급하고
+  # 그 단계가 끝나면 회수한다. 넷 다 있어야 유효하며, 전부 비면 write 자격 없이 동작한다
+  # (push 실패 = fail closed). 발급 자체는 앱이 하므로 자식 프로세스는 App key 를 못 본다.
+  echo "SLACKOPS_PR_REPOSITORY=$(aws ssm get-parameter --region "$REGION" --name /slackops/PR_REPOSITORY --query Parameter.Value --output text 2>/dev/null || true)"
+  echo "SLACKOPS_GITHUB_APP_ID=$(aws ssm get-parameter --region "$REGION" --name /slackops/GITHUB_APP_ID --query Parameter.Value --output text 2>/dev/null || true)"
+  echo "SLACKOPS_GITHUB_INSTALLATION_ID=$(aws ssm get-parameter --region "$REGION" --name /slackops/GITHUB_INSTALLATION_ID --query Parameter.Value --output text 2>/dev/null || true)"
+  # PEM 은 여러 줄이라 systemd EnvironmentFile 이 파싱하지 못한다 — SSM 에 base64 로 넣고
+  # 앱이 디코드한다(`base64 -w0 < app.private-key.pem` 으로 저장).
+  echo "SLACKOPS_GITHUB_APP_PRIVATE_KEY_B64=$(aws ssm get-parameter --region "$REGION" --name /slackops/GITHUB_APP_PRIVATE_KEY_B64 --with-decryption --query Parameter.Value --output text 2>/dev/null || true)"
 } > /etc/slackops-devops-agent.env
 chmod 600 /etc/slackops-devops-agent.env
 

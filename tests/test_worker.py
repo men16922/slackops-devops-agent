@@ -9,6 +9,7 @@ import pytest
 
 from app.commands import logs
 from app.execution_plan import ExecutionPlan, ExecutionPlanError
+from app.policy_boundary import CommandScope, PolicyDenied
 from app.store import (
     Job,
     JobSource,
@@ -170,6 +171,44 @@ def test_duration_ms_recorded_from_injected_monotonic(stores) -> None:
     worker.process_one()
     recorded = metrics.list_for_job(job.id)
     assert recorded[0].duration_ms == pytest.approx(500.0)
+
+
+@pytest.mark.parametrize(
+    ("command", "args"),
+    [
+        ("ping", ""),
+        ("logs", "/aws/lambda/payments"),
+        ("diagnose", "/aws/ecs/payments"),
+        ("detect", "config"),
+        ("tf-review", ""),
+        ("pr", "fix typo"),
+    ],
+)
+def test_scope_policy_denial_is_audited_before_every_executor(
+    stores, command: str, args: str
+) -> None:
+    jobs, audit, _ = stores
+    job = jobs.enqueue(command, args, source=JobSource.WEB)
+    executed: list[str] = []
+
+    def deny_scope(name: str, _argument: str) -> CommandScope:
+        scope = CommandScope(name, "123456789012", "us-east-1", "test:resource", 1)
+        raise PolicyDenied("resource_not_allowed", scope)
+
+    worker = make_worker(
+        stores,
+        executors={command: lambda _job: executed.append(command) or CommandOutcome(result="ok")},
+        scope_authorizer=deny_scope,
+    )
+
+    failed = worker.process_one()
+
+    assert failed is not None and failed.status is JobStatus.FAILED
+    assert executed == []
+    events = audit.list_for_job(job.id)
+    policy = next(event for event in events if event.action == AUDIT_POLICY_DENIED)
+    assert policy.context["reason"] == "resource_not_allowed"
+    assert policy.context["command"] == command
 
 
 # ── 출력 게이트(pr) 분기 ──────────────────────────────────────
@@ -341,7 +380,14 @@ def test_plan_binding_failure_records_dedicated_security_event(stores) -> None:
         AUDIT_PLAN_BINDING_REJECTED,
         AUDIT_FAILED,
     ]
-    assert events[1].context == {"error_type": "ExecutionPlanError"}
+    # 거부 사유까지 남는다 — "무엇이 승인과 달라졌는지"를 감사만 보고 알 수 있어야 한다.
+    assert events[1].context == {
+        "error_type": "ExecutionPlanError",
+        "reason": "diff changed",
+    }
+    # 모든 후속 스텝은 claim(루트)에서 파생된다 — 궤적이 트리로 재구성 가능해야 한다.
+    assert events[0].step_id and events[0].parent_step_id == ""
+    assert {e.parent_step_id for e in events[1:]} == {events[0].step_id}
 
 
 # ── telemetry 계측 결합 (on_metrics → CommandOutcome → metric) ───

@@ -30,7 +30,7 @@ def test_handle_logs_assembles_fetch_sanitize_run() -> None:
     prompt = cmd[2]  # claude -p <prompt> ...
     assert "ERROR boom at line 3" in prompt
     assert UNTRUSTED_OPEN in prompt and UNTRUSTED_CLOSE in prompt
-    assert cmd == build_command(prompt, [])
+    assert cmd == build_command(prompt, [], None, "logs")
     assert "--mcp-config" not in cmd
 
 
@@ -49,7 +49,7 @@ def test_handle_logs_default_uses_adapter_and_untrusted_boundary(
     assert "payments-api" in prompt and "ERROR injected" in prompt
     assert UNTRUSTED_OPEN in prompt and UNTRUSTED_CLOSE in prompt
     assert "call_aws" not in prompt
-    assert cmd == build_command(prompt, [])
+    assert cmd == build_command(prompt, [], None, "logs")
     assert "--mcp-config" not in cmd
 
 

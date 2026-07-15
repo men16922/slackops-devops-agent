@@ -185,7 +185,7 @@ def test_followup_awaiting_returns_approval_blocks() -> None:
         if b["type"] == "actions"
         for e in b["elements"]
     }
-    assert action_ids == {"approve_job", "reject_job"}
+    assert action_ids == {"approve_job", "reject_job", "review_job"}
     assert "review" in text.lower()
 
 

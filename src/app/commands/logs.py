@@ -9,6 +9,7 @@ import(IAM Instance Profile)로 동작하고, 테스트에서는 `fetcher`를 �
 from __future__ import annotations
 
 import re
+import time
 from typing import Callable
 
 from app.allowlist import run_for_command
@@ -20,6 +21,7 @@ from app.commands._replies import (
     no_data_reply,
 )
 from app.sanitizer import build_prompt
+from app.policy_boundary import PolicyDenied, authorize_command
 
 _USAGE_HINT = "Usage: `/devops logs <service>`"
 
@@ -28,6 +30,7 @@ LogFetcher = Callable[[str], str]
 
 # 기본 fetcher 가 가져올 최근 이벤트 수 상한(프롬프트 비대 방지).
 DEFAULT_EVENT_LIMIT = 200
+DEFAULT_LOOKBACK_S = 24 * 60 * 60
 
 # service 인자는 Slack 원문에서 온 untrusted 입력 — CloudWatch log group 문자 집합으로
 # 강제 검증한 뒤에만 template 에 삽입한다(주입 방어 4계층: Slack 입력 직접 전달 금지).
@@ -101,6 +104,7 @@ def fetch_cloudwatch_logs(service: str, limit: int = DEFAULT_EVENT_LIMIT) -> str
             logGroupName=service,
             logStreamName=stream["logStreamName"],
             limit=limit,
+            startTime=int((time.time() - DEFAULT_LOOKBACK_S) * 1000),
             startFromHead=False,  # 끝(최신)에서부터
         ).get("events", [])
         messages.extend(event["message"] for event in events)
@@ -150,6 +154,10 @@ def handle_logs(
         validated = validated_service(service)
     except InvalidServiceName:
         return invalid_service_reply(_USAGE_HINT)
+    try:
+        scope = authorize_command("logs", validated)
+    except PolicyDenied:
+        return ":no_entry: Request is outside the configured security scope."
     active_fetcher = fetch_cloudwatch_logs if fetcher is None else fetcher
     raw_logs = active_fetcher(validated)
     if not raw_logs.strip():
@@ -161,6 +169,7 @@ def handle_logs(
         timeout_s=timeout_s,
         runner=runner,
         on_metrics=on_metrics,
+        policy_scope=scope,
     )
     if result.exit_code != 0:
         return exec_failed_reply(validated, "Log analysis", result.exit_code, result.output)

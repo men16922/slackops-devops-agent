@@ -24,9 +24,18 @@ from app.store._util import day_of as _day_of, utcnow_iso as _utcnow_iso
 _SEQ_PAD = 6  # SK 문자열 정렬용 zero-pad 자릿수
 
 
+def _step_id(seq: int) -> str:
+    """job 내에서 유일하고 결정적인 스텝 식별자 — 난수가 아니라 append 순서에서 유도한다."""
+    return f"S{seq:0{_SEQ_PAD}d}"
+
+
 @dataclass
 class AuditEvent:
     """감사 이벤트 1건 — 누가(actor) 어떤 job 에 무엇을(action) 했는지.
+
+    최종 응답만이 아니라 실행 궤적을 남긴다: step_id/parent_step_id 로 요청→계획→정책→승인→
+    실행→결과를 부모/자식으로 재구성하고, tool_name/capabilities/target_resource/result_hash 로
+    "무엇이 무슨 권한으로 어디에 무엇을 했는지"를 결과 본문 없이 증명한다.
 
     Attributes:
         job_id: 대상 job 식별자.
@@ -35,6 +44,13 @@ class AuditEvent:
         action: 이벤트 종류(enqueued/claimed/awaiting_approval/approved/...).
         actor: 행위자(Slack user / web user / worker).
         detail: 부가 설명(자유 텍스트).
+        step_id: 이 이벤트의 안정 식별자(job 내 유일) — 다른 이벤트가 부모로 지목할 수 있다.
+        parent_step_id: 이 스텝이 파생된 상위 스텝(없으면 루트). 예: 승인 후 발급된 write
+            credential 스텝은 그것을 허가한 `approved` 스텝을 부모로 갖는다.
+        tool_name: 이 스텝이 사용한 도구/명령.
+        capabilities: 이 스텝이 행사한 capability(execution_plan taxonomy).
+        target_resource: 대상 리소스(log_group:/aws/x, repo:owner/name 등).
+        result_hash: 결과 본문의 sha256 — 본문을 저장하지 않고도 무엇이 반환됐는지 고정한다.
     """
 
     job_id: str
@@ -46,6 +62,12 @@ class AuditEvent:
     context: dict[str, str] = field(default_factory=dict)
     prev_event_hash: str = ""
     event_hash: str = ""
+    step_id: str = ""
+    parent_step_id: str = ""
+    tool_name: str = ""
+    capabilities: tuple[str, ...] = ()
+    target_resource: str = ""
+    result_hash: str = ""
 
 
 class AuditStore(Protocol):
@@ -59,8 +81,13 @@ class AuditStore(Protocol):
         actor: str = "",
         detail: str = "",
         context: dict[str, str] | None = None,
+        parent_step_id: str = "",
+        tool_name: str = "",
+        capabilities: tuple[str, ...] = (),
+        target_resource: str = "",
+        result_hash: str = "",
     ) -> AuditEvent:
-        """이벤트 1건 추가."""
+        """이벤트 1건 추가. step_id 는 스토어가 부여한다(호출자가 정하지 않는다)."""
         ...
 
     def list_for_job(self, job_id: str, limit: int = 100) -> list[AuditEvent]:
@@ -117,6 +144,12 @@ class SqliteAuditStore:
             ("context", "TEXT NOT NULL DEFAULT '{}'") ,
             ("prev_event_hash", "TEXT NOT NULL DEFAULT ''"),
             ("event_hash", "TEXT NOT NULL DEFAULT ''"),
+            ("step_id", "TEXT NOT NULL DEFAULT ''"),
+            ("parent_step_id", "TEXT NOT NULL DEFAULT ''"),
+            ("tool_name", "TEXT NOT NULL DEFAULT ''"),
+            ("capabilities", "TEXT NOT NULL DEFAULT ''"),
+            ("target_resource", "TEXT NOT NULL DEFAULT ''"),
+            ("result_hash", "TEXT NOT NULL DEFAULT ''"),
         ):
             if name not in existing:
                 self._conn.execute(f"ALTER TABLE audit_events ADD COLUMN {name} {definition}")
@@ -129,25 +162,39 @@ class SqliteAuditStore:
         actor: str = "",
         detail: str = "",
         context: dict[str, str] | None = None,
+        parent_step_id: str = "",
+        tool_name: str = "",
+        capabilities: tuple[str, ...] = (),
+        target_resource: str = "",
+        result_hash: str = "",
     ) -> AuditEvent:
         previous = self._conn.execute(
             "SELECT event_hash FROM audit_events WHERE job_id = ? ORDER BY ts DESC, seq DESC LIMIT 1",
             (job_id,),
         ).fetchone()
+        seq = next(self._seq)
         event = AuditEvent(
             job_id=job_id,
             ts=self._clock(),
-            seq=next(self._seq),
+            seq=seq,
             action=action,
             actor=actor,
             detail=detail,
             context=dict(context or {}),
             prev_event_hash=str(previous["event_hash"]) if previous else "",
+            step_id=_step_id(seq),
+            parent_step_id=parent_step_id,
+            tool_name=tool_name,
+            capabilities=tuple(capabilities),
+            target_resource=target_resource,
+            result_hash=result_hash,
         )
         event.event_hash = event_hash(event)
         self._conn.execute(
-            "INSERT INTO audit_events (job_id, ts, seq, day, action, actor, detail, context, prev_event_hash, event_hash) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO audit_events (job_id, ts, seq, day, action, actor, detail, context, "
+            "prev_event_hash, event_hash, step_id, parent_step_id, tool_name, capabilities, "
+            "target_resource, result_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 event.job_id,
                 event.ts,
@@ -159,14 +206,19 @@ class SqliteAuditStore:
                 json.dumps(event.context, sort_keys=True, separators=(",", ":")),
                 event.prev_event_hash,
                 event.event_hash,
+                event.step_id,
+                event.parent_step_id,
+                event.tool_name,
+                ",".join(event.capabilities),
+                event.target_resource,
+                event.result_hash,
             ),
         )
         return event
 
     def list_for_job(self, job_id: str, limit: int = 100) -> list[AuditEvent]:
         rows = self._conn.execute(
-            "SELECT job_id, ts, seq, action, actor, detail, context, prev_event_hash, event_hash FROM audit_events "
-            "WHERE job_id = ? ORDER BY ts, seq LIMIT ?",
+            f"SELECT {_SQLITE_COLUMNS} FROM audit_events WHERE job_id = ? ORDER BY ts, seq LIMIT ?",
             (job_id, limit),
         ).fetchall()
         return [_from_sqlite_row(row) for row in rows]
@@ -174,14 +226,20 @@ class SqliteAuditStore:
     def list_feed(self, day: str | None = None, limit: int = 50) -> list[AuditEvent]:
         day = day or _day_of(self._clock())
         rows = self._conn.execute(
-            "SELECT job_id, ts, seq, action, actor, detail, context, prev_event_hash, event_hash FROM audit_events "
-            "WHERE day = ? ORDER BY ts DESC, seq DESC LIMIT ?",
+            f"SELECT {_SQLITE_COLUMNS} FROM audit_events WHERE day = ? ORDER BY ts DESC, seq DESC LIMIT ?",
             (day, limit),
         ).fetchall()
         return [_from_sqlite_row(row) for row in rows]
 
 
+_SQLITE_COLUMNS = (
+    "job_id, ts, seq, action, actor, detail, context, prev_event_hash, event_hash, "
+    "step_id, parent_step_id, tool_name, capabilities, target_resource, result_hash"
+)
+
+
 def _from_sqlite_row(row: sqlite3.Row) -> AuditEvent:
+    raw_capabilities = row["capabilities"] or ""
     return AuditEvent(
         job_id=row["job_id"],
         ts=row["ts"],
@@ -192,6 +250,12 @@ def _from_sqlite_row(row: sqlite3.Row) -> AuditEvent:
         context=_context_from_json(row["context"]),
         prev_event_hash=row["prev_event_hash"],
         event_hash=row["event_hash"],
+        step_id=row["step_id"],
+        parent_step_id=row["parent_step_id"],
+        tool_name=row["tool_name"],
+        capabilities=tuple(c for c in raw_capabilities.split(",") if c),
+        target_resource=row["target_resource"],
+        result_hash=row["result_hash"],
     )
 
 
@@ -224,6 +288,11 @@ class DynamoDbAuditStore:
         actor: str = "",
         detail: str = "",
         context: dict[str, str] | None = None,
+        parent_step_id: str = "",
+        tool_name: str = "",
+        capabilities: tuple[str, ...] = (),
+        target_resource: str = "",
+        result_hash: str = "",
     ) -> AuditEvent:
         from boto3.dynamodb.conditions import Key  # lazy
 
@@ -234,15 +303,22 @@ class DynamoDbAuditStore:
             ScanIndexForward=False,
             Limit=1,
         ).get("Items", [])
+        seq = next(self._seq)
         event = AuditEvent(
             job_id=job_id,
             ts=self._clock(),
-            seq=next(self._seq),
+            seq=seq,
             action=action,
             actor=actor,
             detail=detail,
             context=dict(context or {}),
             prev_event_hash=str(previous[0].get("event_hash", "")) if previous else "",
+            step_id=_step_id(seq),
+            parent_step_id=parent_step_id,
+            tool_name=tool_name,
+            capabilities=tuple(capabilities),
+            target_resource=target_resource,
+            result_hash=result_hash,
         )
         event.event_hash = event_hash(event)
         self._table.put_item(
@@ -260,6 +336,12 @@ class DynamoDbAuditStore:
                 "context": event.context,
                 "prev_event_hash": event.prev_event_hash,
                 "event_hash": event.event_hash,
+                "step_id": event.step_id,
+                "parent_step_id": event.parent_step_id,
+                "tool_name": event.tool_name,
+                "capabilities": list(event.capabilities),
+                "target_resource": event.target_resource,
+                "result_hash": event.result_hash,
             },
             ConditionExpression="attribute_not_exists(PK) AND attribute_not_exists(SK)",
         )
@@ -301,6 +383,12 @@ def _from_item(item: dict[str, Any]) -> AuditEvent:
         context={str(key): str(value) for key, value in item.get("context", {}).items()},
         prev_event_hash=item.get("prev_event_hash", ""),
         event_hash=item.get("event_hash", ""),
+        step_id=item.get("step_id", ""),
+        parent_step_id=item.get("parent_step_id", ""),
+        tool_name=item.get("tool_name", ""),
+        capabilities=tuple(str(c) for c in item.get("capabilities", [])),
+        target_resource=item.get("target_resource", ""),
+        result_hash=item.get("result_hash", ""),
     )
 
 
@@ -315,8 +403,14 @@ def _context_from_json(value: str) -> dict[str, str]:
 
 
 def event_hash(event: AuditEvent) -> str:
-    """Return a stable hash over one event and its predecessor link."""
-    payload = {
+    """Return a stable hash over one event, its trajectory fields, and its predecessor.
+
+    Trajectory fields join the payload **only when set**. Events written before those
+    fields existed hash exactly as they did then, so `verify_event_chain` still passes
+    over records already in DynamoDB — tamper-evidence would be worthless if a schema
+    change silently invalidated every historical chain.
+    """
+    payload: dict[str, Any] = {
         "job_id": event.job_id,
         "ts": event.ts,
         "seq": event.seq,
@@ -326,8 +420,36 @@ def event_hash(event: AuditEvent) -> str:
         "context": event.context,
         "prev_event_hash": event.prev_event_hash,
     }
+    trajectory: dict[str, Any] = {
+        "step_id": event.step_id,
+        "parent_step_id": event.parent_step_id,
+        "tool_name": event.tool_name,
+        "capabilities": list(event.capabilities),
+        "target_resource": event.target_resource,
+        "result_hash": event.result_hash,
+    }
+    payload.update({key: value for key, value in trajectory.items() if value})
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def result_digest(result: str) -> str:
+    """Hash a step's result so the trail can prove it without storing the body."""
+    return hashlib.sha256(result.encode("utf-8")).hexdigest()
+
+
+def build_step_tree(events: list[AuditEvent]) -> dict[str, list[AuditEvent]]:
+    """Group a job's events by parent, so the trajectory can be walked as a tree.
+
+    Roots are keyed by "". Events without a step_id (pre-trajectory records) are ignored
+    rather than silently reparented.
+    """
+    tree: dict[str, list[AuditEvent]] = {}
+    for event in events:
+        if not event.step_id:
+            continue
+        tree.setdefault(event.parent_step_id, []).append(event)
+    return tree
 
 
 def verify_event_chain(events: list[AuditEvent]) -> bool:

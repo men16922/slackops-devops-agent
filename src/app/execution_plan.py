@@ -16,6 +16,32 @@ from pathlib import Path, PurePosixPath
 
 POLICY_VERSION = "secure-runtime-v1"
 
+# Capability taxonomy. A tool's class is declared (see _TOOL_CAPABILITIES), never
+# inferred from its spelling: substring matching silently dropped `git add`,
+# `git checkout`, `python -m pytest` and `terraform plan` into *no* capability at
+# all, which made the aggregate risk of a tool chain read lower than it was.
+READ = "read"
+SENSITIVE_READ = "sensitive-read"
+WRITE_LOW = "write-low"
+WRITE_HIGH = "write-high"
+PRIVILEGED = "privileged"
+
+# Risk is scored per distinct capability and summed across the whole chain, so a
+# plan combining several individually-modest tools is not scored as though it
+# were only the single riskiest one.
+_CAPABILITY_RISK: dict[str, int] = {
+    READ: 1,
+    SENSITIVE_READ: 4,
+    WRITE_LOW: 5,
+    WRITE_HIGH: 20,
+    PRIVILEGED: 50,
+}
+
+# The ceiling a single approved plan may reach. write-high (20) and privileged
+# (50) exceed it on their own, so "L2 stays disabled" and "privileged is blocked"
+# become one arithmetic rule rather than a list of special cases.
+RISK_CEILING = 10
+
 
 class ExecutionPlanError(RuntimeError):
     """The prepared or current execution state violates the approved plan."""
@@ -33,6 +59,14 @@ class ExecutionPlan:
     workspace_root: str
     execution_tools: tuple[str, ...] = ()
     capabilities: tuple[str, ...] = ()
+    # Aggregate risk and the ceiling in force, both frozen at approval time: a
+    # later policy that raises the ceiling cannot retroactively bless this plan.
+    risk_score: int = 0
+    risk_ceiling: int = RISK_CEILING
+    # The account/region the operator approved. Re-checked before execution so an
+    # environment change invalidates the approval instead of silently retargeting.
+    account_id: str = ""
+    region: str = ""
 
     def canonical_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
@@ -62,6 +96,10 @@ class ExecutionPlan:
                 capabilities=tuple(
                     str(capability) for capability in data.get("capabilities", [])
                 ),
+                risk_score=int(data.get("risk_score", 0)),
+                risk_ceiling=int(data.get("risk_ceiling", RISK_CEILING)),
+                account_id=str(data.get("account_id", "")),
+                region=str(data.get("region", "")),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ExecutionPlanError("invalid execution plan") from exc
@@ -69,6 +107,11 @@ class ExecutionPlan:
 
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _write_capabilities(capabilities: tuple[str, ...]) -> set[str]:
+    """The subset that can change something outside this process."""
+    return {c for c in capabilities if c in (WRITE_LOW, WRITE_HIGH, PRIVILEGED)}
 
 
 def configured_workspace_root() -> Path:
@@ -104,17 +147,62 @@ def changed_paths(diff: str) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
+# Declared capability of every tool the allowlist can hand to a model.
+# allowlist.py cross-checks this at import — a tool added on one side only is an
+# import error, not a plan whose risk is quietly understated.
+_TOOL_CAPABILITIES: dict[str, str] = {
+    "Read": READ,
+    "Edit": WRITE_LOW,
+    "Write": WRITE_LOW,
+    "Bash(git status:*)": READ,
+    "Bash(git diff:*)": READ,
+    "Bash(git checkout:*)": WRITE_LOW,
+    "Bash(git add:*)": WRITE_LOW,
+    "Bash(git commit:*)": WRITE_LOW,
+    "Bash(git push:*)": WRITE_LOW,
+    "Bash(gh pr create:*)": WRITE_LOW,
+    # pytest executes repository code and may leave artifacts in the workspace;
+    # classify by what it can do, not by the fact that it is "just tests".
+    "Bash(python -m pytest:*)": WRITE_LOW,
+    "Bash(terraform plan:*)": READ,
+    "Bash(terraform show:*)": READ,
+}
+
+
+def declared_tools() -> frozenset[str]:
+    """Tools with a declared capability (mirrors the allowlist)."""
+    return frozenset(_TOOL_CAPABILITIES)
+
+
 def capabilities_for_tools(tools: tuple[str, ...]) -> tuple[str, ...]:
-    """Aggregate capabilities from the complete planned tool chain, not one call."""
+    """Aggregate capabilities across the complete planned tool chain, not one call.
+
+    Raises:
+        ExecutionPlanError: a tool has no declared capability — an unclassified
+            tool must not be scored as harmless.
+    """
     capabilities: set[str] = set()
     for tool in tools:
-        if tool == "Read" or "get" in tool.lower() or "diff" in tool.lower() or "status" in tool.lower():
-            capabilities.add("read")
-        if any(token in tool for token in ("Edit", "Write", "commit", "push", "gh pr create")):
-            capabilities.add("write-low")
-        if any(token in tool.lower() for token in ("iam", "secret", "delete", "apply", "deploy")):
-            capabilities.add("privileged")
+        try:
+            capabilities.add(_TOOL_CAPABILITIES[tool])
+        except KeyError:
+            raise ExecutionPlanError(f"tool has no declared capability: {tool!r}") from None
     return tuple(sorted(capabilities))
+
+
+def risk_score(capabilities: tuple[str, ...]) -> int:
+    """Score the aggregate capability of a plan.
+
+    Raises:
+        ExecutionPlanError: an unknown capability — fail closed rather than score 0.
+    """
+    total = 0
+    for capability in capabilities:
+        try:
+            total += _CAPABILITY_RISK[capability]
+        except KeyError:
+            raise ExecutionPlanError(f"unknown capability: {capability!r}") from None
+    return total
 
 
 def build_pr_plan(
@@ -123,9 +211,24 @@ def build_pr_plan(
     *,
     workspace_root: Path | None = None,
     execution_tools: tuple[str, ...] = (),
+    account_id: str = "",
+    region: str = "",
 ) -> ExecutionPlan:
-    """Build the immutable plan displayed to and approved by the operator."""
+    """Build the immutable plan displayed to and approved by the operator.
+
+    Raises:
+        ExecutionPlanError: the aggregate risk of the tool chain exceeds the
+            ceiling — such a plan is never offered for approval, so an operator
+            cannot be asked to bless something the policy would refuse anyway.
+    """
     root = workspace_root if workspace_root is not None else configured_workspace_root()
+    capabilities = capabilities_for_tools(tuple(sorted(execution_tools)))
+    score = risk_score(capabilities)
+    if score > RISK_CEILING:
+        raise ExecutionPlanError(
+            f"planned tool chain risk {score} exceeds the ceiling {RISK_CEILING}: "
+            f"capabilities={list(capabilities)}"
+        )
     return ExecutionPlan(
         command="pr",
         args_sha256=_sha256(args.strip()),
@@ -134,7 +237,11 @@ def build_pr_plan(
         policy_version=POLICY_VERSION,
         workspace_root=str(root.resolve(strict=True)),
         execution_tools=tuple(sorted(execution_tools)),
-        capabilities=capabilities_for_tools(tuple(sorted(execution_tools))),
+        capabilities=capabilities,
+        risk_score=score,
+        risk_ceiling=RISK_CEILING,
+        account_id=account_id,
+        region=region,
     )
 
 
@@ -175,8 +282,15 @@ def verify_pr_workspace(
     plan_hash: str,
     *,
     expected_execution_tools: tuple[str, ...] = (),
+    account_id: str = "",
+    region: str = "",
 ) -> ExecutionPlan:
-    """Verify the exact approved plan and current workspace before write execution."""
+    """Verify the exact approved plan and current workspace before write execution.
+
+    Every check here is a re-approval trigger: if it fires, the approval no longer
+    describes what is about to run, and the job fails rather than executing a
+    plan the operator did not see.
+    """
     plan = ExecutionPlan.from_json(plan_json)
     if plan.digest() != plan_hash:
         raise ExecutionPlanError("execution plan hash mismatch")
@@ -185,8 +299,32 @@ def verify_pr_workspace(
     expected_tools = tuple(sorted(expected_execution_tools))
     if plan.execution_tools != expected_tools:
         raise ExecutionPlanError("execution tool chain changed after approval")
-    if plan.capabilities != capabilities_for_tools(expected_tools):
+    current_capabilities = capabilities_for_tools(expected_tools)
+    if plan.capabilities != current_capabilities:
+        approved_writes = _write_capabilities(plan.capabilities)
+        current_writes = _write_capabilities(current_capabilities)
+        if current_writes - approved_writes:
+            raise ExecutionPlanError(
+                "execution escalated to write capability after approval: "
+                f"{sorted(current_writes - approved_writes)}"
+            )
         raise ExecutionPlanError("execution capability aggregation changed after approval")
+    # Re-score rather than trust the stored number, and compare against the
+    # ceiling that was in force at approval — not today's.
+    current_score = risk_score(current_capabilities)
+    if current_score != plan.risk_score:
+        raise ExecutionPlanError(
+            f"execution risk score changed after approval: {plan.risk_score} → {current_score}"
+        )
+    if current_score > plan.risk_ceiling:
+        raise ExecutionPlanError(
+            f"execution risk {current_score} exceeds the approved ceiling {plan.risk_ceiling}"
+        )
+    if plan.account_id != account_id or plan.region != region:
+        raise ExecutionPlanError(
+            "target account or region changed after approval: "
+            f"{plan.account_id}/{plan.region} → {account_id}/{region}"
+        )
     if plan.args_sha256 != _sha256(args.strip()) or plan.diff_sha256 != _sha256(diff):
         raise ExecutionPlanError("approved request or diff no longer matches the plan")
 

@@ -258,3 +258,41 @@ def test_dynamo_single_table_coexistence() -> None:
         assert [j.id for j in jobs.list_recent()] == [job.id]
         assert len(audits.list_feed()) == 1
         assert len(metrics.list_feed()) == 1
+
+
+# ── trajectory 필드 동치 (Sqlite ↔ DynamoDB) ──────────────────
+
+
+@_both_audit
+def test_trajectory_fields_round_trip_on_both_backends(audit_store) -> None:
+    # DynamoDB 는 capabilities 를 리스트로, SQLite 는 문자열로 저장한다 —
+    # 어느 쪽이든 호출자가 보는 모양은 같아야 한다.
+    from app.store import result_digest
+
+    root = audit_store.append("job-1", "claimed", tool_name="pr")
+    child = audit_store.append(
+        "job-1",
+        "write_credentials_issued",
+        parent_step_id=root.step_id,
+        tool_name="sts:github-app-installation-token",
+        capabilities=("read", "write-low"),
+        target_resource="repo:o/r",
+        result_hash=result_digest("PR opened"),
+    )
+
+    events = audit_store.list_for_job("job-1")
+    assert [e.step_id for e in events] == [root.step_id, child.step_id]
+    restored = events[1]
+    assert restored.parent_step_id == root.step_id
+    assert restored.capabilities == ("read", "write-low")
+    assert restored.target_resource == "repo:o/r"
+    assert restored.result_hash == result_digest("PR opened")
+
+
+@_both_audit
+def test_trajectory_chain_verifies_on_both_backends(audit_store) -> None:
+    from app.store.audit_store import verify_event_chain
+
+    root = audit_store.append("job-1", "claimed", tool_name="pr")
+    audit_store.append("job-1", "done", parent_step_id=root.step_id, tool_name="pr")
+    assert verify_event_chain(audit_store.list_for_job("job-1"))

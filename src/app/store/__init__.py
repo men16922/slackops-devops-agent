@@ -11,6 +11,8 @@ from app.store.audit_store import (
     AuditStore,
     DynamoDbAuditStore,
     SqliteAuditStore,
+    build_step_tree,
+    result_digest,
 )
 from app.store.base import (
     CLAIMABLE_STATUSES,
@@ -50,6 +52,8 @@ __all__ = [
     "CLAIMABLE_STATUSES",
     "TERMINAL_STATUSES",
     "AuditEvent",
+    "build_step_tree",
+    "result_digest",
     "AuditStore",
     "ChatRole",
     "ChatStatus",

@@ -35,6 +35,13 @@ export interface Job {
   approval_hash?: string;
 }
 
+/**
+ * Mirrors app/store/audit_store.py AuditEvent.
+ *
+ * Everything past `detail` is optional on purpose: records written before those
+ * fields existed are still in the table, and the dashboard has to render them
+ * rather than crash on a missing attribute.
+ */
 export interface AuditEvent {
   job_id: string;
   ts: string;
@@ -42,6 +49,17 @@ export interface AuditEvent {
   action: string;
   actor: string;
   detail: string;
+  context?: Record<string, string>;
+  prev_event_hash?: string;
+  event_hash?: string;
+  /** Trajectory: step identity + parent link let a job's events form a tree. */
+  step_id?: string;
+  parent_step_id?: string;
+  tool_name?: string;
+  capabilities?: string[];
+  target_resource?: string;
+  /** sha256 of the step's result — proves what was returned without storing it. */
+  result_hash?: string;
 }
 
 export interface Metric {

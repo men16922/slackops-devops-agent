@@ -13,8 +13,10 @@ import json
 import os
 import re
 import subprocess
+import sys
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 # claude 바이너리 이름(EC2 user-data 가 PATH 에 설치).
@@ -64,12 +66,21 @@ def _strip_ansi(text: str) -> str:
     return _CSI_RE.sub("", text)
 
 
-def _agent_subprocess_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+def _agent_subprocess_env(
+    environ: Mapping[str, str] | None = None,
+    extra_env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
     """Claude/MCP 자식 프로세스에 최소 환경만 전달한다.
 
     Agent가 shell 도구나 취약한 MCP dependency를 통해 환경을 읽더라도 Slack bot/app
     token, OAuth callback secret, AWS credential chain, DynamoDB endpoint를 얻지 못하게
     한다. 내부 MCP 서버의 control-plane 연결은 mcp_config의 per-server env로만 준다.
+
+    Args:
+        environ: 원본 환경(테스트 주입점).
+        extra_env: 이 실행 1회에만 명시적으로 주입할 값. 상속이 아니라 호출자가 건네야만
+            들어온다 — 승인 후 발급된 단기 write credential(write_credentials)과 command
+            guard 설정이 이 경로로만 자식에 도달한다.
     """
     source = os.environ if environ is None else environ
     env = {key: value for key in _AGENT_ENV_NAMES if (value := source.get(key))}
@@ -77,7 +88,22 @@ def _agent_subprocess_env(environ: Mapping[str, str] | None = None) -> dict[str,
     # 다시 찾는 경로를 차단한다. mcp_config의 SlackOps stdio 서버만 이를 false로 override
     # 하며, 그 서버는 allowlisted propose/list control-plane 도구만 노출한다.
     env["AWS_EC2_METADATA_DISABLED"] = "true"
+    if extra_env:
+        env.update(extra_env)
     return env
+
+
+def _guard_env(guard_command: str | None) -> dict[str, str]:
+    """command guard hook이 필요로 하는 환경(신뢰 명령 이름 + import 경로)."""
+    if guard_command is None:
+        return {}
+    from app.command_guard import GUARD_COMMAND_ENV
+
+    # hook은 claude 프로세스의 자식이므로 이 값은 모델의 Bash subshell이 바꿀 수 없다.
+    return {
+        GUARD_COMMAND_ENV: guard_command,
+        "PYTHONPATH": str(Path(__file__).resolve().parent.parent),
+    }
 
 
 # 실행기 시그니처: (cmd, timeout_s) → (exit_code, stdout, stderr).
@@ -114,10 +140,16 @@ class RunResult:
     cost_usd: float | None = None
 
 
+def guard_hook_argv() -> list[str]:
+    """command guard hook을 실행할 argv(현재 인터프리터의 모듈 진입점)."""
+    return [sys.executable, "-m", "app.command_guard"]
+
+
 def build_command(
     prompt: str,
     allowed_tools: list[str],
     mcp_config: str | None = None,
+    guard_command: str | None = None,
 ) -> list[str]:
     """`claude -p` 호출 인자 리스트 생성(shell 미사용 — 인자 주입 불가).
 
@@ -128,12 +160,23 @@ def build_command(
     .mcp.json 무시, 전달 설정만 사용)를 추가한다 — 에이전트 모니터가 propose_job MCP 서버를
     등록하는 경로. 허용 도구는 `mcp__<server>__<tool>` 형태로 allowed_tools 에 넣는다.
 
+    guard_command 가 주어지면 `--settings` 로 command guard PreToolUse hook 을 설치한다.
+    `--allowedTools` 패턴은 명령줄 **앞부분**만 검사하므로(측정: Claude Code 2.1.210 에서
+    `Bash(echo:*)` 가 `echo hi; whoami` 를 실행) 그 자체로는 실행 경계가 되지 못한다.
+    hook 의 deny 는 allowedTools 허용을 덮어쓰므로, 모든 Bash 호출이 app.command_guard 의
+    정규화 + 인자 스키마를 통과해야만 실행된다.
+
     Args:
         prompt: sanitizer.build_prompt 로 생성된 검증된 프롬프트.
         allowed_tools: 이 명령에 허용된 도구 목록(Tool Allowlist).
         mcp_config: MCP 서버 설정(인라인 JSON 또는 파일 경로). None 이면 미등록(기존 동작).
+        guard_command: argv 스키마를 고를 신뢰 명령 이름. None 이면 hook 미설치.
     """
+    from app.command_guard import hook_settings_json
+
     cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "json"]
+    if guard_command is not None:
+        cmd.extend(["--settings", hook_settings_json(guard_hook_argv())])
     if mcp_config:
         cmd.extend(["--mcp-config", mcp_config, "--strict-mcp-config"])
     if allowed_tools:
@@ -141,17 +184,26 @@ def build_command(
     return cmd
 
 
+def _runner_with_env(extra_env: Mapping[str, str]) -> SubprocessRunner:
+    """실 subprocess 실행기 — 이 호출 1회에만 유효한 추가 환경을 주입한다."""
+
+    def run(cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+            env=_agent_subprocess_env(extra_env=extra_env),
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+
+    return run
+
+
 def _default_runner(cmd: list[str], timeout_s: int) -> tuple[int, str, str]:
     """기본 실행기 — 실 subprocess 호출(테스트에서는 사용 금지, mock 주입)."""
-    proc = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=timeout_s,
-        check=False,
-        env=_agent_subprocess_env(),
-    )
-    return proc.returncode, proc.stdout, proc.stderr
+    return _runner_with_env({})(cmd, timeout_s)
 
 
 def _parse_tokens(payload: dict[str, object]) -> int | None:
@@ -368,6 +420,8 @@ def run_headless(
     timeout_s: int = DEFAULT_TIMEOUT_S,
     runner: SubprocessRunner | None = None,
     mcp_config: str | None = None,
+    guard_command: str | None = None,
+    extra_env: Mapping[str, str] | None = None,
 ) -> RunResult:
     """Claude Code Headless 를 subprocess 로 실행.
 
@@ -377,6 +431,9 @@ def run_headless(
         timeout_s: 실행 타임아웃(초).
         runner: subprocess 실행기(테스트 주입점). None 이면 실 subprocess.
         mcp_config: MCP 서버 설정(인라인 JSON/경로). 주어지면 --mcp-config + --strict-mcp-config.
+        guard_command: command guard PreToolUse hook 에 적용할 신뢰 명령 이름.
+        extra_env: 이 실행 1회에만 주입할 환경(승인 후 발급된 단기 write credential).
+            상속이 아니라 명시 전달이므로 prepare/진단 경로에는 절대 존재하지 않는다.
 
     Returns:
         RunResult — 출력 + 계측 메타. 실패는 raise 하지 않고 exit_code 로 전달.
@@ -384,8 +441,11 @@ def run_headless(
     Raises:
         ClaudeTimeoutError: timeout_s 초과.
     """
-    active_runner: SubprocessRunner = runner if runner is not None else _default_runner
-    cmd = build_command(prompt, allowed_tools, mcp_config)
+    call_env = {**_guard_env(guard_command), **(extra_env or {})}
+    active_runner: SubprocessRunner = (
+        runner if runner is not None else _runner_with_env(call_env)
+    )
+    cmd = build_command(prompt, allowed_tools, mcp_config, guard_command)
     try:
         exit_code, stdout, stderr = active_runner(cmd, timeout_s)
     except subprocess.TimeoutExpired as exc:

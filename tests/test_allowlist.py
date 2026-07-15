@@ -121,7 +121,9 @@ def test_run_for_command_passes_allowlist_to_runner() -> None:
     assert len(runner.calls) == 1
     cmd, timeout_s = runner.calls[0]
     assert timeout_s == 30
-    assert cmd == build_command("analyze", [])
+    # run_for_command 는 실행 경계(command guard hook)를 항상 함께 건다 — 도구가 비어도
+    # 모델이 얻을 수 있는 shell 표면을 argv 스키마가 결정한다.
+    assert cmd == build_command("analyze", [], None, "logs")
 
 
 def test_run_for_command_threads_mcp_config_to_runner() -> None:
@@ -129,7 +131,7 @@ def test_run_for_command_threads_mcp_config_to_runner() -> None:
     runner = RecordingRunner(stdout=_result_json("ok"))
     run_for_command("logs", "analyze", timeout_s=30, runner=runner, mcp_config=cfg)
     cmd, _ = runner.calls[0]
-    assert cmd == build_command("analyze", [], cfg)
+    assert cmd == build_command("analyze", [], cfg, "logs")
     idx = cmd.index("--mcp-config")
     assert cmd[idx + 1] == cfg
     assert "--strict-mcp-config" in cmd

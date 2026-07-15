@@ -308,7 +308,7 @@ async function seedData() {
     updated_at: isoAt(-280),
     diff: DIFF_AGENT_SAMPLE,
     rationale:
-      "checkout-api 504 게이트웨이 타임아웃 급증(p99 8.1s) 감지 — proxy_read_timeout 상향 PR을 제안합니다. 승인 시에만 push/PR 생성(L1 출력 게이트).",
+      "Detected a checkout-api 504 gateway-timeout spike (p99 8.1s). Proposes a PR to raise proxy_read_timeout; push and PR creation remain behind the L1 approval gate.",
   };
   items.push(jobItem(agentPr));
   items.push(
@@ -329,7 +329,7 @@ async function seedData() {
     requested_by: "agent",
     created_at: isoAt(-60),
     updated_at: isoAt(-60),
-    rationale: "api 5xx 오류율 12% 감지 — 다중 소스 종합 진단을 제안합니다.",
+    rationale: "Detected a 12% API 5xx error rate. Proposes a multi-source diagnostic before any change.",
   };
   items.push(jobItem(agentDiag));
   items.push(

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "purpose": "Isolated, read-only managed AWS MCP pilot. This is not part of the SlackOps EC2 runtime.",
+  "runtimeAccountId": "__RUNTIME_ACCOUNT_ID__",
+  "pilotAccountId": "__PILOT_ACCOUNT_ID__",
+  "pilotRegion": "__PILOT_REGION__",
+  "managedMcpServer": "aws-mcp.amazonaws.com",
+  "pilotRoleName": "slackops-managed-aws-mcp-pilot-role",
+  "allowedLogGroupPrefix": "/approved-service/",
+  "requiredControls": [
+    "separate AWS account from runtimeAccountId",
+    "separate role from all slackops-devops-agent runtime roles",
+    "CloudTrail trail or event data store records AwsMcpEvent data events",
+    "write operations remain absent from the pilot role policy",
+    "VPC endpoint support is verified for the selected managed MCP server before it is required"
+  ],
+  "forbiddenRuntimeRoles": [
+    "slackops-devops-agent-role",
+    "slackops-devops-agent-runtime-role",
+    "slackops-devops-agent-mcp-role",
+    "slackops-devops-agent-audit-role"
+  ]
+}

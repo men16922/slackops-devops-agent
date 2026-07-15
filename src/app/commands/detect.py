@@ -15,6 +15,7 @@ from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
 from app.commands._replies import exec_failed_reply, no_data_reply
 from app.sanitizer import build_prompt
+from app.policy_boundary import PolicyDenied, authorize_command
 from app.telemetry import RunMetricsHook
 
 DetectionFetcher = Callable[[str], str]
@@ -147,6 +148,10 @@ def handle_detect(
         name = validated_category(category)
     except InvalidCategory:
         return _USAGE_HINT
+    try:
+        scope = authorize_command("detect", name)
+    except PolicyDenied:
+        return ":no_entry: Request is outside the configured security scope."
     active_fetcher = fetch_detection_data if fetcher is None else fetcher
     try:
         raw_data = active_fetcher(name)
@@ -160,6 +165,7 @@ def handle_detect(
         timeout_s=timeout_s,
         runner=runner,
         on_metrics=on_metrics,
+        policy_scope=scope,
     )
     if result.exit_code != 0:
         return exec_failed_reply(name, "Detection scan", result.exit_code, result.output)

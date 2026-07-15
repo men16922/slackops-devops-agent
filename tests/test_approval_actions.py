@@ -12,15 +12,23 @@ from typing import Any
 from app.approval_actions import (
     ACTION_APPROVE,
     ACTION_REJECT,
+    ACTION_REVIEW,
     ALREADY_HANDLED,
     AUDIT_APPROVED,
     AUDIT_APPROVAL_DENIED,
     AUDIT_REJECTED,
     DIFF_PREVIEW_MAX,
     NOT_AUTHORIZED,
+    REVIEW_DECISION_ACTION,
+    REVIEW_DECISION_BLOCK,
+    REVIEW_MODAL_CALLBACK,
+    SHORTCUT_REVIEW,
     apply_decision,
     decision_blocks,
+    job_id_from_message_blocks,
+    modal_decision,
     register_approval_actions,
+    review_modal,
 )
 from app.store.audit_store import SqliteAuditStore
 from app.store.base import JobSource, JobStatus
@@ -49,7 +57,11 @@ def test_decision_blocks_has_buttons_with_job_id_value() -> None:
     blocks = decision_blocks(job)
     actions = [b for b in blocks if b["type"] == "actions"][0]
     ids = {e["action_id"]: e["value"] for e in actions["elements"]}
-    assert ids == {ACTION_APPROVE: job_id, ACTION_REJECT: job_id}
+    assert ids == {
+        ACTION_APPROVE: job_id,
+        ACTION_REJECT: job_id,
+        ACTION_REVIEW: job_id,
+    }
     # diff 가 미리보기 섹션에 코드블록으로 들어간다.
     assert any("hello diff" in str(b) for b in blocks)
 
@@ -117,10 +129,12 @@ def test_apply_decision_audit_optional() -> None:
 
 
 class _FakeApp:
-    """app.action(id)(fn) 등록을 잡아두는 최소 Bolt App 대역."""
+    """action/shortcut/view 등록을 잡아두는 최소 Bolt App 대역."""
 
     def __init__(self) -> None:
         self.handlers: dict[str, Any] = {}
+        self.shortcuts: dict[str, Any] = {}
+        self.views: dict[str, Any] = {}
 
     def action(self, action_id: str) -> Any:
         def _register(fn: Any) -> Any:
@@ -129,13 +143,35 @@ class _FakeApp:
 
         return _register
 
+    def shortcut(self, callback_id: str) -> Any:
+        def _register(fn: Any) -> Any:
+            self.shortcuts[callback_id] = fn
+            return fn
+
+        return _register
+
+    def view(self, callback_id: str) -> Any:
+        def _register(fn: Any) -> Any:
+            self.views[callback_id] = fn
+            return fn
+
+        return _register
+
 
 class _FakeClient:
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
+        self.views: list[dict[str, Any]] = []
+        self.ephemeral: list[dict[str, Any]] = []
 
     def chat_update(self, **kwargs: Any) -> None:
         self.updates.append(kwargs)
+
+    def views_open(self, **kwargs: Any) -> None:
+        self.views.append(kwargs)
+
+    def chat_postEphemeral(self, **kwargs: Any) -> None:
+        self.ephemeral.append(kwargs)
 
 
 def _body(job_id: str) -> dict[str, Any]:
@@ -144,6 +180,7 @@ def _body(job_id: str) -> dict[str, Any]:
         "user": {"id": "U777"},
         "container": {"message_ts": "1700.5"},
         "channel": {"id": "C1"},
+        "trigger_id": "trigger-1",
     }
 
 
@@ -181,7 +218,9 @@ def test_binding_reject_routes_to_reject() -> None:
 def test_binding_registers_both_action_ids() -> None:
     app = _FakeApp()
     register_approval_actions(app, jobs=SqliteJobStore())
-    assert set(app.handlers) == {ACTION_APPROVE, ACTION_REJECT}
+    assert set(app.handlers) == {ACTION_APPROVE, ACTION_REJECT, ACTION_REVIEW}
+    assert set(app.shortcuts) == {SHORTCUT_REVIEW}
+    assert set(app.views) == {REVIEW_MODAL_CALLBACK}
 
 
 def test_binding_denies_user_outside_approver_allowlist() -> None:
@@ -208,3 +247,108 @@ def test_audit_labels_match_dashboard_feed_contract() -> None:
     # web/app/actions.ts transition 이 쓰는 라벨과 동일해야 피드/대시보드가 일관 — 드리프트 가드.
     assert AUDIT_APPROVED == "approved"
     assert AUDIT_REJECTED == "rejected"
+
+
+def test_review_modal_keeps_diff_out_of_private_metadata_and_requires_decision() -> None:
+    store = SqliteJobStore()
+    job_id = _awaiting_job(store, diff="secret-looking diff")
+    job = store.get(job_id)
+    assert job is not None
+
+    view = review_modal(job, channel="C1", ts="1700.5")
+
+    assert view["callback_id"] == REVIEW_MODAL_CALLBACK
+    assert job_id in view["private_metadata"]
+    assert "secret-looking diff" not in view["private_metadata"]
+    assert "secret-looking diff" in str(view["blocks"])
+    decision = view["blocks"][-1]
+    assert decision["block_id"] == REVIEW_DECISION_BLOCK
+    assert decision["element"]["action_id"] == REVIEW_DECISION_ACTION
+
+
+def test_modal_decision_defaults_to_deny_for_malformed_or_unknown_value() -> None:
+    assert modal_decision({}) is None
+    body = {
+        "view": {
+            "state": {
+                "values": {
+                    REVIEW_DECISION_BLOCK: {
+                        REVIEW_DECISION_ACTION: {"selected_option": {"value": "approve"}}
+                    }
+                }
+            }
+        }
+    }
+    assert modal_decision(body) is True
+    body["view"]["state"]["values"][REVIEW_DECISION_BLOCK][REVIEW_DECISION_ACTION]["selected_option"]["value"] = "surprise"
+    assert modal_decision(body) is None
+
+
+def test_review_button_opens_modal_for_allowlisted_approver_only() -> None:
+    store = SqliteJobStore()
+    job_id = _awaiting_job(store)
+    app = _FakeApp()
+    register_approval_actions(app, jobs=store, allowed_approvers=frozenset({"U777"}))
+    client = _FakeClient()
+
+    app.handlers[ACTION_REVIEW](ack=lambda: None, body=_body(job_id), client=client)
+
+    assert len(client.views) == 1
+    assert client.views[0]["trigger_id"] == "trigger-1"
+    assert client.views[0]["view"]["callback_id"] == REVIEW_MODAL_CALLBACK
+    assert store.get(job_id).status is JobStatus.AWAITING_APPROVAL  # type: ignore[union-attr]
+
+
+def test_modal_submission_applies_decision_and_updates_original_message() -> None:
+    store = SqliteJobStore()
+    job_id = _awaiting_job(store)
+    job = store.get(job_id)
+    assert job is not None
+    app = _FakeApp()
+    register_approval_actions(app, jobs=store, allowed_approvers=frozenset({"U777"}))
+    client = _FakeClient()
+    acknowledgements: list[dict[str, Any]] = []
+    body = {
+        "user": {"id": "U777"},
+        "view": {
+            "private_metadata": review_modal(job, channel="C1", ts="1700.5")["private_metadata"],
+            "state": {
+                "values": {
+                    REVIEW_DECISION_BLOCK: {
+                        REVIEW_DECISION_ACTION: {"selected_option": {"value": "reject"}}
+                    }
+                }
+            },
+        },
+    }
+
+    app.views[REVIEW_MODAL_CALLBACK](
+        ack=lambda **kwargs: acknowledgements.append(kwargs), body=body, client=client
+    )
+
+    assert acknowledgements == [{}]
+    assert store.get(job_id).status is JobStatus.REJECTED  # type: ignore[union-attr]
+    assert client.updates[0]["channel"] == "C1"
+    assert "rejected" in client.updates[0]["text"]
+
+
+def test_message_shortcut_extracts_only_slackops_approval_action_and_opens_modal() -> None:
+    store = SqliteJobStore()
+    job_id = _awaiting_job(store)
+    app = _FakeApp()
+    register_approval_actions(app, jobs=store, allowed_approvers=frozenset({"U777"}))
+    client = _FakeClient()
+    blocks = decision_blocks(store.get(job_id))  # type: ignore[arg-type]
+    body = {
+        "user": {"id": "U777"},
+        "trigger_id": "shortcut-trigger",
+        "channel": {"id": "C1"},
+        "message": {"ts": "1700.5", "blocks": blocks},
+    }
+
+    assert job_id_from_message_blocks(blocks) == job_id
+    assert job_id_from_message_blocks([{ "type": "actions", "elements": [{"action_id": ACTION_APPROVE, "value": job_id}]}]) is None
+    app.shortcuts[SHORTCUT_REVIEW](ack=lambda: None, body=body, client=client)
+
+    assert client.views[0]["trigger_id"] == "shortcut-trigger"
+    assert client.views[0]["view"]["private_metadata"].find(job_id) >= 0
