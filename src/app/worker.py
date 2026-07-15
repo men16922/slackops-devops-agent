@@ -63,6 +63,19 @@ AUDIT_PLAN_BINDING_REJECTED = "plan_binding_rejected"
 AUDIT_POLICY_DENIED = "policy_denied"
 AUDIT_WRITE_CREDENTIALS_ISSUED = "write_credentials_issued"
 AUDIT_TOOL_CALL = "tool_call"
+AUDIT_CAPABILITY_DRIFT = "capability_drift"
+
+# 해석되지 않은 도구는 지우지 않고 이 접두사로 드러낸다.
+_UNRESOLVED_PREFIX = "unresolved:"
+
+
+class CapabilityDrift(Exception):
+    """실제로 관측된 capability 가 인가된 범위를 벗어났다."""
+
+    def __init__(self, reason: str, *, observed: tuple[str, ...] = ()) -> None:
+        super().__init__(f"capability drift: {reason}")
+        self.reason = reason
+        self.observed = observed
 
 # 승인된 PR execute 단계가 push 할 저장소(owner/name). 미설정이면 write credential 을
 # 발급하지 않는다 — 자격 없이 실행되어 push 가 실패한다(fail closed, 로컬/데모 기본값).
@@ -380,6 +393,8 @@ class Worker:
 
         started = self._monotonic()
         executor = self._executors.get(job.command)
+        resolved: tuple[tuple[ToolCall, str], ...] = ()
+        observed: tuple[str, ...] = ()
         try:
             if executor is None:
                 raise LookupError(
@@ -394,10 +409,14 @@ class Worker:
                 else None
             )
             outcome = executor(job)
+            # What was permitted and what ran are different claims. Check the second
+            # one before the result is allowed to count as a completed job.
+            resolved = self._resolve_tool_steps(job, outcome)
+            observed = self._enforce_observed_capability(job, resolved, plan)
             if plan is not None:
                 self._postcondition_verifier(job, outcome, plan)
         except Exception as exc:  # noqa: BLE001 — 실행 실패를 FAILED 로 기록(루프 생존)
-            return self._fail(job, started, exc, root_step, target_resource)
+            return self._fail(job, started, exc, root_step, target_resource, resolved)
 
         duration_ms = self._duration_ms(started)
         # 출력 게이트(주입 방어 3계층): diff 가 있는 L1 쓰기는 사람 승인 전에
@@ -423,7 +442,7 @@ class Worker:
                 execution_plan=plan.canonical_json(),
                 execution_plan_hash=plan.digest(),
             )
-            observed = self._record_tool_steps(job, root_step, outcome)
+            self._record_tool_steps(job, root_step, resolved)
             self._audit.append(
                 job.id,
                 AUDIT_AWAITING_APPROVAL,
@@ -462,7 +481,7 @@ class Worker:
                 tool_name="gh pr diff",
                 target_resource=target_resource,
             )
-        observed = self._record_tool_steps(job, root_step, outcome)
+        self._record_tool_steps(job, root_step, resolved)
         updated = self._jobs.complete(
             job.id,
             status=JobStatus.DONE,
@@ -512,22 +531,17 @@ class Worker:
         return processed
 
     # ── 내부 ──────────────────────────────────────────────────
-    def _record_tool_steps(
-        self, job: Job, parent_step_id: str, outcome: CommandOutcome
-    ) -> tuple[str, ...]:
-        """관측된 도구 호출을 Claude 호출 아래 자식 스텝으로 남기고 capability 를 재집계한다.
+    def _resolve_tool_steps(
+        self, job: Job, outcome: CommandOutcome
+    ) -> tuple[tuple[ToolCall, str], ...]:
+        """관측된 각 호출을 그것을 인가한 allowlist 도구 패턴으로 해석한다.
 
-        allowlist 는 무엇이 허용됐는지만 말한다. 여기서 기록하는 것은 실제로 무엇이
-        실행됐는지이며, 그 결과로 얻은 capability 가 정적 집계와 어긋나면 그 사실 자체가
-        감사에 남는다.
-
-        Returns:
-            관측된 도구에서 재집계한 capability.
+        guard 의 파스를 재사용한다 — 실행을 실제로 허가하는 것과 의견이 갈릴 수 있는
+        분류기를 하나 더 두지 않는다.
         """
         from app.command_guard import CommandGuardError, resolve_tool
-        from app.execution_plan import capabilities_for_tools
 
-        observed: set[str] = set()
+        resolved: list[tuple[ToolCall, str]] = []
         for call in outcome.tool_steps:
             tool = call.name
             if call.command:
@@ -536,8 +550,79 @@ class Worker:
                 except CommandGuardError:
                     # guard 가 허용한 것만 실행됐어야 한다. 해석되지 않는 명령줄은
                     # 감사에서 지우지 말고 있는 그대로 남긴다.
-                    tool = f"unresolved:{call.name}"
-            observed.add(tool)
+                    tool = f"{_UNRESOLVED_PREFIX}{call.name}"
+            resolved.append((call, tool))
+        return tuple(resolved)
+
+    def _observed_capabilities(
+        self, resolved: tuple[tuple[ToolCall, str], ...]
+    ) -> tuple[str, ...]:
+        from app.execution_plan import capabilities_for_tools
+
+        tools = tuple(
+            sorted({t for _c, t in resolved if not t.startswith(_UNRESOLVED_PREFIX)})
+        )
+        try:
+            return capabilities_for_tools(tools)
+        except ExecutionPlanError:
+            return ()
+
+    def _enforce_observed_capability(
+        self,
+        job: Job,
+        resolved: tuple[tuple[ToolCall, str], ...],
+        plan: ExecutionPlan | None,
+    ) -> tuple[str, ...]:
+        """관측된 capability 가 인가된 범위를 넘으면 실행을 실패시킨다.
+
+        정상 경로에서는 guard 가 argv 단계에서 이미 막으므로 이 검사는 조용하다. 그것이
+        요점이다 — guard 가 우회되거나 도구 표면이 드리프트하면, 그 사실이 감사 기록이
+        아니라 **거부**로 드러나야 한다. 승인 시점 capability 가 기준이며, 정적 allowlist 는
+        승인 계획이 없는 명령의 상한이다.
+
+        Raises:
+            CapabilityDrift: 관측 capability/risk 가 인가 범위를 초과.
+        """
+        from app.execution_plan import capabilities_for_tools, risk_score
+
+        observed = self._observed_capabilities(resolved)
+        unresolved = [c.command or c.name for c, t in resolved if t.startswith(_UNRESOLVED_PREFIX)]
+        if unresolved:
+            raise CapabilityDrift(
+                f"observed a tool call the guard does not authorize: {unresolved[0]!r}",
+                observed=observed,
+            )
+        if not observed:
+            return observed
+        if plan is not None:
+            authorized = tuple(plan.capabilities)
+            ceiling = plan.risk_score
+        else:
+            try:
+                from app.allowlist import allowed_tools
+
+                authorized = capabilities_for_tools(tuple(sorted(allowed_tools(job.command))))
+            except Exception:  # noqa: BLE001 — allowlist 없는 명령(ping)은 도구도 없다
+                authorized = ()
+            ceiling = risk_score(authorized) if authorized else 0
+        extra = set(observed) - set(authorized)
+        if extra:
+            raise CapabilityDrift(
+                f"observed capability outside the authorized set: {sorted(extra)}",
+                observed=observed,
+            )
+        score = risk_score(observed)
+        if score > ceiling:
+            raise CapabilityDrift(
+                f"observed risk {score} exceeds the authorized {ceiling}", observed=observed
+            )
+        return observed
+
+    def _record_tool_steps(
+        self, job: Job, parent_step_id: str, resolved: tuple[tuple[ToolCall, str], ...]
+    ) -> None:
+        """관측된 도구 호출을 Claude 호출 아래 자식 스텝으로 남긴다."""
+        for call, tool in resolved:
             self._audit.append(
                 job.id,
                 AUDIT_TOOL_CALL,
@@ -549,11 +634,6 @@ class Worker:
                 target_resource=job.args,
                 result_hash=call.result_hash,
             )
-        resolvable = tuple(sorted(t for t in observed if not t.startswith("unresolved:")))
-        try:
-            return capabilities_for_tools(resolvable)
-        except Exception:  # noqa: BLE001 — 감사 기록이 실행을 실패시키면 안 된다
-            return ()
 
     @contextmanager
     def _audited_grant(
@@ -601,10 +681,25 @@ class Worker:
         exc: Exception,
         root_step: str = "",
         target_resource: str = "",
+        resolved: tuple[tuple[ToolCall, str], ...] = (),
     ) -> Job | None:
         error = f"{type(exc).__name__}: {exc}"
         updated = self._jobs.complete(job.id, status=JobStatus.FAILED, error=error)
-        if isinstance(exc, ExecutionPlanError):
+        # 실패해도 실제로 무엇이 돌았는지는 남긴다 — 궤적에 구멍이 생기면 안 된다.
+        self._record_tool_steps(job, root_step, resolved)
+        if isinstance(exc, CapabilityDrift):
+            self._audit.append(
+                job.id,
+                AUDIT_CAPABILITY_DRIFT,
+                actor=WORKER_ACTOR,
+                detail="observed capability exceeded the authorized set",
+                context={"reason": exc.reason, "observed": ",".join(exc.observed)},
+                parent_step_id=root_step,
+                tool_name=job.command,
+                capabilities=exc.observed,
+                target_resource=target_resource,
+            )
+        elif isinstance(exc, ExecutionPlanError):
             self._audit.append(
                 job.id,
                 AUDIT_PLAN_BINDING_REJECTED,

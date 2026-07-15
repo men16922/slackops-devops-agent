@@ -5,6 +5,21 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-15 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-16 — D23 promote observed capability from record to gate
+- Status: Done for local/CI. No EC2/live rehearsal.
+- Changed: worker now checks what actually ran before a result may count as a completed job. Observed capability is
+  resolved via the guard's parse and held to the **approved plan's** capability set/risk (or, with no plan, the
+  command's static allowlist as the ceiling). Any tool call the guard does not authorize, any capability outside the
+  authorized set, or any risk above the approved score fails the job with a dedicated `capability_drift` audit event
+  carrying the reason. Tool steps are recorded on the failure path too — a rejected run must not leave a hole in the
+  trajectory. `CapabilityDrift` is its own exception so drift is distinguishable from plan-binding rejection.
+- Verified: `make check` → **540 passed**, Ruff, strict mypy, doc budgets. Drove both paths: authorized
+  (`git status` only) → DONE with `caps=read`; guard-bypass (`curl http://169.254.169.254/` observed) → FAILED with
+  `capability_drift: observed a tool call the guard does not authorize`, and both tool steps still in the tree.
+- Blockers: none. On the normal path this gate is silent because `command_guard` already rejects the argv — that is
+  the intent (defence in depth), not redundancy: it only speaks if the guard is bypassed or the tool surface drifts.
+- Next: GitHub App registration + 4 SSM params + EC2 `pr` execute rehearsal (manual); slides.
+
 ## 2026-07-16 — D22 per-tool-call trajectory + observed capability (Notion P1 close-out)
 - Status: Done for local/CI. No EC2/live rehearsal.
 - Measured first (2.1.210 stream-json): `assistant` events carry `tool_use{id,name,input.command}` and `user`

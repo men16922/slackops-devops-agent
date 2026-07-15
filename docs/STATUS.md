@@ -11,7 +11,7 @@ Last updated: 2026-07-16
 - **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth, immutable plan/approval hash, workspace/tool/postcondition validation, approver allowlist/audit chain, EC2 hardening; Vercel and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `make check` → **536 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- 3-layer gate: `make check` → **540 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
   `cd web && npm run build` and `git diff --check` also pass for D15.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge→Lambda(`alarm_lambda`, detect→propose)→DynamoDB queue→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok). Serverless producer fires EC2-off; EC2 then terminated → ≈ $0.
 - **Vercel dashboard live** on real DynamoDB (link + Team ID captured); `web/lib/ddb.ts` trims env + defaults to us-east-1.
@@ -27,22 +27,24 @@ Last updated: 2026-07-16
   denied before access, Worker emitted `policy_denied` with reason/scope, 24h window verified; artifact/instance removed.
 - **P3 managed AWS MCP pilot scaffold (local/CI only, 2026-07-15):** separate-account contract, context-key-constrained Logs
   read policy, CloudTrail violation query. No AWS role, trust policy, endpoint, MCP session, or EC2 rehearsal exists.
-- **D19–D22 secure runtime (local/CI, 2026-07-16, commit `3affc65`+):** all four rest on one measurement —
+- **D19–D23 secure runtime (local/CI, 2026-07-16, commits `3affc65`/`84535bc`+):** all rest on one measurement —
   `--allowedTools 'Bash(echo:*)'` ran `echo hi; whoami` (2.1.210): tool patterns bind a command line's head, not execution.
-  **D19** `command_guard` normalizes argv + enforces per-command schemas via a PreToolUse hook (deny beats
-  allowedTools; e2e: `;`/`$()` denied, schema match ran). PR write is no longer standing — repo/permission-scoped
-  GitHub App token minted only after approval-hash re-verification, then revoked + audited; App unregistered → fails closed.
+  **D19** `command_guard` normalizes argv + enforces per-command schemas via a PreToolUse hook (deny beats allowedTools;
+  e2e: `;`/`$()` denied, schema match ran). PR write is no longer standing — repo/permission-scoped GitHub App token minted
+  only after approval-hash re-verification, then revoked + audited; App unregistered → fails closed.
   **D20** declared 5-class capability taxonomy (old substring classifier scored `git add`/`pytest`/`terraform plan` as
   *no* capability); chain-summed risk vs `RISK_CEILING=10` (write-high/privileged exceed alone → L2/privileged blocked by
   arithmetic); score/ceiling/account/region pinned in the hashed plan; re-approval on read→write escalation/score/account/
   region change; unclassified tool = import error. `pr` risk 6, `tf-review` 1.
-  **D21** audit events carry store-assigned step_id/parent_step_id/tool_name/capabilities/target_resource/result_hash
-  and form a tree (claim = root; write_credentials_issued descends from its approval step). Trajectory fields hash only
-  when set → chains already in DynamoDB still verify. Sqlite↔DynamoDB moto-equivalent; web mirror updated.
+  **D21** audit events carry store-assigned step_id/parent_step_id/tool_name/capabilities/target_resource/result_hash and
+  form a tree (claim = root; write_credentials_issued descends from its approval step). Trajectory fields hash only when
+  set → chains already in DynamoDB still verify. Sqlite↔DynamoDB moto-equivalent; web mirror updated.
   **D22** stream-json for **observation** (`json` output has no tool-call data); dual-shape parser keeps mocks aligned
   with production; each observed call = a `tool_call` step; `resolve_tool` maps observed argv → declared capability via the
-  guard's own parse. Real e2e: `claimed → tool_call ×2 → done caps=read` vs static read,write-low. Re-aggregation is
-  **observational only** — it does not yet re-gate a job exceeding its approved risk.
+  guard's own parse. Real e2e: `claimed → tool_call ×2 → done caps=read` vs static read,write-low.
+  **D23** observed capability is a gate, not a note: anything the guard does not authorize, or capability/risk beyond the
+  approval, fails the job with a `capability_drift` event (reason kept); failure paths still record what ran. Silent on
+  the normal path by design — it speaks only if the guard is bypassed. Verified: authorized=DONE, `curl` observed=FAILED.
 - **All user-facing text English** (H0): agent Slack/chat + dashboard UI are English; seed rationales translated (2026-07-15).
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics render
   + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
@@ -56,11 +58,10 @@ Last updated: 2026-07-16
   claude_runner (run_headless — runner injection, allowedTools passthrough, stream-json→RunResult+ToolCall, timeout),
   allowlist (per-command Tool Allowlist mapping + run_for_command single entry point — permissions gate →
   allowlist → run_headless, forbidden keywords validated at import-time, default deny),
-  commands/logs (handle_logs — fetcher inject→sanitizer isolate→run_for_command assemble,
-  service-arg regex validation, boto3 lazy default fetcher),
-  commands/diagnose (handle_diagnose — multi-source fetchers injected (logs/kubectl/git diff),
-  per-source failure isolation, single isolation block per section marker, no Claude call when all sources empty),
-  routing registration (register_default_commands — ping/logs/diagnose, module attribute lookup at call time),
+  commands/logs (fetcher inject→sanitizer isolate→run_for_command assemble, service-arg regex, boto3 lazy fetcher),
+  commands/diagnose (multi-source fetchers injected (logs/kubectl/git diff), per-source failure isolation, one
+  isolation block per section marker, no Claude call when all sources empty),
+  routing registration (register_default_commands — module attribute lookup at call time),
   store/ (H0 single-table — JobStore state machine + claim atomicity, AuditStore append/job/day feed,
   TelemetryStore record/feed — each with Sqlite+DynamoDb implementations, moto equivalence verified),
   worker (Worker.process_one — claim→executor→await_approval output gate if diff unapproved, else DONE / FAILED on
@@ -69,10 +70,9 @@ Last updated: 2026-07-16
   commands/pr (2-stage — prepare strips push/PR tools from argv + extracts diff via marker → worker gate; execute
   (post-approval) regains push + `gh pr create` and a scoped write grant; description only as isolation block),
   tf-review is on the slack synchronous path (pr is worker-only since its gate requires store state).
-- telemetry (setup_telemetry real implementation — TracerProvider+SimpleSpanProcessor, exporter inject/OTLP lazy,
-  None when not installed; record_run_metrics emits devops.run span when tracer injected, store record invariant),
-  instrumentation coupling (run_for_command on_metrics — single entry point instruments all Claude calls, 4 handlers
-  passthrough, worker writes back real tokens/cost; Worker emits OTel span when tracer injected). No stubs remaining.
+- telemetry (setup_telemetry — TracerProvider+SimpleSpanProcessor, exporter inject/OTLP lazy, None when not installed;
+  record_run_metrics emits devops.run span when tracer injected), instrumentation coupling (run_for_command on_metrics —
+  single entry point instruments all Claude calls; worker writes back real tokens/cost). No stubs remaining.
 - **web/ dashboard (Next.js 14.2.35 App Router, TS)** — local e2e verified. lib/ddb (single-table TS mirror: GSI2
   FEED/AUDIT/METRIC queries), app/{jobs feed, detail = diff output gate + Approve/Reject + audit, metrics aggregation},
   actions (approval server action = ConditionExpression transition + audit append, optimistic lock), scripts/seed.mjs

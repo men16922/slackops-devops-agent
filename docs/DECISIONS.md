@@ -270,3 +270,20 @@ Last updated: 2026-07-15
   its allowlist statically implies `read,write-low`. Unresolvable argv is recorded as `unresolved:<name>` rather than
   dropped, and audit-step failures are swallowed so recording can never fail an execution. Limitation: re-aggregation
   is **observational only** — it does not yet re-gate a job whose observed capability exceeds its approval.
+
+## D23 — what ran is checked, not just recorded
+- Decision: before a result may count as a completed job, the worker holds the *observed* capability (resolved through
+  `command_guard`'s own parse) to the approved plan's capability set and risk score — or, for a job with no plan, to the
+  command's static allowlist as a ceiling. An unauthorized tool call, a capability outside the authorized set, or risk
+  above the approved score fails the job and writes a `capability_drift` audit event with the reason. Observed tool
+  steps are recorded on the failure path too.
+- Reason: D22 made observation possible but left it advisory — a job whose observed capability exceeded its approval
+  still completed. An audit trail that notices a violation after the fact is a report, not a boundary. On the normal
+  path this check is silent because the PreToolUse guard already rejects the argv; that silence is the point. It exists
+  for the case where the guard is bypassed or the tool surface drifts, which is exactly when the earlier layers have
+  already failed and a second, independent check is the only thing left. Recording steps on failure matters for the
+  same reason the trail exists at all: a rejected run is precisely the one an investigator needs to reconstruct.
+- Impact: `CapabilityDrift` is a distinct exception, so drift is distinguishable from plan-binding rejection in both
+  the audit trail and the failure reason. Measured both ways: an authorized `git status`-only run completes with
+  `caps=read`, while an observed `curl http://169.254.169.254/` fails the job and both tool steps remain in the tree.
+  Limitation: the bound is per-job, so a capability legitimately approved for one job is not re-examined across jobs.

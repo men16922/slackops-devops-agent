@@ -55,9 +55,8 @@ Last updated: 2026-07-15
 - [x] `[auto]` P1 per-tool-call 궤적 + 관측 capability: stream-json 전환(관측 목적), `ToolCall` 파이프라인,
       `tool_call` 감사 스텝, `resolve_tool` 로 관측 argv→선언 capability 재집계 (2026-07-16, DECISIONS D22).
       실 Claude e2e 로 `claimed → tool_call ×2 → done caps=read` 확인.
-- [ ] `[auto]` 관측 capability 를 **게이트로 승격**: 현재 재집계는 감사 기록일 뿐이라, 실행 중 승인 범위를 넘는
-      capability 가 관측돼도 job 이 멈추지 않는다(guard 가 argv 를 막으므로 현재는 이론적 경로).
-      Done: 관측 capability 가 승인된 plan 의 capability/risk 를 초과하면 job 이 실패하고 사유가 감사에 남는다.
+- [x] `[auto]` 관측 capability 게이트 승격: 인가 범위를 넘는 관측은 `capability_drift` 로 job 실패 + 사유 기록,
+      실패 경로에도 tool step 기록 (2026-07-16, DECISIONS D23). 실행 검증: 인가=DONE / guard 우회=FAILED.
 - [ ] `[auto]` P1 post-condition 확장: 현재 remote diff 비교만이고 `pr` 전용. 단 L2(Execute)가 비활성이라
       health/replica/config 재조회는 **검증할 실제 변경이 없다** — L2 를 열 때까지는 값어치가 낮다.
 
