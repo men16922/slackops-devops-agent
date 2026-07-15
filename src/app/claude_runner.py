@@ -119,25 +119,45 @@ class ClaudeTimeoutError(ClaudeRunnerError):
     """Claude Code Headless 실행이 timeout_s 안에 끝나지 않음."""
 
 
+@dataclass(frozen=True)
+class ToolCall:
+    """모델이 실제로 실행한 도구 호출 1건.
+
+    allowlist 는 무엇이 **허용되는지**를 말할 뿐 무엇이 **일어났는지**는 말하지 못한다.
+    감사 궤적과 capability 재집계는 이 관측값을 근거로 한다.
+
+    Attributes:
+        tool_use_id: Claude 가 부여한 호출 식별자(tool_result 와 짝을 이룬다).
+        name: 도구 이름(Bash/Read/Edit/...).
+        command: Bash 호출의 명령줄(그 외 도구는 빈 문자열).
+        result_hash: 결과 본문의 sha256 — 본문은 감사에 남기지 않는다.
+        is_error: 도구가 오류를 돌려줬는지.
+    """
+
+    tool_use_id: str
+    name: str
+    command: str = ""
+    result_hash: str = ""
+    is_error: bool = False
+
+
 @dataclass
 class RunResult:
     """Claude Code Headless 실행 결과.
-
-    tool call 횟수는 `--output-format json` 의 result 객체에 없어 여기서 제공하지 않는다.
-    계측이 필요하면 stream-json 파싱이 도입될 때 추가한다(telemetry.record_run_metrics 는
-    tool_calls 를 별도 인자로 받는다).
 
     Attributes:
         output: 결과 텍스트(JSON 출력이면 `result` 필드, 아니면 raw stdout/stderr).
         exit_code: subprocess 종료 코드.
         tokens: 사용 토큰 수(input+output, 계측용, 없으면 None).
         cost_usd: 호출 비용 USD(계측용, 없으면 None).
+        tool_calls: 이 실행에서 관측된 도구 호출(stream-json 출력에서만 채워진다).
     """
 
     output: str
     exit_code: int
     tokens: int | None = None
     cost_usd: float | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 def guard_hook_argv() -> list[str]:
@@ -174,7 +194,10 @@ def build_command(
     """
     from app.command_guard import hook_settings_json
 
-    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "json"]
+    # stream-json 을 쓰는 이유는 스트리밍이 아니라 **관측** 이다: `json` 출력의 result 객체에는
+    # tool call 정보가 없어서, 무엇이 실제로 실행됐는지 앱이 알 수 없다(감사 궤적/capability
+    # 재집계의 근거가 사라진다). print 모드에서 stream-json 은 --verbose 를 요구한다.
+    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "stream-json", "--verbose"]
     if guard_command is not None:
         cmd.extend(["--settings", hook_settings_json(guard_hook_argv())])
     if mcp_config:
@@ -224,8 +247,58 @@ def _parse_cost(payload: dict[str, object]) -> float | None:
     return None
 
 
+def _tool_calls_from_events(events: list[dict[str, object]]) -> tuple[ToolCall, ...]:
+    """관측된 tool_use 를 그 tool_result 와 짝지어 ToolCall 로 만든다."""
+    from app.store import result_digest
+
+    uses: dict[str, tuple[str, str]] = {}
+    order: list[str] = []
+    results: dict[str, tuple[str, bool]] = {}
+    for event in events:
+        message = event.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use" and isinstance(block.get("id"), str):
+                raw_input = block.get("input")
+                command = ""
+                if isinstance(raw_input, dict) and isinstance(raw_input.get("command"), str):
+                    command = raw_input["command"]
+                uses[block["id"]] = (str(block.get("name", "")), command)
+                order.append(block["id"])
+            elif block.get("type") == "tool_result" and isinstance(
+                block.get("tool_use_id"), str
+            ):
+                results[block["tool_use_id"]] = (
+                    str(block.get("content", "")),
+                    bool(block.get("is_error", False)),
+                )
+    calls: list[ToolCall] = []
+    for use_id in order:
+        name, command = uses[use_id]
+        body, is_error = results.get(use_id, ("", False))
+        calls.append(
+            ToolCall(
+                tool_use_id=use_id,
+                name=name,
+                command=command,
+                result_hash=result_digest(body) if body else "",
+                is_error=is_error,
+            )
+        )
+    return tuple(calls)
+
+
 def _parse_result(exit_code: int, stdout: str, stderr: str) -> RunResult:
-    """stdout 을 RunResult 로 파싱 — `--output-format json` 우선, 실패 시 raw 텍스트."""
+    """stdout 을 RunResult 로 파싱.
+
+    stream-json(JSONL)과 단일 JSON 객체를 모두 받는다. 단일 객체 경로는 `--output-format
+    json` 을 쓰던 시절의 출력 모양이며, 실행기를 주입하는 테스트가 그 모양을 그대로 쓴다 —
+    파서가 한쪽만 알면 mock 과 실물이 갈라진다.
+    """
     try:
         payload = json.loads(stdout)
     except (json.JSONDecodeError, ValueError):
@@ -238,6 +311,36 @@ def _parse_result(exit_code: int, stdout: str, stderr: str) -> RunResult:
             exit_code=exit_code,
             tokens=_parse_tokens(payload),
             cost_usd=_parse_cost(payload),
+        )
+    events: list[dict[str, object]] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+    if events:
+        final = next(
+            (e for e in reversed(events) if e.get("type") == "result"), None
+        )
+        output = ""
+        tokens: int | None = None
+        cost: float | None = None
+        if final is not None:
+            text = final.get("result")
+            output = text if isinstance(text, str) else ""
+            tokens = _parse_tokens(final)
+            cost = _parse_cost(final)
+        return RunResult(
+            output=_strip_ansi(output),
+            exit_code=exit_code,
+            tokens=tokens,
+            cost_usd=cost,
+            tool_calls=_tool_calls_from_events(events),
         )
     output = stdout if stdout.strip() else stderr
     return RunResult(output=_strip_ansi(output), exit_code=exit_code)

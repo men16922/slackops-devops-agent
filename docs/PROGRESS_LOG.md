@@ -5,6 +5,27 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-15 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-16 — D22 per-tool-call trajectory + observed capability (Notion P1 close-out)
+- Status: Done for local/CI. No EC2/live rehearsal.
+- Measured first (2.1.210 stream-json): `assistant` events carry `tool_use{id,name,input.command}` and `user`
+  events carry `tool_result{tool_use_id,is_error,content}` — enough to reconstruct what actually ran.
+- Changed: `run_headless` now uses `--output-format stream-json --verbose`. The reason is **observation, not
+  streaming**: the `json` result object has no tool-call data, so the app could not know what executed.
+  `_parse_result` accepts both JSONL and the old single-JSON object, because injected-runner tests use the latter
+  shape and a parser that knows only one would let mocks and production drift apart. New `ToolCall`
+  (tool_use_id/name/command/result_hash/is_error) flows RunResult → RunMetrics → CommandOutcome.tool_steps → worker,
+  which emits one `tool_call` audit step per observed call under the claim root. `ArgSchema` now names the allowlist
+  tool it authorizes, so `command_guard.resolve_tool` maps an observed argv back to a declared capability using the
+  parse the guard already had to do — no second, drifting classifier. `done` records **observed** capabilities;
+  `awaiting_approval` records `observed_capabilities` beside the planned risk. Unresolvable argv is recorded as
+  `unresolved:<name>` rather than dropped. pr's two Claude calls (prepare+execute) both contribute steps.
+- Verified: `make check` → **536 passed**, Ruff, strict mypy, doc budgets. Real `claude -p` e2e: two real Bash calls →
+  `claimed(pr) → tool_call Bash(git status:*) → tool_call Bash(git diff:*) → done caps=read`, chain verified.
+  Observed `read` (only reads ran) vs the allowlist's static `read,write-low` — the D20 gap is closed.
+- Blockers: none. Audit-step failures are swallowed so recording cannot fail an execution; capability re-aggregation
+  is observational only — it does not (yet) re-gate a job that exceeds its approved risk mid-run.
+- Next: consider gating on observed-vs-approved capability drift; GitHub App registration + EC2 rehearsal stay manual.
+
 ## 2026-07-16 — D21 full-trajectory audit fields (Notion P1)
 - Status: Done for local/CI (store + worker + web mirror). No EC2/live rehearsal.
 - Changed: `AuditEvent` gains `step_id`/`parent_step_id`/`tool_name`/`capabilities`/`target_resource`/`result_hash`;

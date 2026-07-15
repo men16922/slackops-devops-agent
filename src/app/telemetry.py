@@ -10,9 +10,12 @@ span 으로 추가 emit 한다. opentelemetry 미설치 환경에서도 전 경�
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from app.store import MetricRecord, TelemetryStore
+
+if TYPE_CHECKING:  # 관측된 도구 호출의 정의는 실행기(claude_runner)가 소유한다.
+    from app.claude_runner import ToolCall
 
 _DEFAULT_OTLP_ENDPOINT = "http://127.0.0.1:4317"  # 같은 호스트의 ADOT Collector gRPC
 
@@ -27,6 +30,8 @@ class RunMetrics:
         tokens / cost_usd: RunResult 의 계측 메타(없으면 None).
         success: exit_code == 0 (timeout/실행기 예외는 False).
         error: 실패 사유(success=False 일 때).
+        tool_calls: 이 호출에서 **관측된** 도구 호출(stream-json). allowlist 는 무엇이
+            허용되는지만 말한다 — 감사 궤적과 capability 재집계는 이 값을 근거로 한다.
     """
 
     command: str
@@ -35,6 +40,7 @@ class RunMetrics:
     cost_usd: float | None = None
     success: bool = True
     error: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 # 계측 수신 시그니처 — 호출부(worker/슬랙 동기 경로)가 store/OTel 로 연결한다.

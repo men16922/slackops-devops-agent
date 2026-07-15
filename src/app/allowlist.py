@@ -265,6 +265,7 @@ def run_for_command(
                 cost_usd=result.cost_usd,
                 success=result.exit_code == 0,
                 error=None if result.exit_code == 0 else result.output,
+                tool_calls=result.tool_calls,
             )
         )
     return result

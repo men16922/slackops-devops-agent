@@ -252,3 +252,21 @@ Last updated: 2026-07-15
   crashing. Limitation, explicitly: the tree is **phase-level, not call-level** — `--output-format json` exposes no
   per-tool-call data, so sub-steps under a single Claude call need stream-json parsing. Until then D20's capability
   aggregation stays allowlist-derived rather than based on observed tool use.
+
+## D22 — stream-json is an observation channel, and the guard's parse is the capability oracle
+- Decision: `run_headless` runs `claude -p --output-format stream-json --verbose` and reconstructs `ToolCall`s
+  (tool_use_id/name/command/result_hash/is_error) from the event stream; `_parse_result` still accepts the single-JSON
+  object shape. Each observed call becomes a `tool_call` audit step under the job's claim root, and `ArgSchema` names
+  the allowlist tool it authorizes so `command_guard.resolve_tool` maps an observed argv back to a declared capability.
+- Reason: the `json` output's result object carries no tool-call data, so the runtime could not answer "what actually
+  executed" — the trajectory was necessarily phase-level and capability aggregation had to trust the static allowlist
+  (D20's stated limitation). stream-json is adopted for *observation*, not streaming. The dual-shape parser exists
+  because injected-runner tests feed the old single-JSON shape; a parser that understood only one would let mocks and
+  production drift apart silently. Capability resolution reuses the guard's own parse rather than adding a second
+  classifier — a separate matcher would be free to disagree with the thing that actually permits execution, which is
+  exactly how the substring classifier in D20 went wrong.
+- Impact: `done` records observed capabilities and `awaiting_approval` records them beside the planned risk, so the
+  trail shows what ran, not only what was allowed — measured e2e, a `pr` job that only read resolves to `read` while
+  its allowlist statically implies `read,write-low`. Unresolvable argv is recorded as `unresolved:<name>` rather than
+  dropped, and audit-step failures are swallowed so recording can never fail an execution. Limitation: re-aggregation
+  is **observational only** — it does not yet re-gate a job whose observed capability exceeds its approval.

@@ -52,11 +52,12 @@ Last updated: 2026-07-15
 - [x] `[auto]` P1 audit trajectory 필드: step_id/parent_step_id/tool_name/capabilities/target_resource/result_hash,
       store 가 step_id 부여, worker 가 phase 트리 emit(`write_credentials_issued` 부모 = 승인 스텝), `build_step_tree`,
       해시 back-compat(빈 필드는 payload 제외 → 기존 DynamoDB 체인 유효), web 미러 (2026-07-16, DECISIONS D21).
-- [ ] `[auto]` P1 per-tool-call 궤적: 현재 트리는 **phase 단위**다. 한 Claude 호출 안의 도구별 하위 스텝을 남기려면
-      `--output-format stream-json` 파싱이 필요하다(`json` 출력엔 tool call 정보가 없어 `claude_runner` 가
-      tool_calls 를 제공하지 못한다 — `StreamResult.tool_uses` 는 이미 있다).
-      Done: 한 job 의 트리에서 Claude 호출 아래 실제 도구 호출이 자식 스텝으로 보이고, capability 집계가 정적
-      allowlist 가 아니라 **관측된 도구**로 재계산된다(현재 D20 한계를 해소).
+- [x] `[auto]` P1 per-tool-call 궤적 + 관측 capability: stream-json 전환(관측 목적), `ToolCall` 파이프라인,
+      `tool_call` 감사 스텝, `resolve_tool` 로 관측 argv→선언 capability 재집계 (2026-07-16, DECISIONS D22).
+      실 Claude e2e 로 `claimed → tool_call ×2 → done caps=read` 확인.
+- [ ] `[auto]` 관측 capability 를 **게이트로 승격**: 현재 재집계는 감사 기록일 뿐이라, 실행 중 승인 범위를 넘는
+      capability 가 관측돼도 job 이 멈추지 않는다(guard 가 argv 를 막으므로 현재는 이론적 경로).
+      Done: 관측 capability 가 승인된 plan 의 capability/risk 를 초과하면 job 이 실패하고 사유가 감사에 남는다.
 - [ ] `[auto]` P1 post-condition 확장: 현재 remote diff 비교만이고 `pr` 전용. 단 L2(Execute)가 비활성이라
       health/replica/config 재조회는 **검증할 실제 변경이 없다** — L2 를 열 때까지는 값어치가 낮다.
 

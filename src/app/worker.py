@@ -22,7 +22,7 @@ from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from app.claude_runner import SubprocessRunner
+from app.claude_runner import SubprocessRunner, ToolCall
 from app.execution_plan import (
     ExecutionPlan,
     ExecutionPlanError,
@@ -62,6 +62,7 @@ AUDIT_POSTCONDITION_VERIFIED = "postcondition_verified"
 AUDIT_PLAN_BINDING_REJECTED = "plan_binding_rejected"
 AUDIT_POLICY_DENIED = "policy_denied"
 AUDIT_WRITE_CREDENTIALS_ISSUED = "write_credentials_issued"
+AUDIT_TOOL_CALL = "tool_call"
 
 # 승인된 PR execute 단계가 push 할 저장소(owner/name). 미설정이면 write credential 을
 # 발급하지 않는다 — 자격 없이 실행되어 push 가 실패한다(fail closed, 로컬/데모 기본값).
@@ -81,6 +82,8 @@ class CommandOutcome:
         diff: L1 쓰기의 변경 diff. None 이 아니고 job 이 아직 미승인이면
             출력 게이트(AWAITING_APPROVAL)로 분기한다.
         tokens / cost_usd / tool_calls: 계측 메타(없으면 None).
+        tool_steps: 이 실행에서 **관측된** 도구 호출. 감사 궤적의 자식 스텝이 되고,
+            capability 를 정적 allowlist 가 아니라 실제 사용으로 재집계하는 근거가 된다.
     """
 
     result: str = ""
@@ -88,6 +91,7 @@ class CommandOutcome:
     tokens: int | None = None
     cost_usd: float | None = None
     tool_calls: int | None = None
+    tool_steps: tuple[ToolCall, ...] = ()
 
 
 # 명령 실행기 시그니처: (job) → CommandOutcome. 예외는 worker 가 FAILED 로 기록한다.
@@ -207,6 +211,13 @@ def default_executors(
         if captured:
             outcome.tokens = captured[-1].tokens
             outcome.cost_usd = captured[-1].cost_usd
+            # pr 은 prepare/execute 로 Claude 를 2회 호출한다 — 궤적은 두 호출의 도구를
+            # 모두 담아야 하므로 마지막 것만 취하지 않는다.
+            steps: list[ToolCall] = []
+            for metrics in captured:
+                steps.extend(metrics.tool_calls)
+            outcome.tool_steps = tuple(steps)
+            outcome.tool_calls = len(steps) or None
         return outcome
 
     def logs_executor(job: Job) -> CommandOutcome:
@@ -412,6 +423,7 @@ class Worker:
                 execution_plan=plan.canonical_json(),
                 execution_plan_hash=plan.digest(),
             )
+            observed = self._record_tool_steps(job, root_step, outcome)
             self._audit.append(
                 job.id,
                 AUDIT_AWAITING_APPROVAL,
@@ -422,6 +434,8 @@ class Worker:
                     "policy_version": plan.policy_version,
                     "risk_score": str(plan.risk_score),
                     "risk_ceiling": str(plan.risk_ceiling),
+                    # 승인자가 보는 것은 계획이지만, 남는 것은 실제로 무엇이 돌았는지다.
+                    "observed_capabilities": ",".join(observed),
                 },
                 parent_step_id=root_step,
                 tool_name=job.command,
@@ -448,6 +462,7 @@ class Worker:
                 tool_name="gh pr diff",
                 target_resource=target_resource,
             )
+        observed = self._record_tool_steps(job, root_step, outcome)
         updated = self._jobs.complete(
             job.id,
             status=JobStatus.DONE,
@@ -461,6 +476,7 @@ class Worker:
             actor=WORKER_ACTOR,
             parent_step_id=root_step,
             tool_name=job.command,
+            capabilities=observed,
             target_resource=target_resource,
             result_hash=result_digest(outcome.result),
         )
@@ -496,6 +512,49 @@ class Worker:
         return processed
 
     # ── 내부 ──────────────────────────────────────────────────
+    def _record_tool_steps(
+        self, job: Job, parent_step_id: str, outcome: CommandOutcome
+    ) -> tuple[str, ...]:
+        """관측된 도구 호출을 Claude 호출 아래 자식 스텝으로 남기고 capability 를 재집계한다.
+
+        allowlist 는 무엇이 허용됐는지만 말한다. 여기서 기록하는 것은 실제로 무엇이
+        실행됐는지이며, 그 결과로 얻은 capability 가 정적 집계와 어긋나면 그 사실 자체가
+        감사에 남는다.
+
+        Returns:
+            관측된 도구에서 재집계한 capability.
+        """
+        from app.command_guard import CommandGuardError, resolve_tool
+        from app.execution_plan import capabilities_for_tools
+
+        observed: set[str] = set()
+        for call in outcome.tool_steps:
+            tool = call.name
+            if call.command:
+                try:
+                    tool = resolve_tool(job.command, call.command)
+                except CommandGuardError:
+                    # guard 가 허용한 것만 실행됐어야 한다. 해석되지 않는 명령줄은
+                    # 감사에서 지우지 말고 있는 그대로 남긴다.
+                    tool = f"unresolved:{call.name}"
+            observed.add(tool)
+            self._audit.append(
+                job.id,
+                AUDIT_TOOL_CALL,
+                actor=WORKER_ACTOR,
+                detail=call.command or call.name,
+                context={"tool_use_id": call.tool_use_id, "is_error": str(call.is_error)},
+                parent_step_id=parent_step_id,
+                tool_name=tool,
+                target_resource=job.args,
+                result_hash=call.result_hash,
+            )
+        resolvable = tuple(sorted(t for t in observed if not t.startswith("unresolved:")))
+        try:
+            return capabilities_for_tools(resolvable)
+        except Exception:  # noqa: BLE001 — 감사 기록이 실행을 실패시키면 안 된다
+            return ()
+
     @contextmanager
     def _audited_grant(
         self, job: Job, plan: ExecutionPlan

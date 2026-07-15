@@ -46,8 +46,11 @@ def test_build_command_basic_shape() -> None:
     cmd = build_command("do analysis", ["Bash(aws logs:*)", "Read"])
     assert cmd[0] == CLAUDE_BIN
     assert cmd[1:3] == ["-p", "do analysis"]
+    # stream-json 을 쓰는 이유는 스트리밍이 아니라 관측이다 — `json` 출력에는 tool call
+    # 정보가 없어 무엇이 실제로 실행됐는지 감사할 수 없다. print 모드는 --verbose 를 요구한다.
     assert "--output-format" in cmd
-    assert cmd[cmd.index("--output-format") + 1] == "json"
+    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
+    assert "--verbose" in cmd
     idx = cmd.index("--allowedTools")
     assert cmd[idx + 1 :] == ["Bash(aws logs:*)", "Read"]
 

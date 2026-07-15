@@ -51,6 +51,9 @@ class ArgSchema:
 
     Attributes:
         prefix: fixed leading tokens (binary plus subcommand) that must match exactly.
+        tool: the allowlist tool pattern this schema authorizes. It ties an observed
+            command line back to a declared capability, so aggregation can be
+            recomputed from what actually ran rather than from what was permitted.
         flags: permitted flags mapped to whether the flag consumes a value.
         positional: pattern every positional argument must satisfy; None forbids
             positional arguments entirely.
@@ -58,6 +61,7 @@ class ArgSchema:
     """
 
     prefix: tuple[str, ...]
+    tool: str
     flags: Mapping[str, bool] = field(default_factory=dict)
     positional: re.Pattern[str] | None = None
     max_positional: int = 0
@@ -65,6 +69,7 @@ class ArgSchema:
 
 def _schema(
     prefix: str,
+    tool: str,
     *,
     flags: Mapping[str, bool] | None = None,
     positional: re.Pattern[str] | None = None,
@@ -72,6 +77,7 @@ def _schema(
 ) -> ArgSchema:
     return ArgSchema(
         prefix=tuple(prefix.split()),
+        tool=tool,
         flags=flags or {},
         positional=positional,
         max_positional=max_positional,
@@ -86,13 +92,16 @@ _COMMAND_SCHEMAS: dict[str, tuple[ArgSchema, ...]] = {
     "detect": (),
     "diagnose": (),
     "tf-review": (
-        _schema("terraform plan", flags={"-no-color": False, "-input": True}),
-        _schema("terraform show", flags={"-no-color": False, "-json": False}),
+        _schema("terraform plan", "Bash(terraform plan:*)", flags={"-no-color": False, "-input": True}),
+        _schema("terraform show", "Bash(terraform show:*)", flags={"-no-color": False, "-json": False}),
     ),
     "pr": (
-        _schema("git status", flags={"--porcelain": False, "--short": False}),
+        _schema(
+            "git status", "Bash(git status:*)", flags={"--porcelain": False, "--short": False}
+        ),
         _schema(
             "git diff",
+            "Bash(git diff:*)",
             flags={
                 "--no-ext-diff": False,
                 "--binary": False,
@@ -103,17 +112,25 @@ _COMMAND_SCHEMAS: dict[str, tuple[ArgSchema, ...]] = {
             positional=_REPO_PATH_RE,
             max_positional=1,
         ),
-        _schema("git checkout -b", positional=_BRANCH_RE, max_positional=1),
-        _schema("git add", flags={"-A": False, "--all": False}, positional=_REPO_PATH_RE, max_positional=50),
-        _schema("git commit", flags={"-m": True, "--message": True}),
+        _schema("git checkout -b", "Bash(git checkout:*)", positional=_BRANCH_RE, max_positional=1),
+        _schema(
+            "git add",
+            "Bash(git add:*)",
+            flags={"-A": False, "--all": False},
+            positional=_REPO_PATH_RE,
+            max_positional=50,
+        ),
+        _schema("git commit", "Bash(git commit:*)", flags={"-m": True, "--message": True}),
         _schema(
             "git push",
+            "Bash(git push:*)",
             flags={"-u": False, "--set-upstream": False},
             positional=_BRANCH_RE,
             max_positional=2,
         ),
         _schema(
             "gh pr create",
+            "Bash(gh pr create:*)",
             flags={
                 "--title": True,
                 "--body": True,
@@ -124,6 +141,7 @@ _COMMAND_SCHEMAS: dict[str, tuple[ArgSchema, ...]] = {
         ),
         _schema(
             "python -m pytest",
+            "Bash(python -m pytest:*)",
             flags={"-q": False, "--quiet": False, "-x": False, "--tb": True},
             positional=_REPO_PATH_RE,
             max_positional=20,
@@ -202,6 +220,27 @@ def _match_schema(argv: tuple[str, ...], schema: ArgSchema) -> None:
         index += 1
 
 
+def _matching_schema(command: str, command_line: str) -> tuple[tuple[str, ...], ArgSchema]:
+    try:
+        schemas = _COMMAND_SCHEMAS[command]
+    except KeyError:
+        raise CommandGuardError(
+            f"no command guard schema for command (default deny): {command!r}"
+        ) from None
+    argv = normalize(command_line)
+    if not schemas:
+        raise CommandGuardError(f"command {command!r} may not run shell commands")
+    for schema in schemas:
+        try:
+            _match_schema(argv, schema)
+        except CommandGuardError:
+            continue
+        return argv, schema
+    raise CommandGuardError(
+        f"no allowed argument schema matches this command: {' '.join(argv)!r}"
+    )
+
+
 def validate(command: str, command_line: str) -> tuple[str, ...]:
     """Return the normalized argv only if it matches a schema for ``command``.
 
@@ -213,26 +252,22 @@ def validate(command: str, command_line: str) -> tuple[str, ...]:
         CommandGuardError: unknown command (default deny), a forbidden shell
             construct, or no schema match.
     """
-    try:
-        schemas = _COMMAND_SCHEMAS[command]
-    except KeyError:
-        raise CommandGuardError(
-            f"no command guard schema for command (default deny): {command!r}"
-        ) from None
-    argv = normalize(command_line)
-    if not schemas:
-        raise CommandGuardError(f"command {command!r} may not run shell commands")
-    errors: list[str] = []
-    for schema in schemas:
-        try:
-            _match_schema(argv, schema)
-        except CommandGuardError as exc:
-            errors.append(str(exc))
-            continue
-        return argv
-    raise CommandGuardError(
-        f"no allowed argument schema matches this command: {' '.join(argv)!r}"
-    )
+    argv, _schema_matched = _matching_schema(command, command_line)
+    return argv
+
+
+def resolve_tool(command: str, command_line: str) -> str:
+    """Return the allowlist tool pattern that authorizes this exact command line.
+
+    This is the bridge from *observed* execution back to the declared capability
+    table: the guard already had to parse the argv to permit it, so the schema it
+    matched names the tool — no second, drifting classifier.
+
+    Raises:
+        CommandGuardError: the command line matches no schema.
+    """
+    _argv, schema = _matching_schema(command, command_line)
+    return schema.tool
 
 
 # ── PreToolUse hook ────────────────────────────────────────────────────────
