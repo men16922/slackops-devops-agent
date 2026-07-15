@@ -24,7 +24,8 @@
       ],
       "Resource": [
         "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-runtime-role",
-        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-mcp-role"
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-mcp-role",
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-audit-role"
       ]
     }
   ]

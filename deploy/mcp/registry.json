@@ -7,7 +7,7 @@
       "command": ["python", "-m", "app.mcp_server"],
       "tools": ["propose_job", "list_pending"],
       "source": "src/app/mcp_server.py",
-      "sha256": "009ff1a25922335a48e9cbb272a1e2cace822d783f64b291e159da8283072e1c",
+      "sha256": "f7b70c9a854520604669e53e5b9b0de2d0c960ee30244aa8d2ccc4a711f8946c",
       "credential_scope": "DynamoDB slackops-agent proposal queue only",
       "owner": "SlackOps platform",
       "reviewed_at": "2026-07-15"

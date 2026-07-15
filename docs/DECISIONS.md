@@ -175,3 +175,14 @@ Last updated: 2026-07-15
   also bypassed the prompt data boundary. Fixed adapters turn the service/API list into deterministic policy code.
 - Impact: EC2 user-data no longer installs/pre-warms `uvx`; unused S3 access is removed; SSM bootstrap access cannot bulk
   enumerate and is limited to named `/slackops/` parameters. New cloud proof is required because old D13/D4 MCP evidence is historical.
+
+## D17/P1 — enforce the agent boundary with split STS roles and a deployment-owned audit sink
+- Decision: the EC2 instance profile is bootstrap-only; agent services receive separate short-lived runtime and MCP credentials,
+  while a root-only audit role can only inspect/create streams and append to the deployment-provisioned
+  `/slackops/security-boundary-audit` CloudWatch group. The runtime role has an explicit deny for that sink; its 30-day retention
+  is configured by the deployment operator, not the exporter.
+- Reason: prompt instructions and application audit events alone cannot prevent an agent process from changing, redirecting, or
+  fabricating boundary evidence. IAM and systemd must enforce different identities and writable paths at runtime.
+- Impact: root refreshes credentials every 45 minutes; agent services cannot use IMDS or read the audit environment file.
+  The exporter records only credential-refresh metadata and Squid denial status (never requested URLs). Fresh-EC2 rehearsal is
+  the deployment proof; remote-main production rollout remains separate until local commits are pushed.

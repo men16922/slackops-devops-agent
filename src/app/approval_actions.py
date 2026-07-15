@@ -27,6 +27,7 @@ ACTION_REJECT = "reject_job"
 # 감사 action 라벨 — web transition 과 동일(approved/rejected)하게 맞춰 피드 일관성 유지.
 AUDIT_APPROVED = "approved"
 AUDIT_REJECTED = "rejected"
+AUDIT_APPROVAL_DENIED = "approval_denied"
 AUDIT_DETAIL = "via slack"
 
 # Slack section text 는 3000자 한계 — diff 미리보기는 그 아래로 자른다(전체는 Modal=D2.5).
@@ -173,6 +174,14 @@ def register_approval_actions(
         approver = str(user.get("id") or user.get("username") or "unknown")
 
         if approver not in approvers:
+            if audit is not None and job_id:
+                audit.append(
+                    job_id,
+                    AUDIT_APPROVAL_DENIED,
+                    actor=approver,
+                    detail="approver is not in the allowlist",
+                    context={"reason": "approver_not_allowlisted"},
+                )
             decision = Decision(ok=False, status=None, message=NOT_AUTHORIZED)
         else:
             decision = apply_decision(

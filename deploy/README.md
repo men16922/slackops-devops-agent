@@ -23,11 +23,14 @@
      ```
 2. **IAM Role + Instance Profile**: `iam/create-role.sh`
    - **bootstrap role**은 여섯 `/slackops/` secret의 `GetParameter`와 같은 계정의
-     runtime/MCP role 전환만 허용한다. S3와 runtime AWS read 권한은 없다.
+     runtime/MCP/audit role 전환만 허용한다. S3와 runtime AWS read 권한은 없다.
    - **runtime role**은 CloudWatch/Logs/EKS/거버넌스 읽기, OTel export, `slackops-agent`
      DynamoDB control plane만 가진다. SSM secret은 읽지 못한다.
    - **internal MCP role**은 `slackops-agent` DynamoDB queue의 Get/Put/Update/Query만
      가진다. 부팅 시 1시간 STS credential으로 발급되고 45분마다 회전한다.
+   - 배포 운영자가 CloudWatch Logs `/slackops/security-boundary-audit` 그룹(30일 보존)을
+     만든다. root-only **audit role**은 이 그룹의 stream 조회·생성·append만 가능하며,
+     runtime/MCP role은 명시적으로 쓰기가 거부된다.
 3. **DynamoDB 단일테이블 provision**: `dynamodb/create-table.sh`
    - **온디맨드(PAY_PER_REQUEST)** — bursty·저빈도 워크로드라 용량계획 불필요·idle 시 ~0원, GSI 도 자동 상속.
    - `slackops-agent` (PK/SK + GSI1 status 질의 + GSI2 일자 feed). Job/Audit/Telemetry 공유.
@@ -39,17 +42,24 @@
      `-monitor`는 Tier1 신호 관찰 producer다. worker·chat_agent·monitor는 DynamoDB 를 outbound
      폴링만 한다(인바운드 0 유지). **이들이 없으면 웹 승인 실행·채팅 응답·자동 제안이 멈춘다.**
    - 4개 서비스는 IMDS metadata endpoint를 차단한다. root-only credential refresher timer가
-     45분마다 단기 runtime/MCP credential을 회전하고 서비스를 재시작한다.
+     45분마다 단기 runtime/MCP/audit credential을 회전하고 서비스를 재시작한다. 별도 root-only
+     audit exporter가 credential rotation과 Squid `TCP_DENIED`를 중앙 로그 그룹에 남긴다.
    - 4개 서비스의 direct IP egress는 차단된다. localhost Squid가 Slack·Claude·GitHub·AWS·Terraform
      도메인만 proxy하며, proxy 자신도 localhost/link-local 목적지를 거부한다.
    - `REPO_URL` 의 `CHANGE_ME` 를 실제 GitHub repo 로 교체 필요.
+   - **푸시 전 security rehearsal만:** 현재 작업 트리를 tar.gz로 만들고 SHA-256과 1시간 이하의
+     private pre-signed HTTPS URL을 `SOURCE_ARCHIVE_URL`/`SOURCE_ARCHIVE_SHA256`으로 전달할 수 있다.
+     user-data는 hash 검증 후에만 압축을 풀며, rehearsal 직후 object와 bucket을 삭제한다.
 5. **EventBridge 스케줄**: `eventbridge/create-schedules.sh <instance-id>`
    - 기본 평일 09:00 start / 19:00 stop (Asia/Seoul). 상시 가동 금지 불변.
 6. **ADOT Collector** (Day 8–9): `adot/collector-config.yaml` 로 EC2 에 collector 구성.
 
 ## 검증
-- EC2 부팅 후 서비스 4개와 credential timer가 active인지 확인:
-  `systemctl status slackops-devops-agent slackops-devops-agent-worker slackops-devops-agent-chat-agent slackops-devops-agent-monitor slackops-runtime-credentials-refresh.timer`.
+- EC2 부팅 후 서비스 4개와 두 timer가 active인지 확인:
+  `systemctl status slackops-devops-agent slackops-devops-agent-worker slackops-devops-agent-chat-agent slackops-devops-agent-monitor slackops-runtime-credentials-refresh.timer slackops-security-audit-exporter.timer`.
+- `/etc/slackops-security-boundary-audit.env`는 `root:root 600`이며 `devopsagent`가 읽을 수 없어야 한다.
+  `aws logs filter-log-events --log-group-name /slackops/security-boundary-audit`에서
+  `credential_refresh`와 `proxy_denied`가 보이고 URL·query는 기록되지 않아야 한다.
 - `systemctl status squid`가 active인지 확인하고, D17 리허설에서는 systemd sandbox에서 allowlisted
   `https://api.github.com`은 성공하고 unlisted HTTPS domain은 proxy가 거부하는지 확인한다.
 - Slack 채널에서 `/devops ping` → `:white_check_mark: pong ...` 응답.

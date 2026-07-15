@@ -8,7 +8,9 @@ set -euo pipefail
 
 RUNTIME_ROLE_NAME="${RUNTIME_ROLE_NAME:-slackops-devops-agent-runtime-role}"
 MCP_ROLE_NAME="${MCP_ROLE_NAME:-slackops-devops-agent-mcp-role}"
+AUDIT_ROLE_NAME="${AUDIT_ROLE_NAME:-slackops-devops-agent-audit-role}"
 ENV_FILE="${ENV_FILE:-/etc/slackops-devops-agent.runtime.env}"
+AUDIT_ENV_FILE="${AUDIT_ENV_FILE:-/etc/slackops-security-boundary-audit.env}"
 MAX_AGE_S="${MAX_AGE_S:-2700}"
 LOCK_FILE="${LOCK_FILE:-/run/lock/slackops-runtime-credentials.lock}"
 FORCE=false
@@ -60,6 +62,9 @@ read -r RUNTIME_ACCESS_KEY RUNTIME_SECRET_KEY RUNTIME_SESSION_TOKEN < <(
 read -r MCP_ACCESS_KEY MCP_SECRET_KEY MCP_SESSION_TOKEN < <(
   assume_role "$MCP_ROLE_NAME" slackops-mcp
 )
+read -r AUDIT_ACCESS_KEY AUDIT_SECRET_KEY AUDIT_SESSION_TOKEN < <(
+  assume_role "$AUDIT_ROLE_NAME" slackops-security-audit
+)
 
 TMP_FILE="$(mktemp "${ENV_FILE}.XXXXXX")"
 trap 'rm -f "$TMP_FILE"' EXIT
@@ -81,4 +86,16 @@ umask 077
 chmod 600 "$TMP_FILE"
 chown root:root "$TMP_FILE"
 mv -f "$TMP_FILE" "$ENV_FILE"
+AUDIT_TMP_FILE="$(mktemp "${AUDIT_ENV_FILE}.XXXXXX")"
+{
+  printf 'AWS_REGION=%s\n' "$REGION"
+  printf 'AWS_DEFAULT_REGION=%s\n' "$REGION"
+  printf 'AWS_ACCESS_KEY_ID=%s\n' "$AUDIT_ACCESS_KEY"
+  printf 'AWS_SECRET_ACCESS_KEY=%s\n' "$AUDIT_SECRET_KEY"
+  printf 'AWS_SESSION_TOKEN=%s\n' "$AUDIT_SESSION_TOKEN"
+  printf 'AWS_EC2_METADATA_DISABLED=true\n'
+} > "$AUDIT_TMP_FILE"
+chmod 600 "$AUDIT_TMP_FILE"
+chown root:root "$AUDIT_TMP_FILE"
+mv -f "$AUDIT_TMP_FILE" "$AUDIT_ENV_FILE"
 trap - EXIT

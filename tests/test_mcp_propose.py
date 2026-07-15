@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.mcp_server import list_pending_impl, propose_job_impl
-from app.store import JobSource, JobStatus, SqliteJobStore
+from app.store import JobSource, JobStatus, SqliteAuditStore, SqliteJobStore
 from tests._helpers import counter_clock, counter_id
 
 
@@ -18,7 +18,8 @@ def store() -> SqliteJobStore:
 
 
 def test_propose_known_command_enqueues_agent_job(store: SqliteJobStore) -> None:
-    res = propose_job_impl(store, "diagnose", "api", "5xx 급증 감지")
+    audit = SqliteAuditStore()
+    res = propose_job_impl(store, "diagnose", "api", "5xx 급증 감지", audit=audit)
     assert res["ok"] is True
     job = store.get(str(res["job_id"]))
     assert job is not None
@@ -28,14 +29,26 @@ def test_propose_known_command_enqueues_agent_job(store: SqliteJobStore) -> None
     assert job.args == "api"
     assert job.requested_by == "agent"
     assert job.rationale == "5xx 급증 감지"
+    [event] = audit.list_for_job(job.id)
+    assert event.action == "proposed"
+    assert event.context == {"command": "diagnose", "source": "agent"}
 
 
 def test_propose_unknown_command_rejected(store: SqliteJobStore) -> None:
     """미지 명령은 default deny — 큐에 적재되지 않는다(주입 방어)."""
-    res = propose_job_impl(store, "rm-rf", "/", "malicious")
+    audit = SqliteAuditStore()
+    res = propose_job_impl(store, "rm-rf", "/", "malicious", audit=audit)
     assert res["ok"] is False
     assert "default deny" in str(res["error"])
     assert store.list_recent() == []
+    trace_id = str(res["trace_id"])
+    [event] = audit.list_for_job(f"security-{trace_id}")
+    assert event.action == "proposal_denied"
+    assert event.context == {
+        "command": "rm-rf",
+        "reason": "default_deny",
+        "trace_id": trace_id,
+    }
 
 
 def test_propose_forbidden_keyword_rejected(store: SqliteJobStore) -> None:

@@ -1,10 +1,10 @@
 # AGENT_BRIEF — slackops-devops-agent
 Last updated: 2026-07-15
 
-> ▶ NEXT SESSION (**v2 AWSKRUG demo**): commit/push the D16–D17 secure-runtime bundle, then run the new-EC2
->   rehearsal (fixed read adapters + split runtime/MCP roles + 4 services/timer) before **slide finalization →
->   live-demo rehearsal**. D4 real AWS verification, D15 production OAuth, and real login are complete; Slack
->   approver setup remains manual. Presentation:
+> ▶ NEXT SESSION (**v2 AWSKRUG demo**): commit/push the D16–D17 + P1 secure-runtime/rehearsal bundle, then add a
+>   P2 deterministic policy interceptor before **slide finalization → live-demo rehearsal**. D17/P1 new-EC2 runtime
+>   boundaries and central audit evidence were verified; the rehearsal instance stopped. Slack approver setup remains manual.
+>   Presentation:
 >   `docs/presentation/PRESENTATION.md` + `docs/presentation/SlackOps DevOps Agent (Standalone).html`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
@@ -32,9 +32,9 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   + **conversational producer (D10)** — selectbox→natural-language chat. DynamoDB conversation bus (chat_store, GSI1 overloading)
   + claude_runner streaming (stream-json) + chat_agent polling consumer + web Chat (polling Markdown render). Agent
   inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified. (Also includes web result Markdown render, Quarkify, worker entry.)
-- **Verification:** 3-layer gate — `python3 -m pytest tests/ -q` (278 passed, 1 skipped) + ruff + mypy (strict).
+- **Verification:** 3-layer gate — `make check` (392 passed) + ruff + mypy (strict) + documentation budget.
   web/ is `next build` + `docker compose up` e2e green. **`make demo`** runs the full local stack (web+DB+chat_agent+worker) in one shot.
-- **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect now use fixed AWS read adapters → sanitizer isolation (generic AWS MCP retired). D17 adds bootstrap/runtime/MCP role separation, short-lived credentials, and service IMDS denial; the next cloud rehearsal must verify both paths.
+- **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect now use fixed AWS read adapters → sanitizer isolation (generic AWS MCP retired). D17/P1 fresh EC2 rehearsal verified role/credential/egress boundaries plus central audit `credential_refresh` and URL-free `proxy_denied` evidence; instance stopped.
 
 ## Guardrails summary (details in CORE_MANDATES)
 - Socket Mode only (no inbound port). IAM Instance Profile only (no Access Key).

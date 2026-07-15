@@ -14,6 +14,7 @@ from app.approval_actions import (
     ACTION_REJECT,
     ALREADY_HANDLED,
     AUDIT_APPROVED,
+    AUDIT_APPROVAL_DENIED,
     AUDIT_REJECTED,
     DIFF_PREVIEW_MAX,
     NOT_AUTHORIZED,
@@ -185,15 +186,22 @@ def test_binding_registers_both_action_ids() -> None:
 
 def test_binding_denies_user_outside_approver_allowlist() -> None:
     store = SqliteJobStore()
+    audit = SqliteAuditStore()
     job_id = _awaiting_job(store)
     app = _FakeApp()
-    register_approval_actions(app, jobs=store, allowed_approvers=frozenset({"U1"}))
+    register_approval_actions(
+        app, jobs=store, audit=audit, allowed_approvers=frozenset({"U1"})
+    )
     client = _FakeClient()
 
     app.handlers[ACTION_APPROVE](ack=lambda: None, body=_body(job_id), client=client)
 
     assert store.get(job_id).status is JobStatus.AWAITING_APPROVAL  # type: ignore[union-attr]
     assert client.updates[0]["text"] == NOT_AUTHORIZED
+    [event] = audit.list_for_job(job_id)
+    assert event.action == AUDIT_APPROVAL_DENIED
+    assert event.actor == "U777"
+    assert event.context == {"reason": "approver_not_allowlisted"}
 
 
 def test_audit_labels_match_dashboard_feed_contract() -> None:

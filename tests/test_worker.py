@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.commands import logs
-from app.execution_plan import ExecutionPlan
+from app.execution_plan import ExecutionPlan, ExecutionPlanError
 from app.store import (
     Job,
     JobSource,
@@ -23,6 +23,8 @@ from app.worker import (
     AUDIT_DONE,
     AUDIT_FAILED,
     AUDIT_POSTCONDITION_VERIFIED,
+    AUDIT_PLAN_BINDING_REJECTED,
+    AUDIT_POLICY_DENIED,
     WORKER_ACTOR,
     CommandOutcome,
     Worker,
@@ -305,8 +307,8 @@ def test_executor_exception_marks_failed_with_audit_and_metric(stores) -> None:
 
 
 def test_unknown_command_fails_without_execution(stores) -> None:
-    jobs, _, _ = stores
-    jobs.enqueue("rm-rf", source=JobSource.WEB)
+    jobs, audit, _ = stores
+    job = jobs.enqueue("rm-rf", source=JobSource.WEB)
     worker = make_worker(stores, executors={})
 
     failed = worker.process_one()
@@ -314,6 +316,32 @@ def test_unknown_command_fails_without_execution(stores) -> None:
     assert failed is not None
     assert failed.status is JobStatus.FAILED
     assert failed.error is not None and "default deny" in failed.error
+    assert [event.action for event in audit.list_for_job(job.id)] == [
+        AUDIT_CLAIMED,
+        AUDIT_POLICY_DENIED,
+        AUDIT_FAILED,
+    ]
+
+
+def test_plan_binding_failure_records_dedicated_security_event(stores) -> None:
+    jobs, audit, _ = stores
+    job = jobs.enqueue("pr", "fix typo", source=JobSource.WEB)
+    worker = make_worker(
+        stores,
+        executors={"pr": lambda _job: CommandOutcome(result="prepared", diff="--- a/x\n+++ b/x")},
+        plan_builder=lambda _job, _diff: (_ for _ in ()).throw(ExecutionPlanError("diff changed")),
+    )
+
+    failed = worker.process_one()
+
+    assert failed is not None and failed.status is JobStatus.FAILED
+    events = audit.list_for_job(job.id)
+    assert [event.action for event in events] == [
+        AUDIT_CLAIMED,
+        AUDIT_PLAN_BINDING_REJECTED,
+        AUDIT_FAILED,
+    ]
+    assert events[1].context == {"error_type": "ExecutionPlanError"}
 
 
 # ── telemetry 계측 결합 (on_metrics → CommandOutcome → metric) ───

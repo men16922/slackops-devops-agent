@@ -29,11 +29,9 @@ Last updated: 2026-07-15
 - [x] `deploy/iam/create-role.sh` (role+profile, +AmazonSSMManagedInstanceCore for Session Manager).
 - [x] `deploy/ec2/launch-instance.sh` (repo public-transitioned for unauth clone; 3 systemd services active) → `/devops ping` pong verified → EC2 terminated.
 - [ ] `[manual]` `deploy/eventbridge/create-schedules.sh <id>` — skipped (terminate instead of schedule; revisit on redeploy).
-- [ ] `[manual]` On redeploy: confirm 4 `systemctl status` active (slack/worker/chat-agent/monitor) + web chat responds.
-- [ ] `[manual]` D17 split-role deployment: run `deploy/iam/create-role.sh`, launch a **new** EC2 (new user-data required),
-      then verify 4 services + `slackops-runtime-credentials-refresh.timer`, runtime-role AWS read success, MCP proposal-queue
-      write, service IMDS denial, and egress proxy behavior (allow `api.github.com`, deny an unlisted HTTPS domain). Stop the
-      instance after evidence capture.
+- [ ] `[auto]` P2 deterministic policy interceptor: evaluate account/region/resource/time-window at the tool boundary before
+      a fixed read adapter or approved executor starts. Done: default-deny decision/audit reason is tested for each command,
+      and no model-produced argument can expand the allowed scope.
 
 ## Day 6–7 — tf-review + pr remaining
 - [ ] `[manual]` GitHub App minimal scope + branch protection (block auto-merge) setup.

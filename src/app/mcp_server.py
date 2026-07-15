@@ -18,12 +18,14 @@ server name = "slackops" ⇒ 도구 식별자 = `mcp__slackops__propose_job`.
 from __future__ import annotations
 
 import os
+from uuid import uuid4
 from typing import TYPE_CHECKING, Any
 
 from app import permissions
 from app.store.base import JobSource, JobStatus
 
 if TYPE_CHECKING:  # 타입 체크 전용 — 런타임 import 회피(선택 의존성).
+    from app.store.audit_store import AuditStore
     from app.store.base import JobStore
 
 # 에이전트 제안이 "대기 중"으로 간주되는 상태(중복 제안 회피용 list_pending 필터).
@@ -56,6 +58,8 @@ def propose_job_impl(
     command: str,
     args: str = "",
     rationale: str = "",
+    *,
+    audit: AuditStore | None = None,
 ) -> dict[str, object]:
     """에이전트 제안을 큐에 적재(default-deny 검증 후 PENDING/source=agent).
 
@@ -68,12 +72,24 @@ def propose_job_impl(
     Returns:
         성공: {"ok": True, "job_id", "status", "command"}.
         중복: {"ok": True, "deduped": True, "job_id": None, "status": "skipped"} — 무해 no-op.
-        거부: {"ok": False, "error"} — 미지/비허용 명령(주입 방어 default deny).
+        거부: {"ok": False, "error", "trace_id"} — 미지/비허용 명령(주입 방어 default deny).
+            trace_id 는 안전 이벤트와 호출 결과를 연결한다.
     """
     name = command.strip()
     if not permissions.is_allowed(name):
+        trace_id = uuid4().hex
+        if audit is not None:
+            # args/rationale 은 untrusted input 이므로 감사 이벤트에 복사하지 않는다.
+            audit.append(
+                f"security-{trace_id}",
+                "proposal_denied",
+                actor="mcp",
+                detail="command rejected by default-deny policy",
+                context={"command": name, "reason": "default_deny", "trace_id": trace_id},
+            )
         return {
             "ok": False,
+            "trace_id": trace_id,
             "error": (
                 f"command not allowed (default deny): {name!r}. "
                 f"allowed: {sorted(permissions.known_commands())}"
@@ -95,6 +111,14 @@ def propose_job_impl(
         requested_by="agent",
         rationale=rationale.strip() or None,
     )
+    if audit is not None:
+        audit.append(
+            job.id,
+            "proposed",
+            actor="agent",
+            detail="job proposed through internal MCP",
+            context={"command": job.command, "source": job.source.value},
+        )
     return {
         "ok": True,
         "job_id": job.id,
@@ -156,7 +180,7 @@ def audit_store_from_env() -> Any:
     return DynamoDbAuditStore(table, dynamodb=dynamodb)
 
 
-def build_server(store: JobStore) -> Any:
+def build_server(store: JobStore, *, audit: AuditStore | None = None) -> Any:
     """FastMCP 서버 구성(lazy import) — 순수 로직을 stdio 도구로 노출.
 
     server name "slackops" ⇒ 도구 = mcp__slackops__propose_job / mcp__slackops__list_pending.
@@ -172,7 +196,7 @@ def build_server(store: JobStore) -> Any:
         command must be one of: ping/logs/diagnose/tf-review/pr (others are rejected).
         In rationale, write a concise English reason for proposing this job.
         """
-        return propose_job_impl(store, command, args, rationale)
+        return propose_job_impl(store, command, args, rationale, audit=audit)
 
     @mcp.tool()
     def list_pending() -> list[dict[str, object]]:
@@ -184,7 +208,7 @@ def build_server(store: JobStore) -> Any:
 
 def main() -> None:
     """stdio MCP 서버 진입점 — `python -m app.mcp_server`."""
-    build_server(store_from_env()).run()
+    build_server(store_from_env(), audit=audit_store_from_env()).run()
 
 
 if __name__ == "__main__":

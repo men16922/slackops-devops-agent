@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadSecurityBoundaryAuditStreamsOnly",
+      "Effect": "Allow",
+      "Action": ["logs:DescribeLogStreams"],
+      "Resource": "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/slackops/security-boundary-audit:*"
+    },
+    {
+      "Sid": "WriteSecurityBoundaryAuditStreamsOnly",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/slackops/security-boundary-audit:*"
+    }
+  ]
+}

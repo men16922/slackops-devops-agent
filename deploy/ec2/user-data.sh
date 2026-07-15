@@ -35,7 +35,22 @@ APP_DIR=/opt/slackops-devops-agent
 # 기본값 = 실 repo. private repo 면 clone 인증 필요(public 전환 또는 SSM PAT) — deploy/README §B-3 / action_item §B-3.
 # 기본 브랜치(main)를 clone — main 이 작업/제출 브랜치(전체 동기화 유지). 다른 브랜치는 REPO_BRANCH 로 override.
 REPO_URL="${REPO_URL:-https://github.com/men16922/slackops-devops-agent.git}"
-git clone ${REPO_BRANCH:+--branch "$REPO_BRANCH"} "$REPO_URL" "$APP_DIR" || true
+SOURCE_ARCHIVE_URL=""
+SOURCE_ARCHIVE_SHA256=""
+if [[ -n "$SOURCE_ARCHIVE_URL" ]]; then
+  [[ -n "$SOURCE_ARCHIVE_SHA256" ]] || {
+    echo "SOURCE_ARCHIVE_SHA256 is required when SOURCE_ARCHIVE_URL is set" >&2
+    exit 1
+  }
+  install -d -m 755 "$APP_DIR"
+  curl --fail --location --proto '=https' --tlsv1.2 "$SOURCE_ARCHIVE_URL" \
+    --output /tmp/slackops-source.tar.gz
+  printf '%s  %s\n' "$SOURCE_ARCHIVE_SHA256" /tmp/slackops-source.tar.gz | sha256sum --check --status
+  tar --extract --gzip --file /tmp/slackops-source.tar.gz --directory "$APP_DIR"
+  rm -f /tmp/slackops-source.tar.gz
+else
+  git clone ${REPO_BRANCH:+--branch "$REPO_BRANCH"} "$REPO_URL" "$APP_DIR"
+fi
 python3.11 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR"
 chown -R devopsagent:devopsagent "$APP_DIR"
@@ -90,7 +105,13 @@ chmod 600 /etc/slackops-devops-agent.env
 # credential으로 두 target role을 assume하고, root-only 환경 파일에 단기 값을 기록한다.
 install -m 700 "$APP_DIR/deploy/ec2/refresh-runtime-credentials.sh" \
   /usr/local/sbin/slackops-refresh-runtime-credentials
+install -m 700 "$APP_DIR/deploy/ec2/audit-exporter.sh" \
+  /usr/local/sbin/slackops-security-audit-exporter
+# Required before the sandboxed exporter starts: ProtectSystem=strict exposes
+# only explicitly listed writable paths, which must already exist at spawn.
+install -d -o root -g root -m 700 /var/lib/slackops-security-audit
 /usr/local/sbin/slackops-refresh-runtime-credentials --force
+/usr/local/sbin/slackops-security-audit-exporter credential_refresh
 
 # --- systemd unit: Slack Socket Mode 앱(app.main) ---
 cat > /etc/systemd/system/slackops-devops-agent.service <<'UNIT'
@@ -278,6 +299,7 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/local/sbin/slackops-refresh-runtime-credentials --force
 ExecStartPost=/usr/bin/systemctl try-restart slackops-devops-agent.service slackops-devops-agent-worker.service slackops-devops-agent-chat-agent.service slackops-devops-agent-monitor.service
+ExecStartPost=/usr/local/sbin/slackops-security-audit-exporter credential_refresh
 UNIT
 
 cat > /etc/systemd/system/slackops-runtime-credentials-refresh.timer <<'UNIT'
@@ -294,10 +316,41 @@ Unit=slackops-runtime-credentials-refresh.service
 WantedBy=timers.target
 UNIT
 
+cat > /etc/systemd/system/slackops-security-audit-exporter.service <<'UNIT'
+[Unit]
+Description=Export SlackOps proxy-deny security audit events
+After=network-online.target squid.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/slackops-security-audit-exporter proxy_denials
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/slackops-security-audit
+UNIT
+
+cat > /etc/systemd/system/slackops-security-audit-exporter.timer <<'UNIT'
+[Unit]
+Description=Export SlackOps proxy-deny security audit events every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Persistent=true
+Unit=slackops-security-audit-exporter.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+
 systemctl daemon-reload
 systemctl enable --now \
   slackops-devops-agent.service \
   slackops-devops-agent-worker.service \
   slackops-devops-agent-chat-agent.service \
   slackops-devops-agent-monitor.service \
-  slackops-runtime-credentials-refresh.timer
+  slackops-runtime-credentials-refresh.timer \
+  slackops-security-audit-exporter.timer

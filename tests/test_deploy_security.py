@@ -78,6 +78,7 @@ def test_bootstrap_policy_only_reads_boot_secrets_and_assumes_named_roles() -> N
     assert assume["Resource"] == [
         "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-runtime-role",
         "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-mcp-role",
+        "arn:aws:iam::__ACCOUNT_ID__:role/slackops-devops-agent-audit-role",
     ]
 
 

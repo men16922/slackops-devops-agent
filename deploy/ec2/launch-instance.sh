@@ -8,6 +8,32 @@ PROFILE_NAME="${PROFILE_NAME:-slackops-devops-agent-profile}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-t3.medium}"
 TAG_NAME="${TAG_NAME:-slackops-devops-agent}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE_ARCHIVE_URL="${SOURCE_ARCHIVE_URL:-}"
+SOURCE_ARCHIVE_SHA256="${SOURCE_ARCHIVE_SHA256:-}"
+USER_DATA="$DIR/user-data.sh"
+TEMP_USER_DATA=""
+
+cleanup() {
+  [[ -z "$TEMP_USER_DATA" ]] || rm -f "$TEMP_USER_DATA"
+}
+trap cleanup EXIT
+
+escape_sed_replacement() {
+  printf '%s' "$1" | sed 's/[\\&|]/\\&/g'
+}
+
+if [[ -n "$SOURCE_ARCHIVE_URL" ]]; then
+  [[ -n "$SOURCE_ARCHIVE_SHA256" ]] || {
+    echo "SOURCE_ARCHIVE_SHA256 is required when SOURCE_ARCHIVE_URL is set" >&2
+    exit 2
+  }
+  TEMP_USER_DATA="$(mktemp)"
+  sed \
+    -e "s|^SOURCE_ARCHIVE_URL=\"\"$|SOURCE_ARCHIVE_URL=\"$(escape_sed_replacement "$SOURCE_ARCHIVE_URL")\"|" \
+    -e "s|^SOURCE_ARCHIVE_SHA256=\"\"$|SOURCE_ARCHIVE_SHA256=\"$(escape_sed_replacement "$SOURCE_ARCHIVE_SHA256")\"|" \
+    "$USER_DATA" > "$TEMP_USER_DATA"
+  USER_DATA="$TEMP_USER_DATA"
+fi
 
 # 최신 AL2023 AMI
 AMI_ID="$(aws ssm get-parameter \
@@ -33,7 +59,7 @@ aws ec2 run-instances \
   --iam-instance-profile "Name=$PROFILE_NAME" \
   --security-group-ids "$SG_ID" \
   --metadata-options "HttpTokens=required,HttpEndpoint=enabled" \
-  --user-data "file://$DIR/user-data.sh" \
+  --user-data "file://$USER_DATA" \
   --tag-specifications \
     "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME},{Key=Project,Value=slackops-devops-agent}]" \
   --query 'Instances[0].InstanceId' --output text

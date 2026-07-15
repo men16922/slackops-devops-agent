@@ -11,8 +11,8 @@
         "dynamodb:Query"
       ],
       "Resource": [
-        "arn:aws:dynamodb::__ACCOUNT_ID__:table/slackops-agent",
-        "arn:aws:dynamodb::__ACCOUNT_ID__:table/slackops-agent/index/*"
+        "arn:aws:dynamodb:__REGION__:__ACCOUNT_ID__:table/slackops-agent",
+        "arn:aws:dynamodb:__REGION__:__ACCOUNT_ID__:table/slackops-agent/index/*"
       ]
     }
   ]

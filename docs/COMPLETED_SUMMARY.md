@@ -4,6 +4,7 @@ Last updated: 2026-07-15
 > Compressed completed milestones + links. Detailed history in PROGRESS_LOG / docs/archive/. Updated via /checkpoint.
 
 ## Milestones
+- **2026-07-15 — D16–D17/P1 secure runtime + central audit rehearsal**: generic AWS MCP retired for fixed read adapters; bootstrap/runtime/MCP/audit roles, STS rotation, IMDS/direct-egress deny, and localhost allowlist proxy added. A deployment-provisioned 30-day CloudWatch sink accepts only root-only audit-role stream appends; runtime write is explicitly denied. Fresh EC2 verified services/timers, credential refresh and URL-free proxy-deny events. `make check` 392 passed. Local changes remain ahead of remote; details: `docs/PROGRESS_LOG.md`, `docs/strategy.md`.
 - **2026-07-15 — D15 secure runtime deployed**: GitHub OAuth dashboard allowlist, immutable PR execution-plan and approval binding, workspace/tool/postcondition verification, Slack approver allowlist, audit hash chain, and EC2 filesystem hardening. `make check` (367 passed), Vercel Production build/redirect/login page, and real GitHub login passed. `make vercel-deploy` synchronizes the four OAuth values from root `.env`. Details: `docs/reports/2026-07-15-secure-runtime-report.md`.
 - **2026-06-16 — web/ dashboard finished locally (H0 frontend first cut)**: Next.js App Router (jobs/detail/metrics
   + approval server action) + DynamoDB Local offline docker (port 8930) e2e verified. USER_GUIDE.md +

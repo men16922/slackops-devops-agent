@@ -47,6 +47,8 @@ AUDIT_AWAITING_APPROVAL = "awaiting_approval"
 AUDIT_DONE = "done"
 AUDIT_FAILED = "failed"
 AUDIT_POSTCONDITION_VERIFIED = "postcondition_verified"
+AUDIT_PLAN_BINDING_REJECTED = "plan_binding_rejected"
+AUDIT_POLICY_DENIED = "policy_denied"
 
 
 @dataclass
@@ -365,6 +367,22 @@ class Worker:
     def _fail(self, job: Job, started: float, exc: Exception) -> Job | None:
         error = f"{type(exc).__name__}: {exc}"
         updated = self._jobs.complete(job.id, status=JobStatus.FAILED, error=error)
+        if isinstance(exc, ExecutionPlanError):
+            self._audit.append(
+                job.id,
+                AUDIT_PLAN_BINDING_REJECTED,
+                actor=WORKER_ACTOR,
+                detail="execution plan verification failed",
+                context={"error_type": type(exc).__name__},
+            )
+        elif isinstance(exc, LookupError):
+            self._audit.append(
+                job.id,
+                AUDIT_POLICY_DENIED,
+                actor=WORKER_ACTOR,
+                detail="command rejected by default-deny executor gate",
+                context={"command": job.command, "reason": "default_deny"},
+            )
         self._audit.append(job.id, AUDIT_FAILED, actor=WORKER_ACTOR, detail=error)
         record_run_metrics(
             self._metrics,

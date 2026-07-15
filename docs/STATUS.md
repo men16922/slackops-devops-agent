@@ -8,12 +8,11 @@ Last updated: 2026-07-15
   + FastAPI health/metrics. deploy/ artifacts (IAM/EC2/EventBridge/ADOT) ready-to-run.
 - AWS/Slack **cloud deploy A–C verified once** (2026-06-20): Slack App + SSM tokens + IAM + DynamoDB(us-east-1) + EC2 →
   `/devops ping` pong from `ip-…ec2.internal`. EC2 then terminated (cost ~$0). Runbook docs/runbooks/deploy-checklist.md.
-- **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth dashboard boundary, immutable PR execution-plan/approval hash,
-  workspace/tool-chain/postcondition validation, Slack approver allowlist, audit hash chain, and EC2 filesystem hardening.
-  `make vercel-deploy` syncs the four OAuth values from root `.env`; Vercel build, redirect/login page, and real GitHub login passed.
+- **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth boundary, immutable execution-plan/approval hash,
+  workspace/tool-chain/postcondition validation, approver allowlist/audit chain/EC2 hardening; Vercel and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `make check` → **374 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- 3-layer gate: `make check` → **392 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
   `cd web && npm run build` and `git diff --check` also pass for D15.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge rule→Lambda(`alarm_lambda`, detect→propose)
   →DynamoDB queue→worker(Claude)→DONE→Slack ping+done ($0.15/2.7K–6K tok). Serverless producer fires EC2-off. Then EC2 terminated → cost ≈ $0.
@@ -22,12 +21,15 @@ Last updated: 2026-07-15
 - **D16 secure read-adapter hardening (2026-07-15):** logs/diagnose/detect no longer expose generic AWS API MCP to Claude.
   Fixed boto3 read adapters collect only command-specific evidence, then sanitizer isolates it; model tool allowlists are empty.
   Runtime drops the AWS MCP/uvx dependency, unused S3 access, broad SSM enumeration, and child Slack/dashboard secrets.
-- **D17 role/metadata/egress hardening (code-ready, not deployed):** bootstrap-only Instance Profile + separate 1-hour
-  runtime/MCP STS roles (45-min refresh); Claude gets neither credential nor DDB env. Four services deny IMDS/direct IP egress
-  and use localhost Squid domain allowlist; internal MCP source/command/tools and injection/TOCTOU corpus are CI-locked. New EC2
-  rehearsal must prove role identities, refresh, proxy allow/deny, and adapter read; prior D4 MCP proof is historical.
-- **All user-facing text English** (H0): agent Slack/chat responses + web/ dashboard UI. Playwright verified English render (no Korean DOM).
-  ⚠️ **예외(2026-07-10)**: 대시보드 리디자인에서 ARGS→Proposal 컬럼이 `rationale`을 노출 → 시드 mock rationale 2개(agent-2001/2002)가 한글이라 DOM에 한글 등장. 실제 prod agent 는 영어 생성이나 시드 mock 미번역 → 영어화 필요.
+- **D17 role/metadata/egress hardening (real EC2 rehearsal, 2026-07-15):** fresh instance verified 1-hour runtime/MCP STS roles,
+  forced credential rotation, fixed AWS read IAM, four services/timer, IMDS/direct-egress denial, GitHub proxy allow and unlisted-domain deny.
+  MCP `ping` proposal produced `proposed→claimed→done` audit evidence; instance stopped and temporary source artifact removed. Rehearsal fixed
+  the DynamoDB policy region ARN, Squid duplicate-domain ACL, and user-data archive branch; generic AWS MCP remains retired.
+- **P1 central system-boundary audit (real EC2 rehearsal, 2026-07-15):** deployment operator provisions the 30-day
+  `/slackops/security-boundary-audit` group; a root-only audit STS role can create streams/append only. Runtime/MCP cannot
+  write it (runtime `PutLogEvents` produced explicit deny). Fresh EC2 logged `credential_refresh` and URL-free
+  `proxy_denied` events; audit env is root `600`, state is root `700`, and the source artifact/instance were removed/stopped.
+- **All user-facing text English** (H0): Playwright verified, except two Korean seed rationales (`agent-2001/2002`) now exposed by Proposal; translate them.
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics
   render + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
 - lazy-import design — all modules import-safe even without fastapi/slack_bolt installed.

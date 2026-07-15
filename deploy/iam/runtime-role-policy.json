@@ -2,6 +2,19 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "DenySecurityBoundaryAuditWrite",
+      "Effect": "Deny",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:PutRetentionPolicy"
+      ],
+      "Resource": [
+        "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/slackops/security-boundary-audit",
+        "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/slackops/security-boundary-audit:*"
+      ]
+    },
+    {
       "Sid": "CloudWatchReadOnly",
       "Effect": "Allow",
       "Action": [
@@ -72,8 +85,8 @@
         "dynamodb:Query"
       ],
       "Resource": [
-        "arn:aws:dynamodb::__ACCOUNT_ID__:table/slackops-agent",
-        "arn:aws:dynamodb::__ACCOUNT_ID__:table/slackops-agent/index/*"
+        "arn:aws:dynamodb:__REGION__:__ACCOUNT_ID__:table/slackops-agent",
+        "arn:aws:dynamodb:__REGION__:__ACCOUNT_ID__:table/slackops-agent/index/*"
       ]
     }
   ]
