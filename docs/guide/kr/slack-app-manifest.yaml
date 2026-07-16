@@ -26,6 +26,10 @@ features:
       description: 이 작업의 diff 승인 Modal 열기
   assistant_view:
     assistant_description: Slack에서 자연어로 AWS를 진단·조치 제안하는 read-only SRE 어시스턴트
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true          # 봇 DM 허용 (없으면 "메시지 보내기 꺼짐")
+    messages_tab_read_only_enabled: false
 
 oauth_config:
   scopes:

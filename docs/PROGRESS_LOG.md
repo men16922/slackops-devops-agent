@@ -5,6 +5,19 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-16 — GitHub App write-credential path verified locally + SSM staged (task #3, 4/5)
+- Status: Done for the local + staging steps; only the live EC2 `pr` push rehearsal remains.
+- Changed: registered a GitHub App (`App ID 4313190`, installed on `men16922/slackops-devops-agent`,
+  perms `contents`+`pull_requests` write only). Stored SSM 4종 (`PR_REPOSITORY`/`GITHUB_APP_ID`/
+  `GITHUB_INSTALLATION_ID` String, `GITHUB_APP_PRIVATE_KEY_B64` SecureString). Enabled branch protection
+  (require PR + approvals=1) so the token cannot self-merge. No source change.
+- Verified: **local mint smoke against real GitHub** — `GitHubAppGrantIssuer.issue` minted a repo-scoped
+  installation token (len 40, ~10-min expiry) then revoked it → App ID + installation + PEM all valid.
+  This closes the "previously-unverified code path" for everything except the actual push. SSM values re-read OK.
+- Blockers: none. The private-key base64 was piped straight into SSM (never written to a scratch file —
+  auto-mode classifier blocked materializing the key on disk).
+- Next: EC2 `pr` execute live rehearsal (Done conditions 1–3) at presentation time — `docs/runbooks/pr-write-credential-rehearsal.md`.
+
 ## 2026-07-16 — Slack workspace migration + docs consolidation (v2 intro/test)
 - Status: Done (docs + local/cloud-SSM). Uncommitted working tree; GitHub App write path still pending.
 - Changed: **Slack migrated to a new workspace** ("Platform Agent", team `T0BGA6C1YAG`) — App re-created from a

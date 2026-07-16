@@ -4,8 +4,8 @@ Last updated: 2026-07-16
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): main is **pushed / in sync**. Slack migrated to a new workspace
 >   ("Platform Agent"): App re-created via manifest, SSM Slack 4종 refreshed (v2), local `/devops ping` pong verified
 >   (guide: `docs/guide/kr/SLACK_NEW_GUIDE.md` + `slack-app-manifest.yaml`). **In progress — GitHub App write path**
->   (task #3): App created + private key + installation id captured; **pending = 4 SSM params + EC2 `pr` execute
->   rehearsal** (runbook: `docs/runbooks/pr-write-credential-rehearsal.md`). Docs consolidated: `docs/V2_INTRO.md`
+>   (task #3, 4/5): App + **local mint smoke passed vs real GitHub** + SSM 4종 + branch protection done; **pending =
+>   EC2 `pr` execute live rehearsal only** (runbook: `docs/runbooks/pr-write-credential-rehearsal.md`). Docs: `docs/V2_INTRO.md`
 >   (v1→v2 강화 비교) + `docs/V2_TEST.md` (verification), en guides/report → archive.
 >   Manual remains: GitHub App SSM+EC2 rehearsal; register `review_slackops_job` Message Shortcut in the new
 >   workspace; slides (⏰ Canvas trial ends 7/19). Presentation: `docs/presentation/PRESENTATION.md` + `…(Standalone).html`.

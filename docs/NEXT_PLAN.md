@@ -21,11 +21,11 @@ Last updated: 2026-07-16
 ## Secure Agent Runtime — Notion 레퍼런스 잔여 (rationale: DECISIONS D19–D23)
 > 레퍼런스 §8 Implementation Priority 의 **P0 전부 + P1 전부 닫힘**. **번호 체계가 repo 의
 > P1/P2/P3(audit sink/scope boundary/managed-MCP pilot)와 다르다** — 섞어 쓰지 말 것.
-- [ ] `[manual]` **write credential 경로 실검증** — 코드에서 유일하게 미검증인 부분이다. GitHub App 등록(대상 저장소
-      1개, `contents:write`+`pull_requests:write`만) → SSM 4종(`PR_REPOSITORY`/`GITHUB_APP_ID`/
-      `GITHUB_INSTALLATION_ID`/`GITHUB_APP_PRIVATE_KEY_B64`, PEM 은 base64) 저장 → EC2 `pr` execute 1회 리허설.
-      Done: 승인 전 push 시도가 자격 부재로 실패하고, 승인 후에는 installation token 으로 PR 이 열리며
-      `write_credentials_issued` 감사가 남는다. (참고: branch protection 으로 자기 PR 머지 차단도 함께 확인)
+- [ ] `[manual]` **write credential 경로 실검증** — 4/5 완료. GitHub App(`App ID 4313190`, repo `men16922/
+      slackops-devops-agent`, `contents`+`pull_requests` write) 등록·설치 ✅, **로컬 mint 스모크(발급→회수) 실
+      GitHub 통과** ✅, SSM 4종 저장 ✅, branch protection(require PR + approvals=1) ✅. **남은 것 = EC2 `pr`
+      execute 라이브 리허설 1건**(발표 회차). Done: 승인 전 push 실패 → 승인 후 installation token 으로 PR 오픈 →
+      `write_credentials_issued` 감사. 런북 `docs/runbooks/pr-write-credential-rehearsal.md`.
 - [ ] `[auto]` P1 post-condition 확장(health/replica/config 재조회). **단 L2(Execute)가 비활성이라 검증할 실제 변경이
       없어 값어치가 낮다** — L2 를 열기 전에는 착수하지 말 것.
 - [ ] `[manual]` P3 organization expansion pilot: managed AWS MCP 를 별도 role/context-key/CloudTrail 환경에서만 허용;
