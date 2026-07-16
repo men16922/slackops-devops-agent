@@ -126,6 +126,14 @@ def test_credential_refresh_timer_fires_early_at_boot() -> None:
     assert "OnBootSec=45min" not in _USER_DATA
 
 
+def test_user_data_within_ec2_16kb_limit() -> None:
+    """EC2 RunInstances 는 user-data 를 16384 byte 로 제한한다(raw file:// 전송, 압축 없음).
+    한글 주석은 3 byte/자라 이 파일은 만성적으로 한계 근처다 — 초과하면 기동이 실패하므로
+    가드한다(넘으면 주석 압축 또는 gzip user-data 전환)."""
+    size = (_ROOT / "deploy/ec2/user-data.sh").read_bytes()
+    assert len(size) <= 16384, f"user-data.sh is {len(size)} bytes (> 16384 EC2 limit)"
+
+
 def test_agent_egress_is_forced_through_localhost_allowlist_proxy() -> None:
     assert "dnf install -y git jq python3.11 python3.11-pip squid" in _USER_DATA
     assert "HTTP_PROXY=http://127.0.0.1:3128" in _USER_DATA
