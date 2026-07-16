@@ -22,21 +22,17 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
 - **What:** Slack natural-language command → Claude Code Headless on EC2 analyzes AWS/K8s/Terraform/GitHub context → ops automation.
   MVP = Read-Only analysis + PR creation.
 - **Differentiator:** Not just a bot but a reference for "how to run an agent safely" — security (permissions + injection defense) + observability (OTel).
-- **Behavior:** command routing (ping/logs/diagnose registered) + job queue + permission gate + sanitizer
-  + claude_runner + allowlist (run_for_command single entry point) + logs/diagnose handlers (fetcher
-  inject→isolate→assemble; diagnose is multi-source + per-source failure isolation) + store/ (H0 single-table —
-  Job/Audit/Telemetry each with Sqlite+DynamoDb implementations) + telemetry (record_run_metrics→
-  inject store, OTel is a lazy stub) + worker (polling consumer — claim→run→output-gate/
-  complete + audit/metric write-back) + tf-review (plan-isolated review, no apply path)
-  + pr (2-stage output gate — prepare strips push/PR tool argv + extracts diff, execute runs
-  only after approval) — locally verified. AWS/Slack execution prep is in deploy/. **web/ dashboard (Next.js)**
-  = jobs feed/detail (diff output gate + Approve/Reject)/metrics, DynamoDB Local offline docker (port
-  8930) local e2e verified. DDB_ENDPOINT toggle switches to real DynamoDB (Vercel) (D7). Inference = subscription OAuth (D6).
-  + **agent autonomous proposal (D9)** — mcp_server (propose_job MCP) + agent_monitor (Tier1 simulator/Tier2 claude -p):
-  agent proposes to the queue → human approval via the existing output gate. JobSource.AGENT + Job.rationale.
-  Runbook docs/runbooks/agent-mcp-demo.md.
-  + **conversational producer (D10)** — natural-language chat over a DynamoDB conversation bus (chat_store, GSI1) +
-  chat_agent polling consumer + web Chat. Agent inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified.
+- **Behavior:** command routing + job queue + permission gate + sanitizer + claude_runner + allowlist
+  (`run_for_command` single entry) + command_guard (PreToolUse argv schema = the execution boundary) + logs/diagnose/
+  detect (fixed read adapters → isolate → assemble) + store/ (H0 single-table Job/Audit/Telemetry, Sqlite+DynamoDb)
+  + telemetry + worker (claim→run→output-gate/complete, audit trajectory + capability drift gate) + tf-review
+  (plan-isolated, no apply path) + pr (2-stage gate; execute gets a per-approval scoped write grant).
+  **web/ dashboard (Next.js)** = jobs feed / detail (diff gate + Approve/Reject) / metrics; DynamoDB Local docker
+  (8930) e2e verified; DDB_ENDPOINT toggles real DynamoDB (Vercel) (D7). Inference = subscription OAuth (D6).
+  + **agent autonomous proposal (D9)** — mcp_server (propose_job) + agent_monitor; agent proposes → human approval via
+  the existing output gate. JobSource.AGENT + Job.rationale. Runbook docs/runbooks/agent-mcp-demo.md.
+  + **conversational producer (D10)** — natural-language chat over a DynamoDB conversation bus + chat_agent poller +
+  web Chat. Agent inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified.
 - **Verification:** 3-layer gate — `make check` (540 passed) + ruff + mypy (strict) + documentation budget.
   web/ is `next build` + `docker compose up` e2e green. **`make demo`** runs the full local stack (web+DB+chat_agent+worker) in one shot.
 - **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect use fixed read adapters → sanitizer isolation (generic AWS MCP retired). D17/P1/P2 fresh EC2 rehearsal verified role/credential/egress/audit boundaries plus deterministic scope deny before fetch and Worker audit; instance stopped. P3 is local/CI-only separate-account managed-MCP scaffolding, not an enabled AWS integration.

@@ -27,24 +27,14 @@ Last updated: 2026-07-16
   denied before access, Worker emitted `policy_denied` with reason/scope, 24h window verified; artifact/instance removed.
 - **P3 managed AWS MCP pilot scaffold (local/CI only, 2026-07-15):** separate-account contract, context-key-constrained Logs
   read policy, CloudTrail violation query. No AWS role, trust policy, endpoint, MCP session, or EC2 rehearsal exists.
-- **D19–D23 secure runtime (local/CI, 2026-07-16, commits `3affc65`/`84535bc`+):** all rest on one measurement —
-  `--allowedTools 'Bash(echo:*)'` ran `echo hi; whoami` (2.1.210): tool patterns bind a command line's head, not execution.
-  **D19** `command_guard` normalizes argv + enforces per-command schemas via a PreToolUse hook (deny beats allowedTools;
-  e2e: `;`/`$()` denied, schema match ran). PR write is no longer standing — repo/permission-scoped GitHub App token minted
-  only after approval-hash re-verification, then revoked + audited; App unregistered → fails closed.
-  **D20** declared 5-class capability taxonomy (old substring classifier scored `git add`/`pytest`/`terraform plan` as
-  *no* capability); chain-summed risk vs `RISK_CEILING=10` (write-high/privileged exceed alone → L2/privileged blocked by
-  arithmetic); score/ceiling/account/region pinned in the hashed plan; re-approval on read→write escalation/score/account/
-  region change; unclassified tool = import error. `pr` risk 6, `tf-review` 1.
-  **D21** audit events carry store-assigned step_id/parent_step_id/tool_name/capabilities/target_resource/result_hash and
-  form a tree (claim = root; write_credentials_issued descends from its approval step). Trajectory fields hash only when
-  set → chains already in DynamoDB still verify. Sqlite↔DynamoDB moto-equivalent; web mirror updated.
-  **D22** stream-json for **observation** (`json` output has no tool-call data); dual-shape parser keeps mocks aligned
-  with production; each observed call = a `tool_call` step; `resolve_tool` maps observed argv → declared capability via the
-  guard's own parse. Real e2e: `claimed → tool_call ×2 → done caps=read` vs static read,write-low.
-  **D23** observed capability is a gate, not a note: anything the guard does not authorize, or capability/risk beyond the
-  approval, fails the job with a `capability_drift` event (reason kept); failure paths still record what ran. Silent on
-  the normal path by design — it speaks only if the guard is bypassed. Verified: authorized=DONE, `curl` observed=FAILED.
+- **D19–D23 secure agent runtime (local/CI, 2026-07-16, `3affc65`/`84535bc`/`86b08be`):** all five rest on one
+  measurement — `--allowedTools 'Bash(echo:*)'` ran `echo hi; whoami` (2.1.210), so tool patterns bind a command
+  line's head, not execution. Now: PreToolUse `command_guard` (argv normalize + per-command schema) is the boundary;
+  PR write is a per-approval GitHub App token (minted after hash re-verification, revoked, audited); capability is
+  declared (5-class) and chain-summed vs `RISK_CEILING=10`; the audit trail is a step tree with back-compatible
+  hashing; observed capability is recomputed from what ran and **gates** completion (`capability_drift`).
+  Verified e2e vs a real `claude -p`: `;`/`$()` denied, `claimed → tool_call ×2 → done caps=read`, drift=FAILED.
+  Rationale/limits: DECISIONS D19–D23. **Unverified**: GitHub App token path (no App) and no EC2 rehearsal.
 - **All user-facing text English** (H0): agent Slack/chat + dashboard UI are English; seed rationales translated (2026-07-15).
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics render
   + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
