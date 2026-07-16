@@ -4,10 +4,11 @@ Last updated: 2026-07-17
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): Slack migrated to a new workspace
 >   ("Platform Agent"): App re-created via manifest, SSM Slack 4종 refreshed (v2), local `/devops ping` pong verified
 >   (guide: `docs/guide/kr/SLACK_NEW_GUIDE.md` + `slack-app-manifest.yaml`). **GitHub App write path**
->   write-cred **verified by TC** (`make check` **553 passed**) + real-GitHub mint smoke + SSM 4종 + branch protection.
->   EC2 rehearsal found **6 deploy bugs** — #1 MCP launch, #4 drift-on-blocked, #5 pr-no-diff-DONE fixed & pushed;
->   **#2 (refresh OnBootSec 2min) + #3 (worker `reclaim_stale`) fixed & VERIFIED LIVE on a fresh EC2** (2026-07-17,
->   boot+2m13s refresh, real-DynamoDB claim + orphan reclaim; instance stopped). Report: `docs/reports/2026-07-16-ec2-write-cred-rehearsal.md`.
+>   write-cred **verified by TC** (`make check` **557 passed**) + real-GitHub mint smoke + SSM 4종 + branch protection.
+>   #2/#3 **fixed & VERIFIED LIVE on EC2** (2026-07-17; instance stopped). **Live pr test (2026-07-17)**: approver
+>   SecureString-decrypt bug fixed (`63ec156`), men16922 approved via dashboard; execute fail-closed on worktree
+>   drift (plan-binding OK); model pinned to `claude-sonnet-5` (`bad79aa`); prepare prompt hardened (`90da9cc`) after
+>   3/4 prepares emitted no diff. **Real PR not yet opened (prepare non-determinism, not infra).** Next boot applies all.
 >   Docs: `docs/V2_INTRO.md`/`V2_TEST.md`.
 >   Manual remains: register `review_slackops_job` Message Shortcut in the new workspace; slides (⏰ Canvas ~8/09, 23d left).
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.

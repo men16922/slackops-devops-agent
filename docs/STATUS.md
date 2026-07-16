@@ -11,7 +11,11 @@ Last updated: 2026-07-17
 - **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth, immutable plan/approval hash, workspace/tool/postcondition validation, approver allowlist/audit chain, EC2 hardening; Vercel and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `make check` → **553 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- 3-layer gate: `make check` → **557 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- **Live pr test (2026-07-17)**: approver bug fixed (`SLACK_APPROVER_IDS` SecureString now `--with-decryption`,
+  `63ec156`) — men16922 approved via dashboard; execute fail-closed on worktree drift (plan-binding OK). Headless
+  model pinned to `claude-sonnet-5` (`bad79aa`). pr prepare prompt hardened to compel an edit (`90da9cc`) after
+  3/4 live prepares produced no diff. Real PR not yet opened (prepare non-determinism, not infra).
   `cd web && npm run build` green on the current tree (re-verified after the D21 `AuditEvent` mirror change, not
   only for D15); `git diff --check` passes.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge→Lambda(`alarm_lambda`, detect→propose)→DynamoDB queue→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok). Serverless producer fires EC2-off; EC2 then terminated → ≈ $0.

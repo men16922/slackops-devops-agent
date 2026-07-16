@@ -15,8 +15,11 @@ Last updated: 2026-07-16
       ⏰ Canvas 무료 트라이얼 **~8/09 종료**(새 워크스페이스로 교체돼 트라이얼 갱신, 2026-07-17 기준 23일) — 그 전에 캡처/데모.
 - [ ] `[manual]` **새 워크스페이스**에 `review_slackops_job` Message Shortcut 등록 후 Modal diff 승인/거부 확인.
       Done: 비허용 사용자는 modal을 열거나 상태를 바꾸지 못하고, 허용 사용자의 결정은 원본 메시지와 감사 기록에 남음.
-- [ ] `[manual]` EC2 리허설에서 `SLACK_APPROVER_IDS`(SSM v2 갱신됨)를 인스턴스 env에 반영하고 승인 버튼 검증.
-      Done: 비허용 버튼 클릭은 거부되고, 허용 승인자는 감사 기록에 남음.
+- [x] **승인자 검증 완료(2026-07-17)** — `SLACK_APPROVER_IDS` SecureString 미복호화 버그 수정(`63ec156`);
+      men16922 가 대시보드에서 승인 성공, 감사 `approved` 기록. (Slack Message Shortcut 등록은 위 항목 참조 — 대시보드 경로는 검증됨.)
+- [ ] `[manual]` **실 pr 1건 → PR 오픈 라이브 확인**(선택) — 새 부팅엔 approver 복호화·Sonnet5·prepare 강화가 전부
+      반영됨. prepare 가 또 diff 없이 끝나면(비결정성) prepare 재시도 로직 추가를 검토. execute 는 clean worktree +
+      즉시 승인이어야 plan-binding(worktree drift) 통과.
 
 ## Secure Agent Runtime — Notion 레퍼런스 잔여 (rationale: DECISIONS D19–D23)
 > 레퍼런스 §8 Implementation Priority 의 **P0 전부 + P1 전부 닫힘**. **번호 체계가 repo 의
