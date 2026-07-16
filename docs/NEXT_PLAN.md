@@ -12,7 +12,7 @@ Last updated: 2026-07-16
 > 남은 것은 대부분 **사람이 클릭/등록/발표**해야 하는 항목이다.
 > Slack은 새 워크스페이스("Platform Agent")로 이전 완료 — SSM Slack 4종 v2 갱신, 로컬 `/devops ping` pong 확인.
 - [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
-      ⏰ Canvas 무료 트라이얼 **7/19 종료** — 캡처/데모는 그 전에.
+      ⏰ Canvas 무료 트라이얼 **~8/09 종료**(새 워크스페이스로 교체돼 트라이얼 갱신, 2026-07-17 기준 23일) — 그 전에 캡처/데모.
 - [ ] `[manual]` **새 워크스페이스**에 `review_slackops_job` Message Shortcut 등록 후 Modal diff 승인/거부 확인.
       Done: 비허용 사용자는 modal을 열거나 상태를 바꾸지 못하고, 허용 사용자의 결정은 원본 메시지와 감사 기록에 남음.
 - [ ] `[manual]` EC2 리허설에서 `SLACK_APPROVER_IDS`(SSM v2 갱신됨)를 인스턴스 env에 반영하고 승인 버튼 검증.

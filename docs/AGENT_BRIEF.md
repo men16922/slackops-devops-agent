@@ -9,7 +9,7 @@ Last updated: 2026-07-17
 >   **#2 (refresh at-boot: OnBootSec 2min) + #3 (rotation kills in-flight: worker `reclaim_stale`) now fixed code+test**;
 >   both need only optional real-EC2 observation. Report: `docs/reports/2026-07-16-ec2-write-cred-rehearsal.md`. EC2 stopped.
 >   Docs: `docs/V2_INTRO.md`/`V2_TEST.md`.
->   Manual remains: register `review_slackops_job` Message Shortcut in the new workspace; slides (⏰ Canvas 7/19).
+>   Manual remains: register `review_slackops_job` Message Shortcut in the new workspace; slides (⏰ Canvas ~8/09, 23d left).
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)
