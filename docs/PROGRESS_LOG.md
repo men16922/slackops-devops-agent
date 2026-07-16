@@ -5,6 +5,19 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-16 — Entry-doc tidy + secure-runtime bundle committed
+- Status: Done. Working tree clean; `main` is **10 commits ahead of origin — not pushed**.
+- Changed: committed the whole secure-runtime bundle as three commits (`3affc65` D16–D21 + P1/P2/P3,
+  `84535bc` D22, `86b08be` D23), then ran `/tidy-docs` (`0d6ea2e`). Every entry doc was at or near cap, so the next
+  checkpoint would have failed the gate. PROGRESS_LOG 118→61 (newest 3 kept; D20/D19 + two 07-15 entries → archive),
+  NEXT_PLAN 70→42 (14 `[x]` items → one COMPLETED_SUMMARY milestone), STATUS 120→110 and AGENT_BRIEF 60→56 (D19–D23
+  detail → DECISIONS link), COMPLETED_SUMMARY 19→39 (3 milestones incl. what stayed unverified).
+- Verified: `make check` → **540 passed**, Ruff, strict mypy (39 files), doc budgets green (56/110/42/61).
+  Archive/plan/decision/runbook links all resolve; DECISIONS retains D19–D23 rationale.
+- Blockers: none in code. The one unverified code path is the **write-credential path** (no GitHub App registered);
+  it is now called out separately in NEXT_PLAN rather than buried among finished checkboxes.
+- Next: push `main`; then GitHub App + 4 SSM params + EC2 `pr` execute rehearsal; slides (⏰ Canvas trial ends 7/19).
+
 ## 2026-07-16 — D23 promote observed capability from record to gate
 - Status: Done for local/CI. No EC2/live rehearsal.
 - Changed: worker now checks what actually ran before a result may count as a completed job. Observed capability is

@@ -92,8 +92,9 @@ Last updated: 2026-07-16
   (EC2+IAM). Reframe: triage/safe-response layer over existing signals.
 
 ## Active Focus
-- **v2 = AWSKRUG 발표 데모** (branch `v2`, plan `docs/plans/2026-06-25-awskrug-demo.md`). Slack 해커톤 제출 **폐기**(Devpost §3
-  Eligibility 한국 미달). 목표 = "Slack 자연어 → 실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
+- **v2 = AWSKRUG 발표 데모** (plan `docs/plans/2026-06-25-awskrug-demo.md`; 작업은 전부 `main` — plan 문서의 `v2`
+  브랜치 표기는 유효하지 않다). Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 한국 미달). 목표 = "Slack 자연어 →
+  실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
 - **D1–D3 + 실 Slack sandbox e2e 완료(2026-07-02)** — DM 폴백(register_dm_messages) 경로로 스트리밍→pr 제안→diff+버튼→
   approved 전이(audit via slack)→**Canvas 자동 생성**→footer/payload 확정. ASSISTANT_POLL_TIMEOUT_S(240s).
   **D4 실 AWS 검증(2026-07-06)**: EC2→CloudWatch 진단+write-denied. Modal diff·Shortcut 은 코드 완료(07-15), Slack App
