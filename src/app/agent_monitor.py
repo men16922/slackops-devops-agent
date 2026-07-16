@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import re
 from typing import TYPE_CHECKING
 
@@ -156,7 +157,7 @@ def mcp_config_json() -> str:
         {
             "mcpServers": {
                 "slackops": {
-                    "command": "python",
+                    "command": sys.executable,
                     "args": ["-m", "app.mcp_server"],
                     "env": env,
                 }

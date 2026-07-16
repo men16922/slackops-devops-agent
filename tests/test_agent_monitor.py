@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -106,7 +107,7 @@ def test_mcp_config_gives_dynamodb_connection_only_to_internal_server(
 
     payload = json.loads(mcp_config_json())
     server = payload["mcpServers"]["slackops"]
-    assert server["command"] == "python"
+    assert server["command"] == sys.executable
     assert server["args"] == ["-m", "app.mcp_server"]
     assert server["env"] == {
         "AWS_EC2_METADATA_DISABLED": "true",
