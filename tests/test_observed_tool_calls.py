@@ -240,6 +240,30 @@ class TestCapabilityDriftGate:
         steps = [e for e in audit.list_for_job(job.id) if e.action == AUDIT_TOOL_CALL]
         assert [e.detail for e in steps] == ["curl http://evil"]
 
+    def test_guard_denied_call_is_not_drift(self) -> None:
+        from app.store import JobStatus
+        from app.worker import AUDIT_CAPABILITY_DRIFT
+
+        # The PreToolUse guard denies a compound `a && b` (unresolvable), recorded
+        # with is_error=True but never run — the model then retries with an
+        # authorized call. A blocked call must not fail the job for the guard doing
+        # its job; drift is only for a call that bypassed the guard and ran.
+        outcome = CommandOutcome(
+            result="ok",
+            tool_steps=(
+                ToolCall("t1", "Bash", "git status --porcelain && git branch", "", True),
+                ToolCall("t2", "Bash", "git status --porcelain", "", False),
+            ),
+        )
+        job, audit, final = self._run(outcome)
+        assert final is not None and final.status is JobStatus.DONE
+        assert not [
+            e for e in audit.list_for_job(job.id) if e.action == AUDIT_CAPABILITY_DRIFT
+        ]
+        # the blocked call is still in the trajectory (tamper-evidence)
+        steps = [e.detail for e in audit.list_for_job(job.id) if e.action == AUDIT_TOOL_CALL]
+        assert "git status --porcelain && git branch" in steps
+
     def test_capability_outside_the_authorized_set_fails(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

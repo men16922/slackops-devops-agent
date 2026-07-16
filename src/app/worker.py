@@ -585,8 +585,16 @@ class Worker:
         """
         from app.execution_plan import capabilities_for_tools, risk_score
 
-        observed = self._observed_capabilities(resolved)
-        unresolved = [c.command or c.name for c, t in resolved if t.startswith(_UNRESOLVED_PREFIX)]
+        # Only tool calls that actually ran count as observed capability. A call the
+        # PreToolUse guard denied is still recorded in the trajectory (is_error=True)
+        # but never executed — counting it as drift would fail the job for the guard
+        # doing its job, when the model then retries with an allowed argv (e.g. it
+        # splits a blocked `a && b` into two authorized calls). D23's purpose is to
+        # catch a call that *bypassed* the guard and ran (is_error=False), not one the
+        # guard blocked.
+        executed = tuple((call, tool) for call, tool in resolved if not call.is_error)
+        observed = self._observed_capabilities(executed)
+        unresolved = [c.command or c.name for c, t in executed if t.startswith(_UNRESOLVED_PREFIX)]
         if unresolved:
             raise CapabilityDrift(
                 f"observed a tool call the guard does not authorize: {unresolved[0]!r}",

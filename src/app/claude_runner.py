@@ -22,7 +22,7 @@ from typing import Callable
 # claude 바이너리 이름(EC2 user-data 가 PATH 에 설치).
 CLAUDE_BIN = "claude"
 
-DEFAULT_TIMEOUT_S = 300
+DEFAULT_TIMEOUT_S = 600
 
 # CLI 도구(kubectl/git/aws)가 색상 출력을 켜면 ANSI 이스케이프(CSI)가 결과 텍스트에 섞인다.
 # 저장 전 여기서 제거 — web/Slack 등 모든 소비자가 깨끗한 텍스트를 받는다(렌더링은 표시만 담당).
