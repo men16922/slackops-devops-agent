@@ -126,6 +126,14 @@ def test_credential_refresh_timer_fires_early_at_boot() -> None:
     assert "OnBootSec=45min" not in _USER_DATA
 
 
+def test_securestring_params_fetched_with_decryption() -> None:
+    """SecureString SSM 파라미터는 --with-decryption 으로 가져와야 한다 — 없으면 KMS 암호문이
+    env 값이 돼 조용히 오동작한다(SLACK_APPROVER_IDS 는 암호문이 allowlist 가 돼 전부 거부됨)."""
+    for name in ("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_APPROVER_IDS", "GITHUB_APP_PRIVATE_KEY_B64"):
+        line = next(ln for ln in _USER_DATA.splitlines() if f"/slackops/{name} " in ln)
+        assert "--with-decryption" in line, f"{name} fetched without --with-decryption"
+
+
 def test_user_data_within_ec2_16kb_limit() -> None:
     """EC2 RunInstances 는 user-data 를 16384 byte 로 제한한다(raw file:// 전송, 압축 없음).
     한글 주석은 3 byte/자라 이 파일은 만성적으로 한계 근처다 — 초과하면 기동이 실패하므로

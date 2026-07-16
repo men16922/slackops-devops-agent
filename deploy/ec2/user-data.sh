@@ -103,8 +103,8 @@ ACCOUNT_ID="$(aws sts get-caller-identity --region "$REGION" --query Account --o
   echo "OTEL_SERVICE_NAME=slackops-devops-agent"
   # 제안 알림(선택) — 채널 미설정 시 notifier 는 no-op. SSM 파라미터 부재 시 빈 값(부팅 실패 방지).
   echo "SLACK_NOTIFY_CHANNEL=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_NOTIFY_CHANNEL --query Parameter.Value --output text 2>/dev/null || true)"
-  # Slack 버튼 승인자는 user ID allowlist가 비어 있으면 전부 거부(fail closed).
-  echo "SLACK_APPROVER_IDS=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_APPROVER_IDS --query Parameter.Value --output text 2>/dev/null || true)"
+  # Slack 승인자 allowlist(비면 전부 거부). SecureString → --with-decryption 필수(없으면 암호문이 allowlist 가 됨).
+  echo "SLACK_APPROVER_IDS=$(aws ssm get-parameter --region "$REGION" --name /slackops/SLACK_APPROVER_IDS --with-decryption --query Parameter.Value --output text 2>/dev/null || true)"
   # 대시보드 deep-link 용(예: https://<app>.vercel.app). 부재 시 링크 대신 (job <id>) 텍스트.
   echo "DASHBOARD_URL=$(aws ssm get-parameter --region "$REGION" --name /slackops/DASHBOARD_URL --query Parameter.Value --output text 2>/dev/null || true)"
   # 승인 후 발급되는 단기 write credential(GitHub App). 상시 PAT 를 두지 않는다 —
