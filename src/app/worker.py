@@ -77,6 +77,10 @@ class CapabilityDrift(Exception):
         self.reason = reason
         self.observed = observed
 
+
+class PrPrepareProducedNoDiff(Exception):
+    """pr prepare 단계가 승인 게이트로 넘길 diff 를 만들지 못했다 — 성공(DONE)이 아니라 실패다."""
+
 # 승인된 PR execute 단계가 push 할 저장소(owner/name). 미설정이면 write credential 을
 # 발급하지 않는다 — 자격 없이 실행되어 push 가 실패한다(fail closed, 로컬/데모 기본값).
 PR_REPOSITORY_ENV = "SLACKOPS_PR_REPOSITORY"
@@ -466,6 +470,25 @@ class Worker:
             )
             self._record(job, duration_ms, outcome, success=True)
             return updated
+
+        # A pr in the prepare phase (not yet approved) must produce a diff to gate.
+        # Reaching here means outcome.diff is None — the model made no change (often a
+        # prepare that spent its whole budget investigating and never edited). Completing
+        # as DONE would falsely report success for a PR that was never created, so fail
+        # with a clear reason. Read-only commands (logs/diagnose/tf-review) and the pr
+        # execute phase (approved_by set, pushes the approved diff) legitimately have no
+        # diff here and fall through to DONE.
+        if job.command == "pr" and job.approved_by is None:
+            return self._fail(
+                job,
+                started,
+                PrPrepareProducedNoDiff(
+                    "pr prepare produced no diff — no change was made "
+                    "(the model may have run out of time before editing)"
+                ),
+                root_step,
+                target_resource,
+            )
 
         if job.command == "pr" and job.approved_by is not None:
             self._audit.append(

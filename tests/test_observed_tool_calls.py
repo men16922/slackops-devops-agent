@@ -16,7 +16,7 @@ from app.command_guard import CommandGuardError, resolve_tool
 from app.execution_plan import capabilities_for_tools, risk_score
 from app.store import SqliteAuditStore, SqliteJobStore, SqliteTelemetryStore, result_digest
 from app.store import JobSource, build_step_tree
-from app.worker import AUDIT_TOOL_CALL, CommandOutcome, Worker
+from app.worker import AUDIT_AWAITING_APPROVAL, AUDIT_TOOL_CALL, CommandOutcome, Worker
 from tests._helpers import counter_clock, counter_id
 
 
@@ -134,17 +134,48 @@ class TestObservedCapability:
         assert risk_score(caps) < risk_score(capabilities_for_tools(("Bash(git push:*)",)))
 
 
+# A pr prepare must yield a diff to reach the approval gate; these trajectory/drift
+# tests exercise the pre-gate logic (tool-step resolution, capability drift) so they
+# carry a diff and a stub plan builder to land on AWAITING_APPROVAL rather than the
+# (now-rejected) empty-diff path.
+_PR_DIFF = "--- a/x.py\n+++ b/x.py\n-old\n+new"
+
+
+class _StubPlan:
+    capabilities: tuple[str, ...] = ("read",)
+    policy_version = "test-policy"
+    risk_score = 0
+    risk_ceiling = 10
+
+    def canonical_json(self) -> str:
+        return "{}"
+
+    def digest(self) -> str:
+        return "stub-plan-hash"
+
+
+def _stub_plan_builder(_job, _diff) -> _StubPlan:
+    return _StubPlan()
+
+
 class TestWorkerTrajectory:
     def _worker(self, outcome: CommandOutcome):
         jobs = SqliteJobStore(clock=counter_clock(), id_factory=counter_id())
         audit = SqliteAuditStore(clock=counter_clock())
         metrics = SqliteTelemetryStore(clock=counter_clock())
-        worker = Worker(jobs, audit, metrics, executors={"pr": lambda _job: outcome})
+        worker = Worker(
+            jobs,
+            audit,
+            metrics,
+            executors={"pr": lambda _job: outcome},
+            plan_builder=_stub_plan_builder,  # type: ignore[arg-type]  # duck-typed stub
+        )
         return jobs, audit, worker
 
     def test_each_observed_call_becomes_a_child_step(self) -> None:
         outcome = CommandOutcome(
             result="opened",
+            diff=_PR_DIFF,
             tool_steps=(
                 ToolCall("t1", "Bash", "git status --porcelain", result_digest("A x"), False),
                 ToolCall("t2", "Bash", "git push -u origin feat/x", result_digest("ok"), False),
@@ -167,17 +198,19 @@ class TestWorkerTrajectory:
         # 결과 본문은 남기지 않고 해시만 남는다.
         assert tool_steps[0].result_hash == result_digest("A x")
 
-    def test_done_step_carries_observed_capabilities(self) -> None:
+    def test_gate_step_carries_observed_capabilities(self) -> None:
         outcome = CommandOutcome(
             result="opened",
+            diff=_PR_DIFF,
             tool_steps=(ToolCall("t1", "Bash", "git status", result_digest("A x"), False),),
         )
         jobs, audit, worker = self._worker(outcome)
         job = jobs.enqueue("pr", args="fix", source=JobSource.SLACK)
         worker.process_one()
 
-        done = [e for e in audit.list_for_job(job.id) if e.action == "done"][0]
-        assert done.capabilities == ("read",)
+        # 관측 capability 는 결과가 아니라 승인 게이트 스텝에 남는다(읽기만 돌았으므로 read).
+        gate = [e for e in audit.list_for_job(job.id) if e.action == AUDIT_AWAITING_APPROVAL][0]
+        assert gate.context["observed_capabilities"] == "read"
 
     def test_unresolvable_command_is_kept_not_erased(self) -> None:
         # guard 를 통과한 것만 실행됐어야 한다. 그래도 해석 불가한 명령줄이 나오면
@@ -201,7 +234,13 @@ class TestCapabilityDriftGate:
         jobs = SqliteJobStore(clock=counter_clock(), id_factory=counter_id())
         audit = SqliteAuditStore(clock=counter_clock())
         metrics = SqliteTelemetryStore(clock=counter_clock())
-        worker = Worker(jobs, audit, metrics, executors={command: lambda _job: outcome})
+        worker = Worker(
+            jobs,
+            audit,
+            metrics,
+            executors={command: lambda _job: outcome},
+            plan_builder=_stub_plan_builder,  # type: ignore[arg-type]  # duck-typed stub
+        )
         job = jobs.enqueue(command, args="fix", source=JobSource.SLACK)
         final = worker.process_one()
         return job, audit, final
@@ -211,11 +250,12 @@ class TestCapabilityDriftGate:
 
         outcome = CommandOutcome(
             result="ok",
+            diff=_PR_DIFF,
             tool_steps=(ToolCall("t1", "Bash", "git status --porcelain", "", False),),
         )
         _job, _audit, final = self._run(outcome)
-        # 정상 경로에서 게이트는 조용하다 — 상시 거부로 퇴화하지 않았는지 확인.
-        assert final is not None and final.status is JobStatus.DONE
+        # 정상 경로에서 게이트는 조용하다 — 드리프트로 실패시키지 않고 승인 게이트에 도달한다.
+        assert final is not None and final.status is JobStatus.AWAITING_APPROVAL
 
     def test_unauthorized_argv_fails_the_job(self) -> None:
         from app.store import JobStatus
@@ -250,13 +290,15 @@ class TestCapabilityDriftGate:
         # its job; drift is only for a call that bypassed the guard and ran.
         outcome = CommandOutcome(
             result="ok",
+            diff=_PR_DIFF,
             tool_steps=(
                 ToolCall("t1", "Bash", "git status --porcelain && git branch", "", True),
                 ToolCall("t2", "Bash", "git status --porcelain", "", False),
             ),
         )
         job, audit, final = self._run(outcome)
-        assert final is not None and final.status is JobStatus.DONE
+        # 차단된 호출은 드리프트가 아니다 — job 은 실패하지 않고 승인 게이트에 도달한다.
+        assert final is not None and final.status is JobStatus.AWAITING_APPROVAL
         assert not [
             e for e in audit.list_for_job(job.id) if e.action == AUDIT_CAPABILITY_DRIFT
         ]

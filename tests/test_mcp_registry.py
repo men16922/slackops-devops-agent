@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 from app.agent_monitor import MONITOR_TOOLS, mcp_config_json
@@ -36,11 +37,11 @@ def test_internal_mcp_source_matches_reviewed_registry_hash() -> None:
 def test_registry_pins_stdio_command_and_proposal_only_tools() -> None:
     entry = _slackops_registry_entry()
     assert entry["transport"] == "stdio"
-    assert entry["command"] == ["python", "-m", "app.mcp_server"]
+    assert entry["command"] == ["-m", "app.mcp_server"]
     assert entry["tools"] == ["propose_job", "list_pending"]
     assert entry["credential_scope"] == "DynamoDB slackops-agent proposal queue only"
     assert entry["owner"] == "SlackOps platform"
-    assert entry["reviewed_at"] == "2026-07-15"
+    assert entry["reviewed_at"] == "2026-07-16"
 
 
 def test_all_agent_mcp_tool_allowlists_match_registry_inventory() -> None:
@@ -55,6 +56,9 @@ def test_runtime_mcp_config_matches_registry_command() -> None:
     entry = _slackops_registry_entry()
     payload = json.loads(mcp_config_json())
     server = payload["mcpServers"]["slackops"]
-    assert [server["command"], *server["args"]] == entry["command"]
+    # The registry pins the module invocation (the reviewable supply-chain surface);
+    # the interpreter is the app's own sys.executable, resolved per environment.
+    assert server["command"] == sys.executable
+    assert server["args"] == entry["command"]
     # Static credential only: the MCP child must never fall back to IMDS.
     assert server["env"]["AWS_EC2_METADATA_DISABLED"] == "true"

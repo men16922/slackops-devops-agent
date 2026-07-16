@@ -234,6 +234,27 @@ def test_pr_outcome_with_diff_stops_at_awaiting_approval(stores) -> None:
     assert metrics.list_for_job(job.id)[0].success is True
 
 
+def test_pr_prepare_without_diff_fails_not_done(stores) -> None:
+    # A pr prepare that yields no diff (the model investigated but never edited, or ran
+    # out of time before editing) must FAIL — completing as DONE would tell the user a
+    # PR is done when none exists and nothing was ever gated. Read-only commands and the
+    # pr execute phase legitimately have no diff and are unaffected.
+    jobs, audit, _ = stores
+    job = jobs.enqueue("pr", "raise a timeout", source=JobSource.SLACK, requested_by="U1")
+    worker = make_worker(
+        stores,
+        executors={"pr": lambda _job: CommandOutcome(result="I only looked around")},
+    )
+
+    final = worker.process_one()
+
+    assert final is not None and final.status is JobStatus.FAILED
+    assert final.error is not None and "no diff" in final.error
+    actions = [e.action for e in audit.list_for_job(job.id)]
+    assert AUDIT_FAILED in actions
+    assert AUDIT_AWAITING_APPROVAL not in actions
+
+
 def test_approved_pr_job_completes_without_regating(stores) -> None:
     jobs, audit, _ = stores
     job = jobs.enqueue("pr", "fix typo", source=JobSource.SLACK, requested_by="U1")

@@ -4,13 +4,14 @@
     {
       "name": "slackops",
       "transport": "stdio",
-      "command": ["python", "-m", "app.mcp_server"],
+      "command": ["-m", "app.mcp_server"],
+      "command_interpreter": "sys.executable (the app's own trusted interpreter, resolved at runtime; not a fixed path since AL2023 has no `python` and the app lives in a venv)",
       "tools": ["propose_job", "list_pending"],
       "source": "src/app/mcp_server.py",
       "sha256": "f7b70c9a854520604669e53e5b9b0de2d0c960ee30244aa8d2ccc4a711f8946c",
       "credential_scope": "DynamoDB slackops-agent proposal queue only",
       "owner": "SlackOps platform",
-      "reviewed_at": "2026-07-15"
+      "reviewed_at": "2026-07-16"
     }
   ]
 }
