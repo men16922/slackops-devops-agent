@@ -17,9 +17,13 @@ Last updated: 2026-07-16
       Done: 비허용 사용자는 modal을 열거나 상태를 바꾸지 못하고, 허용 사용자의 결정은 원본 메시지와 감사 기록에 남음.
 - [x] **승인자 검증 완료(2026-07-17)** — `SLACK_APPROVER_IDS` SecureString 미복호화 버그 수정(`63ec156`);
       men16922 가 대시보드에서 승인 성공, 감사 `approved` 기록. (Slack Message Shortcut 등록은 위 항목 참조 — 대시보드 경로는 검증됨.)
-- [ ] `[manual]` **실 pr 1건 → PR 오픈 라이브 확인**(선택) — 새 부팅엔 approver 복호화·Sonnet5·prepare 강화가 전부
-      반영됨. prepare 가 또 diff 없이 끝나면(비결정성) prepare 재시도 로직 추가를 검토. execute 는 clean worktree +
-      즉시 승인이어야 plan-binding(worktree drift) 통과.
+- [ ] `[auto]` ★ **pr execute-blocking 버그 수정** — `_prepare` 가 **모델이 찍은 diff 텍스트**를 해시·승인하는데
+      execute(`verify_pr_workspace`, `execution_plan.py:340`)는 런타임의 `git diff HEAD --no-ext-diff --binary`
+      와 바이트 비교 → 모델 근사치(가짜 index/@@)라 **항상 `plan_binding_rejected`**. TC가 verifier를 mock 해서
+      못 잡음(실 PR 이 한 번도 안 열린 진짜 이유). 수정: prepare 가 **런타임 git diff 를 정본**으로(표시·해시·
+      execute 동일 소스). 신규 TC: 임시 git repo 에 대해 unmock verify. 그 뒤 실 PR 라이브 재검증(=이번엔 통과).
+- [ ] `[manual]` 실 pr 1건 → PR 오픈 라이브 확인(선택, 위 버그 수정 **선행**). 새 부팅엔 approver 복호화·Sonnet5·
+      prepare 강화 반영됨. prepare 가 또 diff 없이 끝나면(비결정성) prepare 재시도 로직 검토.
 
 ## Secure Agent Runtime — Notion 레퍼런스 잔여 (rationale: DECISIONS D19–D23)
 > 레퍼런스 §8 Implementation Priority 의 **P0 전부 + P1 전부 닫힘**. **번호 체계가 repo 의
