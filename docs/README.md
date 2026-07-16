@@ -1,5 +1,5 @@
 # docs/ — slackops-devops-agent
-최종 갱신: 2026-06-17
+최종 갱신: 2026-07-16
 
 > docs 인덱스 + Read Path. 전체 bulk-read 금지 — Read Path 순서대로만.
 
@@ -19,6 +19,13 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
 | `COMPLETED_SUMMARY.md` | 완료 milestone 압축+링크 | — |
 | `DECISIONS.md` | 비가역 결정(Decision/Reason/Impact) | — |
 | `DOCS_POLICY.md` | 문서 운영 규칙(context budget) | — |
+| `V2_INTRO.md` | v1(해커톤)→v2(AWSKRUG) 강화점 비교(발표 준비) | — |
+| `V2_TEST.md` | 검증·테스트 통합 가이드(게이트/스위트맵/e2e) | — |
+| `strategy.md` | 보안·제품 전략(전문가 증거) | — |
+| `suggestion.md` | 입문→고급 온보딩 | — |
+| `guide/kr/` | 사용자·운영자 가이드(Slack/Dashboard/Vercel/QA/데모) | — |
+| `runbooks/` | 운영 런북(deploy-checklist/agent-mcp-demo/pr-write-credential) | — |
+| `presentation/` | AWSKRUG 발표 대본 + 슬라이드 | — |
 | `plans/` | dated 스냅샷(YYYY-MM-DD-<topic>.md, historical) | — |
 | `engineering/` | 하네스 엔지니어링 bibles(제네릭) + `interp/INTERPRETATION.md`(리포 매핑) | — |
 

@@ -1,17 +1,14 @@
 # AGENT_BRIEF — slackops-devops-agent
 Last updated: 2026-07-16
 
-> ▶ NEXT SESSION (**v2 AWSKRUG demo**): the secure-runtime bundle is **committed** (`3affc65`, `84535bc`, +D23) but
->   **not pushed** — main is ahead of origin. Next: push, then **slide finalization → live-demo rehearsal**
->   (plan: `docs/plans/2026-06-25-awskrug-demo.md`).
->   D19–D23 (2026-07-16) closed the Notion-reference P0 pair + P1 aggregation/trajectory: PreToolUse `command_guard`
->   is now the execution boundary (measured: `--allowedTools` alone let `echo hi; whoami` run), PR write credentials
->   are minted per approval, capability is declared + risk-scored vs a ceiling, and the audit trail is a step tree
->   whose observed capability gates completion.
->   Manual remains: GitHub App registration + 4 SSM params + EC2 `pr` execute rehearsal; Slack App Message Shortcut
->   registration; Slack approver setup. Remaining `[auto]` work is thin — the P0/P1 reference items are closed.
->   Presentation:
->   `docs/presentation/PRESENTATION.md` + `docs/presentation/SlackOps DevOps Agent (Standalone).html`.
+> ▶ NEXT SESSION (**v2 AWSKRUG demo**): main is **pushed / in sync**. Slack migrated to a new workspace
+>   ("Platform Agent"): App re-created via manifest, SSM Slack 4종 refreshed (v2), local `/devops ping` pong verified
+>   (guide: `docs/guide/kr/SLACK_NEW_GUIDE.md` + `slack-app-manifest.yaml`). **In progress — GitHub App write path**
+>   (task #3): App created + private key + installation id captured; **pending = 4 SSM params + EC2 `pr` execute
+>   rehearsal** (runbook: `docs/runbooks/pr-write-credential-rehearsal.md`). Docs consolidated: `docs/V2_INTRO.md`
+>   (v1→v2 강화 비교) + `docs/V2_TEST.md` (verification), en guides/report → archive.
+>   Manual remains: GitHub App SSM+EC2 rehearsal; register `review_slackops_job` Message Shortcut in the new
+>   workspace; slides (⏰ Canvas trial ends 7/19). Presentation: `docs/presentation/PRESENTATION.md` + `…(Standalone).html`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)

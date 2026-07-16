@@ -5,7 +5,7 @@
 > records live in `docs/PROGRESS_LOG.md` (2026-07-01/02 entries), not here.
 > **Part A (LOCAL)** runs entirely on this Mac — `make demo-all` + a real Slack workspace connection, no EC2, ~$1.
 > **Part B (REAL AWS)** is a single paid EC2 run — do it after Part A passes.
-> Authority: `docs/NEXT_PLAN.md` > `docs/plans/2026-06-25-awskrug-demo.md` §4 > this file.
+> Authority: `docs/NEXT_PLAN.md` > this file.
 > How to run: Agent = [SLACK_GUIDE.md](SLACK_GUIDE.md) · Dashboard = [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) · Infra = `docs/runbooks/deploy-checklist.md`.
 >
 > ⛔ Slack hackathon submission is **abandoned** (Devpost §3 — South Korea ineligible). Goal = **AWSKRUG live presentation demo**.

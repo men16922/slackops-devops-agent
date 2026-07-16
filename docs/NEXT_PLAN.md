@@ -7,15 +7,15 @@ Last updated: 2026-07-16
 > Unattended rounds do one `[auto]` top-to-bottom. Each item's "Done:" criterion must be met to finish.
 > Completed history: docs/COMPLETED_SUMMARY.md (milestones) · docs/DECISIONS.md D19–D23 (secure-runtime rationale).
 
-## ★ Active — v2 AWSKRUG 발표 데모 (plan: docs/plans/2026-06-25-awskrug-demo.md)
+## ★ Active — v2 AWSKRUG 발표 데모
 > D1–D4 + Modal/Shortcut 코드 완료, 실 Slack sandbox e2e 통과 (COMPLETED_SUMMARY 참조).
 > 남은 것은 대부분 **사람이 클릭/등록/발표**해야 하는 항목이다.
-- [ ] `[manual]` main → origin push (현재 9 ahead: `3affc65`/`84535bc`/`86b08be` + 이전 6).
+> Slack은 새 워크스페이스("Platform Agent")로 이전 완료 — SSM Slack 4종 v2 갱신, 로컬 `/devops ping` pong 확인.
 - [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
       ⏰ Canvas 무료 트라이얼 **7/19 종료** — 캡처/데모는 그 전에.
-- [ ] `[manual]` Slack App에 `review_slackops_job` Message Shortcut 등록 후 Modal diff 승인/거부를 실 Slack에서 확인.
+- [ ] `[manual]` **새 워크스페이스**에 `review_slackops_job` Message Shortcut 등록 후 Modal diff 승인/거부 확인.
       Done: 비허용 사용자는 modal을 열거나 상태를 바꾸지 못하고, 허용 사용자의 결정은 원본 메시지와 감사 기록에 남음.
-- [ ] `[manual]` 다음 실 Slack/EC2 리허설에서 SSM의 `SLACK_APPROVER_IDS`를 인스턴스 환경 파일에 반영하고 승인 버튼 검증.
+- [ ] `[manual]` EC2 리허설에서 `SLACK_APPROVER_IDS`(SSM v2 갱신됨)를 인스턴스 env에 반영하고 승인 버튼 검증.
       Done: 비허용 버튼 클릭은 거부되고, 허용 승인자는 감사 기록에 남음.
 
 ## Secure Agent Runtime — Notion 레퍼런스 잔여 (rationale: DECISIONS D19–D23)

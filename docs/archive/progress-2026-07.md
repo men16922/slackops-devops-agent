@@ -48,7 +48,7 @@
 - Changed: reconciled the current verification baseline across entry-point documents; no source or deployment configuration changed in this checkpoint.
 - Verified: `make check` → 417 passed, Ruff clean, strict mypy clean (37 source files), documentation budgets all green; `git diff --check` passes.
 - Blockers: commit/push is intentionally pending; Slack App Message Shortcut registration, approver-button rehearsal, and slide finalization remain manual.
-- Next: review the scoped bundle, commit/push it, then complete the live-demo rehearsal described in `docs/plans/2026-06-25-awskrug-demo.md`.
+- Next: review the scoped bundle, commit/push it, then complete the live-demo rehearsal described in `docs/plans/2026-06-25-awskrug-demo.md` (deleted 2026-07-16).
 
 ## 2026-07-15 — Slack Modal diff approval and Message Shortcut
 - Status: Local/CI implementation done; no Slack live rehearsal performed.
@@ -102,7 +102,7 @@
 - Changed: dashboard GitHub OAuth/allowlist, Slack approver allowlist, canonical execution-plan/approval hash, workspace·tool-chain·remote-PR-diff verification, append-only audit hash chain, EC2 systemd hardening; `make vercel-deploy` syncs the four OAuth values from root `.env`.
 - Verified: `make check` (367 passed, Ruff, mypy, doc budget), `cd web && npm run build`, `git diff --check`, Docker dashboard build/seed + API smoke; Vercel Production build READY, `/`→`/login` 307, login page 200, real GitHub login succeeded.
 - Blockers: `SLACK_APPROVER_IDS` is synced to SSM; only the interactive Slack approval-button proof remains.
-- Next: commit this scoped bundle, then AWSKRUG slide/rehearsal. Details: `docs/reports/2026-07-15-secure-runtime-report.md`.
+- Next: commit this scoped bundle, then AWSKRUG slide/rehearsal. Details: `docs/archive/2026-07-15-secure-runtime-report.md`.
 
 ## 2026-07-10 — web 대시보드 리디자인 (AWS/Datadog 스타일 라이트 테마 + 관측성 컴포넌트)
 - Status: Done. 다크(GitHub풍) → AWS 콘솔/Datadog 감성 라이트 테마 전면 리디자인. 커밋 `35f4b38` (feature/dashboard-aws-theme, 7 files, +613/-148).

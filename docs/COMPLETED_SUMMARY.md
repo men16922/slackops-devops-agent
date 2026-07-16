@@ -19,14 +19,14 @@ Last updated: 2026-07-16
   gate) + poll-in-thread, postmortem Canvas, local mock fallback console, and Slack Modal diff approval +
   `review_slackops_job` Message Shortcut (local/CI). Real Slack sandbox e2e passed all six items via the DM fallback
   path (2026-07-02); D4 real-AWS diagnose + write-denied verified on EC2 (2026-07-06). Slack App shortcut
-  registration and approver-button rehearsal remain manual. Plan: `docs/plans/2026-06-25-awskrug-demo.md`.
+  registration and approver-button rehearsal remain manual.
 - **2026-06-20 — cloud deploy A–C + event-driven full loop live**: Slack App + SSM tokens + IAM + DynamoDB(us-east-1)
   + EC2 → `/devops ping` pong, then terminated (cost ≈ $0). CloudWatch ALARM→EventBridge→Lambda→queue→worker→Slack
   verified on real AWS. The H0 Devpost submission was abandoned (Devpost §3 eligibility); the infrastructure and code
   are reused by v2. Details: `docs/archive/progress-2026-06.md`.
 - **2026-07-15 — P3 managed AWS MCP pilot scaffold**: separate-account contract, managed-MCP context-key-bound three-action Logs policy, mutation deny, CloudTrail `AwsMcpEvent` violation query, runbook, and CI isolation regression added. No AWS pilot identity, endpoint, session, or rehearsal was created. Details: `deploy/mcp/managed-aws-pilot/`, `docs/PROGRESS_LOG.md`.
 - **2026-07-15 — D16–D17/P1/P2 secure runtime, audit, and scope rehearsal**: generic AWS MCP retired for fixed read adapters; split roles, STS rotation, IMDS/direct-egress deny, central root-only audit sink, and deterministic account/region/resource/time policy added. Fresh EC2 verified services/timers, audit events, pre-fetch scope deny, and Worker `policy_denied`; `make check` 408 passed. Local changes remain ahead of remote; details: `docs/PROGRESS_LOG.md`, `docs/strategy.md`.
-- **2026-07-15 — D15 secure runtime deployed**: GitHub OAuth dashboard allowlist, immutable PR execution-plan and approval binding, workspace/tool/postcondition verification, Slack approver allowlist, audit hash chain, and EC2 filesystem hardening. `make check` (367 passed), Vercel Production build/redirect/login page, and real GitHub login passed. `make vercel-deploy` synchronizes the four OAuth values from root `.env`. Details: `docs/reports/2026-07-15-secure-runtime-report.md`.
+- **2026-07-15 — D15 secure runtime deployed**: GitHub OAuth dashboard allowlist, immutable PR execution-plan and approval binding, workspace/tool/postcondition verification, Slack approver allowlist, audit hash chain, and EC2 filesystem hardening. `make check` (367 passed), Vercel Production build/redirect/login page, and real GitHub login passed. `make vercel-deploy` synchronizes the four OAuth values from root `.env`. Details: `docs/archive/2026-07-15-secure-runtime-report.md`.
 - **2026-06-16 — web/ dashboard finished locally (H0 frontend first cut)**: Next.js App Router (jobs/detail/metrics
   + approval server action) + DynamoDB Local offline docker (port 8930) e2e verified. USER_GUIDE.md +
   decisions on Claude subscription inference (D6) / dashboard data-source toggle (D7). Details: PROGRESS_LOG (2026-06-16 entry).

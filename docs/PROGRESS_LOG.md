@@ -5,6 +5,24 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-16 — Slack workspace migration + docs consolidation (v2 intro/test)
+- Status: Done (docs + local/cloud-SSM). Uncommitted working tree; GitHub App write path still pending.
+- Changed: **Slack migrated to a new workspace** ("Platform Agent", team `T0BGA6C1YAG`) — App re-created from a
+  manifest, SSM Slack 4종 (`SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`/`SLACK_APPROVER_IDS`/`SLACK_NOTIFY_CHANNEL`)
+  overwritten to v2; new guide `docs/guide/kr/SLACK_NEW_GUIDE.md` + `slack-app-manifest.yaml`.
+  **Docs consolidated**: added `docs/V2_INTRO.md` (v1 해커톤 → v2 AWSKRUG 강화 비교) and `docs/V2_TEST.md`
+  (검증 통합 — gate/스위트맵/e2e); archived `docs/guide/en/` (4, Korean-only policy) → `docs/archive/guide-en/`
+  and the one-off secure-runtime report → `docs/archive/`; refreshed `docs/README.md` index; fixed dangling refs
+  from the deleted awskrug plan. Added task-#3 runbook `docs/runbooks/pr-write-credential-rehearsal.md`;
+  `.gitignore` now ignores `*.pem` (GitHub App private key).
+- Verified: new bot token `auth.test` OK (team "Platform Agent"); new-workspace `/devops ping` → pong;
+  `make demo` full stack up (dashboard 8930 = 200, DDB 8931 seeded, worker/chat pollers); doc-budget green
+  (55/112/42/…); no broken links to moved paths; cleanup inventory found no dead source (all refs live).
+- Blockers: none. GitHub App write path (task #3) is the only unverified code path — App created but SSM 4종 +
+  EC2 `pr` execute rehearsal pending.
+- Next: (1) resume task #3 — need numeric App ID + target repo → SSM 4종 → EC2 rehearsal; (2) register
+  `review_slackops_job` Message Shortcut in the new workspace; slides (Canvas trial ends 7/19).
+
 ## 2026-07-16 — Entry-doc tidy + secure-runtime bundle committed
 - Status: Done. Working tree clean; `main` is **10 commits ahead of origin — not pushed**.
 - Changed: committed the whole secure-runtime bundle as three commits (`3affc65` D16–D21 + P1/P2/P3,

@@ -12,7 +12,8 @@ Last updated: 2026-07-16
 
 ## Verification Baseline
 - 3-layer gate: `make check` → **540 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
-  `cd web && npm run build` and `git diff --check` also pass for D15.
+  `cd web && npm run build` green on the current tree (re-verified after the D21 `AuditEvent` mirror change, not
+  only for D15); `git diff --check` passes.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge→Lambda(`alarm_lambda`, detect→propose)→DynamoDB queue→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok). Serverless producer fires EC2-off; EC2 then terminated → ≈ $0.
 - **Vercel dashboard live** on real DynamoDB (link + Team ID captured); `web/lib/ddb.ts` trims env + defaults to us-east-1.
   D15 GitHub OAuth + required allowlist deployed to Production; unauthenticated `/` redirects to `/login`.
@@ -92,8 +93,8 @@ Last updated: 2026-07-16
   (EC2+IAM). Reframe: triage/safe-response layer over existing signals.
 
 ## Active Focus
-- **v2 = AWSKRUG 발표 데모** (plan `docs/plans/2026-06-25-awskrug-demo.md`; 작업은 전부 `main` — plan 문서의 `v2`
-  브랜치 표기는 유효하지 않다). Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 한국 미달). 목표 = "Slack 자연어 →
+- **v2 = AWSKRUG 발표 데모** (작업은 전부 `main`). Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 한국 미달).
+  목표 = "Slack 자연어 →
   실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
 - **D1–D3 + 실 Slack sandbox e2e 완료(2026-07-02)** — DM 폴백(register_dm_messages) 경로로 스트리밍→pr 제안→diff+버튼→
   approved 전이(audit via slack)→**Canvas 자동 생성**→footer/payload 확정. ASSISTANT_POLL_TIMEOUT_S(240s).

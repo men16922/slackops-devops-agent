@@ -1,0 +1,49 @@
+# SlackOps DevOps Agent — App Manifest (Socket Mode)
+# 사용: 새 워크스페이스 → api.slack.com/apps → Create New App → From a manifest → 이 내용 붙여넣기.
+# 코드에서 뽑은 값: slash `/devops`, message shortcut callback_id `review_slackops_job`,
+#   DM 폴백(message.im), Assistant 스레드, 승인 버튼/Modal(interactivity), Canvas(canvases:write).
+# 주의: 붙여넣기 시 `assistant_view` 를 거부하면 그 블록만 지우고 붙인 뒤,
+#   앱 설정 UI 의 "Agents & AI Apps" 에서 수동으로 켠다(scope/이벤트는 그대로 둔다).
+
+display_information:
+  name: SlackOps DevOps Agent
+  description: Slack 자연어로 AWS를 안전 진단하고 승인 게이트로 실행하는 DevOps 에이전트
+  background_color: "#1a1d21"
+
+features:
+  bot_user:
+    display_name: slackops
+    always_online: true
+  slash_commands:
+    - command: /devops
+      description: DevOps agent
+      usage_hint: "ping | logs <svc> | diagnose <svc> | tf-review | pr <desc>"
+      should_escape: false
+  shortcuts:
+    - name: Review SlackOps job
+      type: message
+      callback_id: review_slackops_job
+      description: 이 작업의 diff 승인 Modal 열기
+  assistant_view:
+    assistant_description: Slack에서 자연어로 AWS를 진단·조치 제안하는 read-only SRE 어시스턴트
+
+oauth_config:
+  scopes:
+    bot:
+      - commands          # /devops slash
+      - chat:write        # 스레드/채널 응답, 승인 버튼 메시지
+      - canvases:write    # 포스트모템 Canvas
+      - assistant:write   # Assistant 스레드 UX
+      - im:history        # DM 폴백(message.im) 읽기
+
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.im                          # DM 폴백
+      - assistant_thread_started            # Assistant 스레드 시작
+      - assistant_thread_context_changed    # Assistant 컨텍스트 변경
+  interactivity:
+    is_enabled: true      # 승인 버튼/Message Shortcut/Modal (Socket Mode라 Request URL 불필요)
+  socket_mode_enabled: true
+  org_deploy_enabled: false
+  token_rotation_enabled: false

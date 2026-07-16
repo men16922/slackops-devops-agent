@@ -5,7 +5,7 @@
 > 기록은 `docs/PROGRESS_LOG.md`(2026-07-01/02 엔트리)에 있고 여기엔 두지 않는다.
 > **Part A (LOCAL)** 는 이 Mac 에서 전부 수행 — `make demo-all` + 실 Slack 워크스페이스 연결, EC2 불필요, ~$1.
 > **Part B (REAL AWS)** 는 유료 EC2 1회 — Part A 통과 후 수행.
-> 권위: `docs/NEXT_PLAN.md` > `docs/plans/2026-06-25-awskrug-demo.md` §4 > 이 문서.
+> 권위: `docs/NEXT_PLAN.md` > 이 문서.
 > 실행 방법: 에이전트 = [SLACK_GUIDE.md](SLACK_GUIDE.md) · 대시보드 = [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) · 인프라 = `docs/runbooks/deploy-checklist.md`.
 >
 > ⛔ Slack 해커톤 제출은 **폐기**(Devpost §3 한국 자격 미달). 목표 = **AWSKRUG 발표 라이브 데모**.
