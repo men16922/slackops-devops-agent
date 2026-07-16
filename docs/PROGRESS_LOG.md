@@ -5,6 +5,20 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-17 — deploy #2/#3 verified LIVE on a fresh EC2 (i-00c24ec9239ad18c1)
+- Status: Done. Both fixes observed working on real EC2 + real DynamoDB, then instance stopped.
+- Launch snag fixed first: user-data hit the 16384-byte RunInstances limit (16714) → compressed
+  to 16318 + guard test `test_user_data_within_ec2_16kb_limit` (`f936cf0`); pushed so main is launchable.
+- **#2 (early boot refresh)**: boot 20:35:46Z → `runtime-credentials-refresh.timer` LAST fired
+  **20:37:59Z (boot+2m13s)**, `OnBootSec=2min` confirmed on-box, 4 units active. Worker identity
+  resolves to `slackops-devops-agent-runtime-role` (not bootstrap); a `ping` enqueued to real
+  DynamoDB was **claimed→DONE** ("✅ pong") — no 45-min bootstrap-role Query denial.
+- **#3 (orphan reclaim)**: on real DynamoDB, enqueue→claim (RUNNING)→`reclaim_stale_running` →
+  **FAILED** with "orphaned running job reclaimed (worker interrupted before completion)"; worker
+  restarted active. Confirms DynamoDbJobStore GSI1 query + conditional RUNNING→FAILED works live.
+- Not covered: #5's real-Claude "diff in 600s" tuning (needs a human Slack pr + Approve) — worker-gate
+  correctness already TC + local-e2e proven. Instance stopped (`make cloud-stop`); DynamoDB/Vercel idle ≈ $0.
+
 ## 2026-07-17 — deploy stabilization #2: credential-refresh timer fires early at boot
 - Status: Done (code + test). Real EC2 verification remains (`[manual]`, systemd-only).
 - Problem (#2): `slackops-runtime-credentials-refresh.timer` had `OnBootSec=45min`, so its

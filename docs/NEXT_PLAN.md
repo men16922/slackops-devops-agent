@@ -25,13 +25,9 @@ Last updated: 2026-07-16
       write_credentials/worker_write_grant/execution_plan/pr/worker/drift). 실 GitHub 발급→회수 로컬 스모크
       ✅(App `4313190`), SSM 4종 ✅, branch protection ✅. **선택 잔여** = 실 EC2 PR 1회(2클릭) — 배포
       #2/#3 선행. 상세: `docs/reports/2026-07-16-ec2-write-cred-rehearsal.md`.
-- [~] **배포 안정화 #2** — credential refresher가 부팅 시 미가동(첫 발화 +43분) → 서비스가 초기 IAM 전파 지연으로
-      DynamoDB Query 거부, worker claim 불가. **코드+테스트 완료(2026-07-17)**: refresh timer `OnBootSec` 45min→2min
-      (부팅 직후 refresh+restart). 잔여 `[manual]` = 실 EC2 부팅에서 수렴 관측(선택). 상세: PROGRESS_LOG 2026-07-17.
-- [~] **배포 안정화 #3** — 45분 credential 회전이 서비스 재시작으로 진행 중 worker job 을 끊어 고아 running 이
-      되던 문제. **코드+TC 완료(2026-07-17, 551 passed)**: `reclaim_stale_running`(Sqlite/DynamoDb) +
-      `Worker.reclaim_stale()`(startup·idle 회수, 타임아웃 초과 RUNNING→FAILED, 재큐 아님). 잔여 `[manual]` =
-      실 EC2 리허설에서 회수 라이브 관측(선택). 상세: PROGRESS_LOG 2026-07-17.
+- [x] **배포 안정화 #2/#3 — 코드+TC+실 EC2 검증 완료(2026-07-17)**. #2 refresh timer `OnBootSec` 45min→2min
+      (실 부팅에서 boot+2m13s 발화, worker가 runtime-role로 DynamoDB claim→DONE). #3 `reclaim_stale_running`+
+      `Worker.reclaim_stale()`(실 DynamoDB에서 고아 RUNNING→FAILED). user-data 16KB 한계 가드 추가. 상세: PROGRESS_LOG 2026-07-17.
 - [ ] `[auto]` P1 post-condition 확장(health/replica/config 재조회). **단 L2(Execute)가 비활성이라 검증할 실제 변경이
       없어 값어치가 낮다** — L2 를 열기 전에는 착수하지 말 것.
 - [ ] `[manual]` P3 organization expansion pilot: managed AWS MCP 를 별도 role/context-key/CloudTrail 환경에서만 허용;
