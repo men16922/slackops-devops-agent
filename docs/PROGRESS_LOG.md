@@ -5,6 +5,19 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-17 — deploy stabilization #2: credential-refresh timer fires early at boot
+- Status: Done (code + test). Real EC2 verification remains (`[manual]`, systemd-only).
+- Problem (#2): `slackops-runtime-credentials-refresh.timer` had `OnBootSec=45min`, so its
+  first fire (which re-mints runtime creds + restarts the 4 services) was ~45min after boot.
+  A service that started on boot-time creds still denied for DynamoDB Query (initial IAM
+  propagation) stayed broken for 45min — matches the rehearsal's "+43min" observation; a
+  manual `systemctl start …refresh.service` fixed it instantly (report §#2, prior EC2 diagnosis).
+- Fix: `OnBootSec=45min` → `2min` (kept `OnUnitActiveSec=45min`; refresh service is
+  `After=network-online`). Early refresh+restart converges services onto the runtime role in
+  minutes, not 45. STS-safe (line-133 boot creds valid 60min cover the 2min gap). New guard
+  test `test_credential_refresh_timer_fires_early_at_boot`. `make check` = **552 passed**.
+- Blockers: none. Backlog now: (optional) EC2 rehearsal to observe both #2/#3 live; slides (7/19).
+
 ## 2026-07-17 — deploy stabilization #3: worker reclaims orphaned RUNNING jobs
 - Status: Done (code + TC). EC2 rehearsal to observe it live remains (`[manual]`).
 - Problem: credential rotation `try-restart` kills an in-flight worker job → it stays

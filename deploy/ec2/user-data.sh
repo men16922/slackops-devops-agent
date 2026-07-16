@@ -309,6 +309,10 @@ UNIT
 # STS target role session은 1시간이다. 45분마다 root가 새 값을 발급하고 서비스를
 # 재시작해 만료 credential을 사용하지 않게 한다. 서비스 프로세스에는 IMDS deny가 계속
 # 적용되므로, restart 이후에도 metadata에서 bootstrap credential을 직접 얻을 수 없다.
+# 첫 발화는 부팅 직후(OnBootSec=2min)로 둔다 — 부팅 시점 line 133 이 쓴 runtime creds 로
+# 시작한 서비스가 초기 IAM 전파 지연 등으로 DynamoDB Query 를 거부당하면(배포 안정화 #2),
+# 이 조기 refresh+restart 가 몇 분 안에 정상 runtime role 로 수렴시킨다(45분 대기 없이).
+# refresh 서비스는 After=network-online 이라 네트워크 준비 후 실행된다.
 cat > /etc/systemd/system/slackops-runtime-credentials-refresh.service <<'UNIT'
 [Unit]
 Description=Refresh SlackOps short-lived runtime credentials
@@ -327,7 +331,7 @@ cat > /etc/systemd/system/slackops-runtime-credentials-refresh.timer <<'UNIT'
 Description=Refresh SlackOps runtime credentials before STS expiry
 
 [Timer]
-OnBootSec=45min
+OnBootSec=2min
 OnUnitActiveSec=45min
 Persistent=true
 Unit=slackops-runtime-credentials-refresh.service

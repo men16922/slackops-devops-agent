@@ -119,6 +119,13 @@ def test_credential_refresh_timer_restarts_services_before_expiry() -> None:
     assert "try-restart slackops-devops-agent.service" in _USER_DATA
 
 
+def test_credential_refresh_timer_fires_early_at_boot() -> None:
+    """배포 안정화 #2 — 첫 발화가 부팅 직후여야 초기 IAM 전파 지연에 갇힌 서비스를
+    45분 대기 없이 정상 runtime role 로 수렴시킨다(45min 이면 부팅 미가동과 동일)."""
+    assert "OnBootSec=2min" in _USER_DATA
+    assert "OnBootSec=45min" not in _USER_DATA
+
+
 def test_agent_egress_is_forced_through_localhost_allowlist_proxy() -> None:
     assert "dnf install -y git jq python3.11 python3.11-pip squid" in _USER_DATA
     assert "HTTP_PROXY=http://127.0.0.1:3128" in _USER_DATA
