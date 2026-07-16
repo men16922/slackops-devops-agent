@@ -13,6 +13,7 @@ from collections.abc import Callable
 from app.store._util import utcnow_iso as _utcnow_iso
 from app.store.base import (
     CLAIMABLE_STATUSES,
+    ORPHANED_RUNNING_ERROR,
     Job,
     JobSource,
     JobStatus,
@@ -144,6 +145,36 @@ class SqliteJobStore:
             self._conn.execute("ROLLBACK")
             raise
         return self.get(row["id"])
+
+    def reclaim_stale_running(self, older_than: str) -> list[Job]:
+        """updated_at < older_than 인 RUNNING job 을 FAILED 로 원자 전이(고아 회수)."""
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            rows = self._conn.execute(
+                "SELECT id FROM jobs WHERE status = ? AND updated_at < ?",
+                (JobStatus.RUNNING.value, older_than),
+            ).fetchall()
+            now = self._clock()
+            reclaimed_ids: list[str] = []
+            for row in rows:
+                cur = self._conn.execute(
+                    "UPDATE jobs SET status = ?, error = ?, updated_at = ? "
+                    "WHERE id = ? AND status = ?",
+                    (
+                        JobStatus.FAILED.value,
+                        ORPHANED_RUNNING_ERROR,
+                        now,
+                        row["id"],
+                        JobStatus.RUNNING.value,
+                    ),
+                )
+                if cur.rowcount:
+                    reclaimed_ids.append(row["id"])
+            self._conn.execute("COMMIT")
+        except Exception:
+            self._conn.execute("ROLLBACK")
+            raise
+        return [job for job_id in reclaimed_ids if (job := self.get(job_id)) is not None]
 
     # ── 출력 게이트 / 종료 ─────────────────────────────────────
     def await_approval(

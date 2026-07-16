@@ -18,6 +18,7 @@ from typing import Any
 from app.store._util import encode_for_dynamodb as _encode, utcnow_iso as _utcnow_iso
 from app.store.base import (
     CLAIMABLE_STATUSES,
+    ORPHANED_RUNNING_ERROR,
     Job,
     JobSource,
     JobStatus,
@@ -110,6 +111,34 @@ class DynamoDbJobStore:
                 if claimed is not None:
                     return claimed
         return None
+
+    def reclaim_stale_running(self, older_than: str) -> list[Job]:
+        """updated_at < older_than 인 RUNNING job 을 FAILED 로 조건부 전이(고아 회수).
+
+        GSI1(STATUS#running)은 created_at 으로 정렬돼 updated_at KeyCondition 이 안 되므로
+        client-side 로 cutoff 비교한다(RUNNING 집합은 작다). 각 전이는 _conditional_set 의
+        status==RUNNING 조건부라 그 사이 완료된 job 을 잘못 실패시키지 않는다(None → skip).
+        """
+        from boto3.dynamodb.conditions import Key  # lazy
+
+        reclaimed: list[Job] = []
+        resp = self._table.query(
+            IndexName="GSI1",
+            KeyConditionExpression=Key("GSI1PK").eq(f"STATUS#{JobStatus.RUNNING.value}"),
+            ScanIndexForward=True,
+        )
+        for item in resp.get("Items", []):
+            if item.get("updated_at", "") >= older_than:
+                continue
+            failed = self._conditional_set(
+                item["id"],
+                expected=JobStatus.RUNNING,
+                new=JobStatus.FAILED,
+                extra={"error": ORPHANED_RUNNING_ERROR},
+            )
+            if failed is not None:
+                reclaimed.append(failed)
+        return reclaimed
 
     # ── 출력 게이트 / 종료 ─────────────────────────────────────
     def await_approval(

@@ -26,6 +26,7 @@ from app.worker import (
     AUDIT_POSTCONDITION_VERIFIED,
     AUDIT_PLAN_BINDING_REJECTED,
     AUDIT_POLICY_DENIED,
+    AUDIT_RECLAIMED_STALE,
     WORKER_ACTOR,
     CommandOutcome,
     Worker,
@@ -109,6 +110,61 @@ def test_run_forever_sleeps_when_empty_and_processes_jobs(stores) -> None:
     )
     assert processed == 2
     assert sleeps == [0.5]  # 마지막 1회는 빈 큐 → sleep
+
+
+# ── stale RUNNING 회수 (배포 안정화 #3 — 회전 재시작에 끊긴 고아 정리) ────────
+
+# now_iso 를 미래로 고정 + timeout=0 → cutoff 가 claim 이후 updated_at 을 지나 stale 로 본다.
+_FUTURE_NOW = "2026-06-12T00:01:00.000000Z"
+
+
+def test_reclaim_stale_fails_orphaned_running_with_audit_and_metric(stores) -> None:
+    """고아 RUNNING job 을 FAILED 로 회수하고 감사 이벤트 + 실패 metric 을 남긴다."""
+    from app.store import ORPHANED_RUNNING_ERROR
+
+    jobs, audit, metrics = stores
+    job = jobs.enqueue("pr", "fix", source=JobSource.SLACK, requested_by="U1")
+    jobs.claim()  # → RUNNING(고아 시뮬레이션: worker 가 여기서 죽었다고 가정)
+    worker = make_worker(stores, now_iso=lambda: _FUTURE_NOW, stale_running_timeout_s=0.0)
+
+    reclaimed = worker.reclaim_stale()
+
+    assert [j.id for j in reclaimed] == [job.id]
+    assert jobs.get(job.id).status is JobStatus.FAILED
+    assert jobs.get(job.id).error == ORPHANED_RUNNING_ERROR
+    actions = [e.action for e in audit.list_for_job(job.id)]
+    assert AUDIT_RECLAIMED_STALE in actions
+    recorded = metrics.list_for_job(job.id)
+    assert recorded and recorded[0].success is False
+
+
+def test_reclaim_stale_noop_when_nothing_orphaned(stores) -> None:
+    """고아가 없으면 회수도 감사/metric 기록도 없다."""
+    jobs, audit, metrics = stores
+    job = jobs.enqueue("logs", "api")  # PENDING(claim 안 함 → RUNNING 아님)
+    worker = make_worker(stores, now_iso=lambda: _FUTURE_NOW, stale_running_timeout_s=0.0)
+
+    assert worker.reclaim_stale() == []
+    assert jobs.get(job.id).status is JobStatus.PENDING
+    assert audit.list_for_job(job.id) == []
+    assert metrics.list_for_job(job.id) == []
+
+
+def test_run_forever_reclaims_orphan_at_startup(stores) -> None:
+    """run_forever 는 시작 즉시 회수한다 — 재시작으로 남은 고아를 바로 정리."""
+    jobs, _, _ = stores
+    orphan = jobs.enqueue("pr", "fix")
+    jobs.claim()  # → RUNNING(직전 worker 가 남긴 고아)
+    worker = make_worker(
+        stores,
+        executors={},
+        now_iso=lambda: _FUTURE_NOW,
+        stale_running_timeout_s=0.0,
+    )
+
+    worker.run_forever(poll_interval_s=0.1, max_iterations=1, sleep=lambda _s: None)
+
+    assert jobs.get(orphan.id).status is JobStatus.FAILED
 
 
 # ── claim→실행→complete e2e (mock runner + SqliteJobStore) ────

@@ -190,6 +190,58 @@ def test_complete_failed_records_error(store: object) -> None:
     assert failed.error == "boom"
 
 
+# ── stale RUNNING 회수 (고아 job 정리 — 배포 안정화 #3) ──────────────────────
+
+# counter_clock 는 "2026-06-12T00:00:{i:02d}.000000Z" 로 초당 전진하므로, 아래 cutoff 는
+# claim 이후의 updated_at(:01~:09 대) 를 확실히 지나거나(FUTURE) 앞서(PAST) 있다.
+_CUTOFF_FUTURE = "2026-06-12T00:01:00.000000Z"
+_CUTOFF_PAST = "2026-06-12T00:00:00.000000Z"
+
+
+@_both
+def test_reclaim_stale_running_fails_orphaned_job(store: object) -> None:
+    """updated_at 이 cutoff 이전인 RUNNING job 은 ORPHANED 사유로 FAILED 회수."""
+    from app.store import ORPHANED_RUNNING_ERROR
+
+    job = store.enqueue("pr", "fix")
+    claimed = store.claim()
+    assert claimed.status is JobStatus.RUNNING
+
+    reclaimed = store.reclaim_stale_running(older_than=_CUTOFF_FUTURE)
+
+    assert [j.id for j in reclaimed] == [job.id]
+    fetched = store.get(job.id)
+    assert fetched.status is JobStatus.FAILED
+    assert fetched.error == ORPHANED_RUNNING_ERROR
+
+
+@_both
+def test_reclaim_stale_running_spares_fresh_running(store: object) -> None:
+    """cutoff 이후에 갱신된(활성) RUNNING job 은 회수하지 않는다 — 활성 job 오판 방지."""
+    store.enqueue("pr", "fix")
+    claimed = store.claim()
+
+    reclaimed = store.reclaim_stale_running(older_than=_CUTOFF_PAST)
+
+    assert reclaimed == []
+    assert store.get(claimed.id).status is JobStatus.RUNNING
+
+
+@_both
+def test_reclaim_stale_running_ignores_non_running(store: object) -> None:
+    """RUNNING 이 아닌 job(PENDING/DONE 등)은 cutoff 와 무관하게 회수 대상이 아니다."""
+    done_job = store.enqueue("logs", "api")
+    claimed = store.claim()  # logs → RUNNING
+    store.complete(claimed.id, status=JobStatus.DONE, result="ok")  # → DONE(종료)
+    pending = store.enqueue("ping")  # PENDING 유지(claim 안 함)
+
+    reclaimed = store.reclaim_stale_running(older_than=_CUTOFF_FUTURE)
+
+    assert reclaimed == []
+    assert store.get(done_job.id).status is JobStatus.DONE
+    assert store.get(pending.id).status is JobStatus.PENDING
+
+
 # ── 상태머신 집합 invariant (구현 무관 — 상수 정의 무결성 가드) ──────────────
 
 

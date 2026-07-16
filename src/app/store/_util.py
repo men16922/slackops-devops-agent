@@ -6,13 +6,25 @@ _utcnow_iso/_day_of/_encode 를 한 곳으로. 모듈들은 기존 이름으로 
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+_ISO_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def utcnow_iso() -> str:
     """UTC 현재 시각의 ISO 문자열(마이크로초 포함) — store 기본 clock."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.now(timezone.utc).strftime(_ISO_FMT)
+
+
+def iso_before(reference: str, seconds: float) -> str:
+    """reference(ISO) 로부터 seconds 이전의 ISO 문자열.
+
+    utcnow_iso 와 같은 포맷을 유지해 store 의 updated_at 과 사전식(=시간순) 비교가
+    성립한다 — stale RUNNING job 회수의 cutoff 를 만든다.
+    """
+    dt = datetime.strptime(reference, _ISO_FMT).replace(tzinfo=timezone.utc)
+    return (dt - timedelta(seconds=seconds)).strftime(_ISO_FMT)
 
 
 def day_of(ts: str) -> str:

@@ -39,6 +39,7 @@ from app.store import (
     TelemetryStore,
     result_digest,
 )
+from app.store._util import iso_before, utcnow_iso
 from app.telemetry import RunMetrics, record_run_metrics
 from app.write_credentials import (
     GitHubAppGrantIssuer,
@@ -49,6 +50,12 @@ from app.write_credentials import (
 
 # 폴링 간격 기본값(초) — 큐가 비었을 때만 대기한다.
 POLL_INTERVAL_S = 2.0
+
+# updated_at 이 이 시간(초)보다 오래된 RUNNING job 은 고아로 간주해 FAILED 회수한다.
+# 정당한 최장 실행(Claude headless 타임아웃 300~600s)을 충분히 넘겨 활성 job 을 잘못
+# 실패시키지 않고, credential 회전 주기(45분)보다 짧아 회전 재시작에 끊긴 고아를 정리한다.
+STALE_RUNNING_TIMEOUT_S = 900.0
+_STALE_RUNNING_TIMEOUT_ENV = "SLACKOPS_STALE_RUNNING_TIMEOUT_S"
 
 # audit 이벤트의 actor — worker 가 수행한 전이임을 표시.
 WORKER_ACTOR = "worker"
@@ -64,6 +71,7 @@ AUDIT_POLICY_DENIED = "policy_denied"
 AUDIT_WRITE_CREDENTIALS_ISSUED = "write_credentials_issued"
 AUDIT_TOOL_CALL = "tool_call"
 AUDIT_CAPABILITY_DRIFT = "capability_drift"
+AUDIT_RECLAIMED_STALE = "reclaimed_stale"
 
 # 해석되지 않은 도구는 지우지 않고 이 접두사로 드러낸다.
 _UNRESOLVED_PREFIX = "unresolved:"
@@ -156,6 +164,18 @@ def _env_grant_provider(
         return nullcontext(None)
     repository, issuer = configured
     return pr_write_grant(job, plan, repository=repository, issuer=issuer)
+
+
+def _stale_running_timeout_from_env() -> float:
+    """SLACKOPS_STALE_RUNNING_TIMEOUT_S 를 초 단위 float 로 읽는다(미설정/무효면 기본값)."""
+    raw = os.environ.get(_STALE_RUNNING_TIMEOUT_ENV, "").strip()
+    if not raw:
+        return STALE_RUNNING_TIMEOUT_S
+    try:
+        value = float(raw)
+    except ValueError:
+        return STALE_RUNNING_TIMEOUT_S
+    return value if value > 0 else STALE_RUNNING_TIMEOUT_S
 
 
 def _build_pr_plan(job: Job, diff: str) -> ExecutionPlan:
@@ -316,6 +336,8 @@ class Worker:
         executors: dict[str, CommandExecutor] | None = None,
         runner: SubprocessRunner | None = None,
         monotonic: Callable[[], float] | None = None,
+        now_iso: Callable[[], str] | None = None,
+        stale_running_timeout_s: float | None = None,
         tracer: Any | None = None,
         plan_builder: PlanBuilder | None = None,
         execution_verifier: ExecutionVerifier | None = None,
@@ -333,6 +355,10 @@ class Worker:
                 매핑에 없는 명령은 실행 없이 FAILED(default deny).
             runner: 기본 실행기에 전달할 subprocess 실행기(테스트 주입점).
             monotonic: duration_ms 계측용 단조 시계(테스트 주입점).
+            now_iso: stale-running cutoff 계산용 벽시계(ISO 문자열, 테스트 주입점).
+                None 이면 utcnow_iso(store 기본 clock 과 같은 포맷 → updated_at 비교 성립).
+            stale_running_timeout_s: 이 시간(초)보다 오래 RUNNING 인 job 을 고아로 회수.
+                None 이면 SLACKOPS_STALE_RUNNING_TIMEOUT_S 환경변수, 없으면 기본값.
             tracer: telemetry.setup_telemetry 가 돌려준 OTel tracer. None 이면
                 store 기록만 하고 OTel emit 은 생략한다.
             plan_builder: PR prepare diff 를 immutable execution plan 으로 만드는 함수.
@@ -355,6 +381,12 @@ class Worker:
             else default_executors(runner, grant_provider=self._audited_grant)
         )
         self._monotonic = monotonic if monotonic is not None else time.monotonic
+        self._now_iso = now_iso if now_iso is not None else utcnow_iso
+        self._stale_running_timeout_s = (
+            stale_running_timeout_s
+            if stale_running_timeout_s is not None
+            else _stale_running_timeout_from_env()
+        )
         self._tracer = tracer
         self._plan_builder = plan_builder if plan_builder is not None else _build_pr_plan
         self._execution_verifier = (
@@ -525,6 +557,45 @@ class Worker:
         self._record(job, duration_ms, outcome, success=True)
         return updated
 
+    def reclaim_stale(self) -> list[Job]:
+        """고아 RUNNING job(worker 중단으로 끊긴 in-flight)을 FAILED 로 회수.
+
+        worker 가 credential 회전 재시작 등으로 실행 중 job 을 끊고 죽으면 그 job 은 claim
+        대상이 아닌 RUNNING 에 영구히 남는다. cutoff(now - timeout)보다 오래된 RUNNING job 을
+        store 가 조건부로 FAILED 전이하고, 여기서 각 회수 job 에 감사 이벤트 + 실패 metric 을
+        남긴다. 자동 재실행은 하지 않는다 — 사용자가 재요청한다(pr execute 재큐 = 이중 push 위험).
+
+        Returns:
+            이번에 회수(FAILED 전이)된 job 목록.
+        """
+        cutoff = iso_before(self._now_iso(), self._stale_running_timeout_s)
+        reclaimed = self._jobs.reclaim_stale_running(cutoff)
+        for job in reclaimed:
+            self._audit.append(
+                job.id,
+                AUDIT_RECLAIMED_STALE,
+                actor=WORKER_ACTOR,
+                detail=(
+                    "running job orphaned by worker interruption "
+                    f"(no progress since {job.updated_at}); failed on reclaim"
+                ),
+                context={
+                    "command": job.command,
+                    "timeout_s": str(self._stale_running_timeout_s),
+                },
+                tool_name=job.command,
+            )
+            record_run_metrics(
+                self._metrics,
+                job.id,
+                command=job.command,
+                duration_ms=0.0,
+                success=False,
+                error=job.error or "",
+                tracer=self._tracer,
+            )
+        return reclaimed
+
     def run_forever(
         self,
         *,
@@ -545,11 +616,15 @@ class Worker:
         active_sleep = sleep if sleep is not None else time.sleep
         processed = 0
         iterations = 0
+        # 시작 즉시 1회 — 이 worker 가 방금 재시작으로 끊고 남긴 고아를 바로 정리한다.
+        self.reclaim_stale()
         while max_iterations is None or iterations < max_iterations:
             iterations += 1
             if self.process_one() is not None:
                 processed += 1
             else:
+                # 큐가 빈 폴링마다 backstop 회수 — 시작 이후 나타난 고아도 정리한다.
+                self.reclaim_stale()
                 active_sleep(poll_interval_s)
         return processed
 

@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -11,7 +11,7 @@ Last updated: 2026-07-16
 - **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth, immutable plan/approval hash, workspace/tool/postcondition validation, approver allowlist/audit chain, EC2 hardening; Vercel and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `make check` → **540 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- 3-layer gate: `make check` → **551 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
   `cd web && npm run build` green on the current tree (re-verified after the D21 `AuditEvent` mirror change, not
   only for D15); `git diff --check` passes.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge→Lambda(`alarm_lambda`, detect→propose)→DynamoDB queue→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok). Serverless producer fires EC2-off; EC2 then terminated → ≈ $0.
@@ -56,7 +56,8 @@ Last updated: 2026-07-16
   store/ (H0 single-table — JobStore state machine + claim atomicity, AuditStore append/job/day feed,
   TelemetryStore record/feed — each with Sqlite+DynamoDb implementations, moto equivalence verified),
   worker (Worker.process_one — claim→executor→await_approval output gate if diff unapproved, else DONE / FAILED on
-  exception + audit/metric write-back, run_forever injected-sleep polling, commands outside mapping default deny),
+  exception + audit/metric write-back, run_forever injected-sleep polling, commands outside mapping default deny;
+  reclaim_stale fails orphaned RUNNING jobs left by a rotation restart — deploy #3, code+TC),
   commands/tf_review (PlanFetcher injected, argv fixed to `terraform plan`, no-apply path; plan isolation → review),
   commands/pr (2-stage — prepare strips push/PR tools from argv + extracts diff via marker → worker gate; execute
   (post-approval) regains push + `gh pr create` and a scoped write grant; description only as isolation block),

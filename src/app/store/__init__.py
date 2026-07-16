@@ -16,6 +16,7 @@ from app.store.audit_store import (
 )
 from app.store.base import (
     CLAIMABLE_STATUSES,
+    ORPHANED_RUNNING_ERROR,
     TERMINAL_STATUSES,
     Job,
     JobSource,
@@ -50,6 +51,7 @@ from app.store.telemetry_store import (
 __all__ = [
     "CHAT_CLAIMABLE",
     "CLAIMABLE_STATUSES",
+    "ORPHANED_RUNNING_ERROR",
     "TERMINAL_STATUSES",
     "AuditEvent",
     "build_step_tree",

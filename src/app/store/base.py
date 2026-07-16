@@ -36,6 +36,12 @@ TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
     {JobStatus.DONE, JobStatus.FAILED, JobStatus.REJECTED}
 )
 
+# worker 재시작(예: credential 회전이 in-flight 를 끊음)으로 고아가 된 RUNNING job 의 종료 사유.
+# 이런 job 은 claim 대상이 아니어서 영구히 RUNNING 에 남는다 — 타임아웃 초과 시 이 사유로 FAILED.
+ORPHANED_RUNNING_ERROR = (
+    "orphaned running job reclaimed (worker interrupted before completion)"
+)
+
 
 class JobSource(str, Enum):
     """job 제출 경로(컨트롤 플레인)."""
@@ -120,6 +126,16 @@ class JobStore(Protocol):
 
     def claim(self) -> Job | None:
         """claim 가능한 가장 오래된 job 을 원자적으로 RUNNING 으로 전이 후 반환(없으면 None)."""
+        ...
+
+    def reclaim_stale_running(self, older_than: str) -> list[Job]:
+        """updated_at 이 older_than(ISO) 이전인 RUNNING job 을 FAILED 로 원자 전이.
+
+        worker 가 in-flight job 을 끊고 죽으면(예: credential 회전 재시작) 그 job 은
+        RUNNING 에 고아로 남는다. cutoff 보다 오래된 RUNNING job 을 ORPHANED_RUNNING_ERROR
+        사유로 FAILED 처리하고 회수된 job 목록을 반환한다(자동 재실행 아님 — 사용자 재시도).
+        전이는 status==RUNNING 조건부라 활성 job 을 잘못 실패시키지 않는다.
+        """
         ...
 
     def await_approval(

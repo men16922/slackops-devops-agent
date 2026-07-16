@@ -5,6 +5,22 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-17 — deploy stabilization #3: worker reclaims orphaned RUNNING jobs
+- Status: Done (code + TC). EC2 rehearsal to observe it live remains (`[manual]`).
+- Problem: credential rotation `try-restart` kills an in-flight worker job → it stays
+  RUNNING forever (claim only picks APPROVED/PENDING) → orphaned, never recovered.
+- Fix: `JobStore.reclaim_stale_running(older_than)` (Sqlite + DynamoDb, conditional
+  RUNNING→FAILED with `ORPHANED_RUNNING_ERROR`); worker computes cutoff = now − timeout
+  (`STALE_RUNNING_TIMEOUT_S=900`, env `SLACKOPS_STALE_RUNNING_TIMEOUT_S`) and calls
+  `Worker.reclaim_stale()` at run_forever startup + on each idle poll, writing a
+  `reclaimed_stale` audit event + failed metric per job. Chose **fail, not requeue** —
+  requeuing a pr *execute* (post-approval push) risks a double push; same "no false
+  success / human retries" principle as the #5 empty-diff fix. `_util.iso_before` helper.
+- Verified: `make check` = **551 passed** (was 542; +9: store 3×2 backends + worker 3),
+  ruff, mypy strict, doc-budget all green. Not run: real EC2 (deploy systemd unchanged —
+  rotation still restarts the worker by design; the orphan is now cleaned up, not stuck).
+- Blockers: none. Next: (optional) EC2 rehearsal to observe reclaim live; slides (Canvas 7/19).
+
 ## 2026-07-16 — write-cred + pr flow verified by TC; EC2 rehearsal found 6 deploy bugs
 - Status: Done. Correctness of the write-cred + pr flow is verified by tests (`make check` =
   **542 passed**, ruff, mypy strict, doc-budget); real GitHub mint→revoke confirmed by local
