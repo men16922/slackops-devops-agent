@@ -5,6 +5,21 @@ Last updated: 2026-07-16
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-16 — write-cred + pr flow verified by TC; EC2 rehearsal found 6 deploy bugs
+- Status: Done. Correctness of the write-cred + pr flow is verified by tests (`make check` =
+  **542 passed**, ruff, mypy strict, doc-budget); real GitHub mint→revoke confirmed by local
+  smoke (App `4313190`). Not done: one real-EC2 PR (optional — needs 2 human clicks + #2/#3).
+- Fixed & committed: #1 MCP launch `python`→`sys.executable` (`1bb34f2`); #4 drift gate ignores
+  guard-denied (is_error) tool calls (`0daf506`); #5 a pr prepare that yields no diff now FAILs
+  instead of silently DONE (`2cc25ab`) + MCP registry made interpreter-agnostic. Regression tests
+  added for each; the drift/trajectory tests that leaned on the old empty-diff-DONE path fixed.
+- EC2 rehearsal (i-0472/i-0975, both stopped) surfaced deploy bugs, documented not fixed:
+  #2 credential refresher not run at boot → ~45min on the bootstrap role → worker can't Query
+  DynamoDB (claim fails); #3 45-min credential rotation restarts services, killing an in-flight
+  pr prepare (job orphaned in "running"). Report: docs/reports/2026-07-16-ec2-write-cred-rehearsal.md.
+- Positive on real EC2: P2 scope boundary, D23 drift gate, MCP propose_job all observed working.
+- Next: (backlog) fix deploy #2/#3; optional real-EC2 PR; slides (Canvas trial 7/19). main pushed.
+
 ## 2026-07-16 — GitHub App write-credential path verified locally + SSM staged (task #3, 4/5)
 - Status: Done for the local + staging steps; only the live EC2 `pr` push rehearsal remains.
 - Changed: registered a GitHub App (`App ID 4313190`, installed on `men16922/slackops-devops-agent`,

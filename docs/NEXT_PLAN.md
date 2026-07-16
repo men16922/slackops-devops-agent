@@ -21,11 +21,14 @@ Last updated: 2026-07-16
 ## Secure Agent Runtime — Notion 레퍼런스 잔여 (rationale: DECISIONS D19–D23)
 > 레퍼런스 §8 Implementation Priority 의 **P0 전부 + P1 전부 닫힘**. **번호 체계가 repo 의
 > P1/P2/P3(audit sink/scope boundary/managed-MCP pilot)와 다르다** — 섞어 쓰지 말 것.
-- [ ] `[manual]` **write credential 경로 실검증** — 4/5 완료. GitHub App(`App ID 4313190`, repo `men16922/
-      slackops-devops-agent`, `contents`+`pull_requests` write) 등록·설치 ✅, **로컬 mint 스모크(발급→회수) 실
-      GitHub 통과** ✅, SSM 4종 저장 ✅, branch protection(require PR + approvals=1) ✅. **남은 것 = EC2 `pr`
-      execute 라이브 리허설 1건**(발표 회차). Done: 승인 전 push 실패 → 승인 후 installation token 으로 PR 오픈 →
-      `write_credentials_issued` 감사. 런북 `docs/runbooks/pr-write-credential-rehearsal.md`.
+- [x] **write credential 경로 검증** — 코드 correctness는 **TC로 검증 완료**(`make check` 542 passed:
+      write_credentials/worker_write_grant/execution_plan/pr/worker/drift). 실 GitHub 발급→회수 로컬 스모크
+      ✅(App `4313190`), SSM 4종 ✅, branch protection ✅. **선택 잔여** = 실 EC2 PR 1회(2클릭) — 배포
+      #2/#3 선행. 상세: `docs/reports/2026-07-16-ec2-write-cred-rehearsal.md`.
+- [ ] `[manual]` **배포 안정화 #2** — credential refresher가 부팅 시 미가동(첫 발화 +43분) → 서비스가 bootstrap
+      role로 시작해 DynamoDB Query 거부, worker claim 불가. 수정: refresh timer에 `OnBootSec` 등 부팅 즉시 1회.
+- [ ] `[manual]` **배포 안정화 #3** — 45분 credential 회전이 서비스 재시작으로 진행 중 worker job(pr prepare)을
+      끊음(고아 running). 수정: 회전 시 in-flight drain, 또는 worker가 오래된 running job 재큐/타임아웃.
 - [ ] `[auto]` P1 post-condition 확장(health/replica/config 재조회). **단 L2(Execute)가 비활성이라 검증할 실제 변경이
       없어 값어치가 낮다** — L2 를 열기 전에는 착수하지 말 것.
 - [ ] `[manual]` P3 organization expansion pilot: managed AWS MCP 를 별도 role/context-key/CloudTrail 환경에서만 허용;

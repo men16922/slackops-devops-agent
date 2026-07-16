@@ -4,11 +4,12 @@ Last updated: 2026-07-16
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): main is **pushed / in sync**. Slack migrated to a new workspace
 >   ("Platform Agent"): App re-created via manifest, SSM Slack 4종 refreshed (v2), local `/devops ping` pong verified
 >   (guide: `docs/guide/kr/SLACK_NEW_GUIDE.md` + `slack-app-manifest.yaml`). **In progress — GitHub App write path**
->   (task #3, 4/5): App + **local mint smoke passed vs real GitHub** + SSM 4종 + branch protection done; **pending =
->   EC2 `pr` execute live rehearsal only** (runbook: `docs/runbooks/pr-write-credential-rehearsal.md`). Docs: `docs/V2_INTRO.md`
->   (v1→v2 강화 비교) + `docs/V2_TEST.md` (verification), en guides/report → archive.
->   Manual remains: GitHub App SSM+EC2 rehearsal; register `review_slackops_job` Message Shortcut in the new
->   workspace; slides (⏰ Canvas trial ends 7/19). Presentation: `docs/presentation/PRESENTATION.md` + `…(Standalone).html`.
+   write-cred **verified by TC** (`make check` 542 passed) + real-GitHub mint smoke + SSM 4종 + branch protection.
+>   EC2 rehearsal found **6 deploy bugs** — #1 MCP launch, #4 drift-on-blocked, #5 pr-no-diff-DONE all fixed &
+>   pushed; **#2/#3 (credential refresh at-boot / kills in-flight jobs) are open backlog**. Report:
+>   `docs/reports/2026-07-16-ec2-write-cred-rehearsal.md`. Optional: 1 real-EC2 PR (2 clicks). EC2 stopped.
+>   Docs: `docs/V2_INTRO.md`/`V2_TEST.md`. ⚠️ PROGRESS_LOG at 120/120 — run `/tidy-docs` before next checkpoint.
+>   Manual remains: register `review_slackops_job` Message Shortcut in the new workspace; slides (⏰ Canvas 7/19).
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)
