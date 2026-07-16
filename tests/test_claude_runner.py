@@ -85,6 +85,18 @@ def test_build_command_is_arg_list_no_shell() -> None:
     assert "x; rm -rf / && echo $(pwd)" in cmd
 
 
+def test_build_command_pins_model_to_sonnet_5() -> None:
+    """모델 미지정 시 CLI 기본값 변동에 결과가 흔들린다 — 항상 Sonnet 5 로 고정."""
+    for cmd in (build_command("p", ["Read"]), build_stream_command("p", ["Read"])):
+        assert cmd[cmd.index("--model") + 1] == "claude-sonnet-5"
+
+
+def test_build_command_model_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SLACKOPS_CLAUDE_MODEL 로 코드 수정 없이 모델 override 가능."""
+    monkeypatch.setenv("SLACKOPS_CLAUDE_MODEL", "claude-opus-4-8")
+    assert build_command("p", ["Read"])[build_command("p", ["Read"]).index("--model") + 1] == "claude-opus-4-8"
+
+
 def test_agent_subprocess_env_excludes_control_plane_and_aws_credentials() -> None:
     env = _agent_subprocess_env(
         {

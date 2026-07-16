@@ -22,7 +22,18 @@ from typing import Callable
 # claude 바이너리 이름(EC2 user-data 가 PATH 에 설치).
 CLAUDE_BIN = "claude"
 
+# 모든 headless 호출이 쓸 모델. 미지정 시 CLI 기본값이 바뀌면 결과가 흔들리므로 고정한다.
+# ops 가 코드 수정 없이 바꿀 수 있게 SLACKOPS_CLAUDE_MODEL 로 override.
+DEFAULT_MODEL = "claude-sonnet-5"
+_MODEL_ENV = "SLACKOPS_CLAUDE_MODEL"
+
 DEFAULT_TIMEOUT_S = 600
+
+
+def _model_args() -> list[str]:
+    """`--model <model>` 인자 — 환경변수 override, 없으면 DEFAULT_MODEL."""
+    model = os.environ.get(_MODEL_ENV, "").strip() or DEFAULT_MODEL
+    return ["--model", model]
 
 # CLI 도구(kubectl/git/aws)가 색상 출력을 켜면 ANSI 이스케이프(CSI)가 결과 텍스트에 섞인다.
 # 저장 전 여기서 제거 — web/Slack 등 모든 소비자가 깨끗한 텍스트를 받는다(렌더링은 표시만 담당).
@@ -197,7 +208,7 @@ def build_command(
     # stream-json 을 쓰는 이유는 스트리밍이 아니라 **관측** 이다: `json` 출력의 result 객체에는
     # tool call 정보가 없어서, 무엇이 실제로 실행됐는지 앱이 알 수 없다(감사 궤적/capability
     # 재집계의 근거가 사라진다). print 모드에서 stream-json 은 --verbose 를 요구한다.
-    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "stream-json", "--verbose"]
+    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "stream-json", "--verbose", *_model_args()]
     if guard_command is not None:
         cmd.extend(["--settings", hook_settings_json(guard_hook_argv())])
     if mcp_config:
@@ -378,7 +389,7 @@ def build_stream_command(
     mcp_config: str | None = None,
 ) -> list[str]:
     """`claude -p --output-format stream-json` 인자 리스트(JSONL 스트리밍)."""
-    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "stream-json", "--verbose"]
+    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "stream-json", "--verbose", *_model_args()]
     if mcp_config:
         cmd.extend(["--mcp-config", mcp_config, "--strict-mcp-config"])
     if allowed_tools:
