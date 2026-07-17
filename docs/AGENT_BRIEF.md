@@ -6,9 +6,10 @@ Last updated: 2026-07-17
 >   deterministic execute (`app.pr_execution.open_pr`, no LLM in the write path) → **GitHub PR #3 OPEN** →
 >   job DONE. Three stacked root causes fixed: `ba813bf` (runtime diff as authoritative source),
 >   `9081bed` (runtime-deterministic git plumbing), `be0422d` (grant-authed remote postcondition).
->   `make check` **563 passed**. EC2 stopped ($0). Slack on the new "Platform Agent" workspace.
->   ★ NEXT (all manual, presentation): register `review_slackops_job` Message Shortcut in the new
->   workspace; AWSKRUG slides (⏰ Canvas ~8/09); close the 2 open test PRs (#2/#3, unmerged).
+>   **Slack-native approval also verified LIVE**: Approve/Reject buttons AND the "Review change" Modal
+>   both approve `via slack` (Paulos=U0BG6ELKMH8 approver) → execute → real PR. `review_slackops_job`
+>   Message Shortcut registered + working. `make check` **563 passed**. EC2 stopped ($0).
+>   ★ NEXT (all manual, presentation): AWSKRUG slides (⏰ Canvas ~8/09). Test PRs all closed.
 >   Guides: `docs/guide/kr/SLACK_NEW_GUIDE.md`, `docs/V2_INTRO.md`/`V2_TEST.md`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 

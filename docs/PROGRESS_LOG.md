@@ -5,6 +5,19 @@ Last updated: 2026-07-17
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-17 — Slack approval verified LIVE (buttons + Modal), approver id resolved
+- Status: DONE + verified LIVE. Slack-native approval closes the loop: Approve/Reject buttons AND the
+  "Review change" Modal both approve `via slack` → deterministic execute → real PR. EC2 stopped ($0).
+- Modal: "Review diff" → Modal(diff + Decision) → "Approve and run"/"Apply decision" → approver allowlist →
+  job `3e2934ee` approved `via slack`(U0BG6ELKMH8) → PR #5. Buttons: `8261489c` → PR #4. (Test PRs #4/#5 closed.)
+- Diagnosis note: Paulos (yeongsigchoe7@gmail.com, Slack id **U0BG6ELKMH8**) == `SLACK_APPROVER_IDS`, so IS an
+  approver — dashboard uses the men16922 **GitHub** identity, a separate allowlist. The earlier "Modal won't open"
+  was an OBSERVATION error (screenshots caught the fade-in animation early), not a bug. Added approval-handler
+  logging + an ephemeral fallback (`ead7137`) — kept as a real diagnosability/UX improvement.
+- Infra note: on a stop→start EC2, `runtime-credentials-refresh` (OnBootSec) restarts services ~boot+2min and can
+  orphan an in-flight prepare (job `03706f6d` stuck RUNNING → reclaim FAILs it). Fresh `cloud-up` avoids it.
+- Verified: `make check` **563 passed** + ruff + mypy strict + doc-budget.
+
 ## 2026-07-17 — pr execute FIXED end-to-end: a real PR opens live (the MVP write path closes)
 - Status: DONE + verified LIVE. Job `f879c3fe` reached **DONE** with `Pull request opened:
   .../pull/3`; GitHub PR #3 OPEN. The 3-year-open "no real PR" gap is closed. EC2 stopped ($0).
@@ -29,44 +42,12 @@ Last updated: 2026-07-17
   close. Infra: on a stop→start EC2, `runtime-credentials-refresh` flock contention delays service
   start-pre ~2min (self-resolves); a fresh `cloud-up` avoids it.
 
-## 2026-07-17 — fresh-EC2 pr run: prepare hardening worked; found the real execute-blocking bug
-- Status: Root cause found (no code change this session). Instance i-0269c8e791e26cc84 launched with all
-  current main fixes from boot, then stopped ($0). No real PR yet — but now we know exactly why.
-- What worked (fresh boot, no manual steps): `SLACK_APPROVER_IDS` decrypted from boot (`63ec156`);
-  `claude-sonnet-5` pinned; **the prepare-prompt hardening (`90da9cc`) worked — the model made the edit
-  and produced a 298-char diff → AWAITING_APPROVAL** (vs 3/4 no-diff before). men16922 approved via dashboard.
-- **THE BUG (execute always fail-closes):** `_prepare` hashes/approves the diff **text the model prints
-  between the markers**, but `verify_pr_workspace` (execute) recomputes the runtime's own
-  `git diff HEAD --no-ext-diff --binary` and **byte-compares** (`execution_plan.py:340`). The model emits an
-  approximation — fake `index 0000000..0000000`, a different `@@` function-context line, a shifted context
-  line — so the two never match → `plan_binding_rejected` every time. Confirmed by diffing both on-box.
-  Masked until now because TC mocks the verifier, so the byte comparison never ran. This is why no real PR
-  has ever opened through the execute path — it is a verification-source mismatch, not infra/approval/drift.
-- Verified: on-box `git diff HEAD` (real `index 33bbea3..36d8fdf`) vs stored approved diff (`index 0000000`).
-- Blockers: the diff-source mismatch. Next: fix `_prepare` to use the RUNTIME's `git diff HEAD --no-ext-diff
-  --binary` as the authoritative diff (display + hash + execute), not the model's printed text; add a TC that
-  exercises the real (unmocked) verify against a temp git repo. Then re-run the live PR (should pass).
-
-## 2026-07-17 — live Slack/dashboard pr test: approver bug fixed, model pinned, prepare hardened
-- Status: Done (code + partial live). Fresh EC2 launched, driven, then stopped ($0). One clean real
-  PR not reached — root cause is prepare non-determinism (below), not infra.
-- **Approver bug (root-caused + fixed)**: `SLACK_APPROVER_IDS` is a SecureString but user-data fetched
-  it **without `--with-decryption`**, so the instance baked KMS ciphertext into the allowlist → every
-  approval denied ("approver is not in the allowlist") even for the correct id. Fix `63ec156` (+ guard
-  test that all SecureString params decrypt) + patched the running instance env. After the fix,
-  **men16922 approved job 2ade0913 via the GitHub dashboard** (browser-driven) — approval path confirmed.
-- **plan-binding security observed working**: that approved execute then fail-closed with
-  `working tree diff changed after approval` (D19–23 TOCTOU) because the shared worktree drifted over the
-  22-min prepare→approve gap — no wrong PR pushed.
-- **Sonnet 5 pinned** (`bad79aa`): headless runs had no `--model`; now `claude-sonnet-5` (env-overridable).
-- **prepare hardened** (`90da9cc`): 3 of 4 live prepares emitted 0 tool calls + no diff (model advised
-  instead of editing; Claude itself healthy). Prompt now orders it to MAKE the edit autonomously; a
-  solvable change MUST produce a diff. Guard test added.
-- **16KB user-data guard** (`f936cf0`): the #2 comment pushed user-data over the RunInstances limit;
-  compressed + size guard test. `.claude/settings.local.json` gained an autoMode allow for SSM ops.
-- Verified: `make check` = **557 passed**, ruff, mypy strict, doc-budget green. Instance stopped.
-- Next: on next EC2 boot everything applies from boot (decrypted approver, Sonnet 5, stronger prepare) —
-  one `pr` should reach a real PR more reliably. Docs tidied (PROGRESS_LOG 108→49).
+## 2026-07-17 — (superseded, see above) approver fix + prepare hardening + finding the execute bug
+- Two earlier 07-17 sessions, now fully superseded by "pr execute FIXED end-to-end": fixed the approver
+  SecureString-decrypt bug (`63ec156`), pinned `claude-sonnet-5` (`bad79aa`), hardened the prepare prompt
+  (`90da9cc`), added the 16KB user-data guard (`f936cf0`), and root-caused the diff-source execute bug
+  (later fixed by `ba813bf`). men16922 approved via dashboard; TOCTOU plan-binding observed working. Detail
+  in git history for those commits.
 
 ## 2026-07-17 — deploy #2/#3 verified LIVE on a fresh EC2 (i-00c24ec9239ad18c1)
 - Status: Done. Both fixes observed working on real EC2 + real DynamoDB, then instance stopped.
