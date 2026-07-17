@@ -343,20 +343,53 @@ def register_approval_actions(
                 if log is not None:
                     log.warning("approval.review_denial_notice_failed", job_id=job_id)
 
+    def _review_hint(body: dict[str, Any], client: Any, approver: str, reason: str) -> None:
+        # Opening the review modal is best-effort UX; when it can't open, tell the
+        # approver why and point them at the Approve/Reject buttons instead of
+        # leaving the click silently doing nothing.
+        channel = (body.get("channel") or {}).get("id")
+        if not channel:
+            return
+        try:
+            client.chat_postEphemeral(
+                channel=channel,
+                user=approver,
+                text=f":information_source: Couldn't open the review modal — {reason}. "
+                "Use the Approve / Reject buttons on the message.",
+            )
+        except Exception:  # noqa: BLE001 — a notice failure must not alter state
+            if log is not None:
+                log.warning("approval.review_hint_failed", job_id="")
+
     def _open_review(body: dict[str, Any], client: Any, job_id: str, origin: tuple[str, str] | None) -> None:
-        if _approver(body) not in approvers:
+        approver = _approver(body)
+        if approver not in approvers:
             _deny_review(body, client, job_id)
             return
         job = jobs.get(job_id)
         trigger_id = body.get("trigger_id")
-        if job is None or job.status.value != "awaiting_approval" or not isinstance(trigger_id, str) or not trigger_id:
+        has_trigger = isinstance(trigger_id, str) and bool(trigger_id)
+        status = job.status.value if job is not None else None
+        if log is not None:
+            log.info(
+                "approval.review_requested",
+                job_id=job_id,
+                status=status,
+                has_trigger=has_trigger,
+            )
+        if job is None or status != "awaiting_approval":
+            _review_hint(body, client, approver, "this job is no longer awaiting approval")
+            return
+        if not has_trigger:
+            _review_hint(body, client, approver, "Slack did not provide a modal trigger")
             return
         channel, ts = origin or ("modal", "modal")
         try:
             client.views_open(trigger_id=trigger_id, view=review_modal(job, channel=channel, ts=ts))
-        except Exception:  # noqa: BLE001 — an expired Slack trigger must not alter state
+        except Exception as exc:  # noqa: BLE001 — an expired Slack trigger must not alter state
             if log is not None:
-                log.warning("approval.review_open_failed", job_id=job_id)
+                log.warning("approval.review_open_failed", job_id=job_id, error=str(exc))
+            _review_hint(body, client, approver, "the review action expired or was rejected")
 
     def _handle(ack: Callable[[], None], body: dict[str, Any], client: Any, *, approve: bool) -> None:
         ack()
@@ -400,6 +433,8 @@ def register_approval_actions(
         ack()
         actions = body.get("actions") or [{}]
         job_id = str(actions[0].get("value", ""))
+        if log is not None:
+            log.info("approval.review_button", job_id=job_id, has_trigger=bool(body.get("trigger_id")))
         _open_review(body, client, job_id, _origin(body))
 
     def _on_shortcut(ack: Callable[[], None], body: dict[str, Any], client: Any) -> None:
@@ -409,8 +444,17 @@ def register_approval_actions(
         channel = (body.get("channel") or {}).get("id")
         ts = message.get("ts")
         origin = (channel, ts) if isinstance(channel, str) and isinstance(ts, str) else None
+        if log is not None:
+            log.info(
+                "approval.shortcut_received",
+                job_id=job_id,
+                has_blocks=isinstance(message.get("blocks"), list),
+                has_trigger=bool(body.get("trigger_id")),
+            )
         if job_id is not None:
             _open_review(body, client, job_id, origin)
+        elif log is not None:
+            log.info("approval.shortcut_no_job", channel=channel)
 
     def _on_modal_submission(ack: Callable[..., None], body: dict[str, Any], client: Any) -> None:
         metadata = _parse_modal_metadata(str((body.get("view") or {}).get("private_metadata", "")))
