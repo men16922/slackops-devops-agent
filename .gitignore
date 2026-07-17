@@ -48,3 +48,8 @@ docs/test/history/*-overnight-review-checklist.md
 docs/submission/
 .serena/
 .DS_Store
+
+# 로컬 문서 윤문·렌더링 중간물
+/_workspace/
+/tmp/
+/*.heic

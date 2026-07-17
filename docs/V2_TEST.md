@@ -1,7 +1,7 @@
 # V2_TEST — 검증·테스트 통합 가이드 (v2)
 
 > 대상: 개발/리뷰/발표 준비. 목적: v2의 **테스트·검증 표면 전체**를 한 곳에.
-> 기준: 2026-07-16. 게이트 권위 = `make check`. (구 `docs/guide/kr/QA_TEST.md`는 pass 수치가
+> 기준: 2026-07-17. 게이트 권위 = `make check`. (구 `docs/guide/kr/QA_TEST.md`는 pass 수치가
 > 오래됨 — 이 문서가 현행.) 상세 시나리오: `docs/guide/kr/DEMO_SCRIPT.md`.
 
 ## 1. 3층 게이트 — `make check`
@@ -15,7 +15,7 @@
 | `make typecheck` | `python3 -m mypy src` | mypy strict |
 | `make check-doc-budget` | `bash harness/check-doc-budget.sh` | 진입문서 라인 캡 |
 
-- **현재 baseline: `540 passed` (~4.6s)** — STATUS와 일치. 스위트 42개 파일 / 420개 `def test_`.
+- **현재 baseline: `563 passed`** — STATUS와 일치한다. 실행 시간과 수집 수는 환경에 따라 달라질 수 있다.
 - 게이트의 `make test`는 bare `pytest`(순수). 데모/에이전트 타깃만 `DEV_ENV`
   (`PYTHONPATH=src DDB_ENDPOINT=…:8931 AWS_REGION=us-east-1 AWS_*=local`)를 씀.
 - `make smoke-local` = 동일 pytest(overnight-seed 빠른 스모크).
@@ -64,11 +64,11 @@
 | 이벤트 루프 | CloudWatch ALARM→EventBridge→Lambda→DDB 큐→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok), EC2-off에서도 발화 (2026-06-20) |
 | `/devops ping` | 실 EC2→Slack pong (2026-06-20) · **신 워크스페이스 로컬 pong 확인(2026-07-16)** |
 
-## 5. 수동/미검증 잔여 (사람 필요)
+## 5. 수동 잔여 (사람 필요)
 
-- **GitHub App write 경로(pr execute / D19)** — 유일한 미검증 코드 경로. App 미등록 → mint→revoke·실 push 미검증. 절차: `docs/runbooks/pr-write-credential-rehearsal.md`. 발표 라이브 EC2 회차에 검증 예정.
-- **Slack Message Shortcut 등록(`review_slackops_job`)** — 코드 완료(07-15), 등록은 수동. 비허용 사용자 modal 차단 + 허용 결정의 원본 메시지/감사 반영 확인.
-- **approver 리허설 / Part B 실 AWS** — `make cloud-up`→Assistant로 실 CloudWatch 진단→write "denied"→`make cloud-stop`. 비용 사람 승인(~$1).
-- **D19–D23 EC2 리허설 없음** — 로컬 `claude -p` 대상만 검증.
-- **Canvas 무료 트라이얼 2026-07-19 종료** — 캡처/데모는 그 전에(또는 유료 워크스페이스).
+- **보안 거부 증거 캡처** — `restart/apply/delete` 거부와 plan hash mismatch 화면을 발표용으로 보관한다.
+- **발표 리허설** — 실 CloudWatch 진단→Review change→승인→PR 흐름과 캡처 전환 시간을 측정한다.
+- **D19–D23 EC2 통합 리허설** — command guard와 capability drift는 실 `claude -p`, GitHub App PR은 실제
+  PR #3–#5에서 각각 검증했다. 두 경계를 한 EC2 세션에서 연속 시연하는 작업은 남아 있다.
+- **Canvas 무료 트라이얼 약 2026-08-09 종료** — 종료 전에 포스트모템 시연 화면을 보관한다.
 - **알려진 한계**: 비스트리밍 `worker` 경로의 `tool_calls` 텔레메트리는 아직 `None`(스트리밍 chat_agent/Assistant만 수집).

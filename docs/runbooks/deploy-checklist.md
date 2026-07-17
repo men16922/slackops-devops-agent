@@ -147,7 +147,7 @@ EC2 stop/start(상시 가동 금지 불변). 기본 평일 09:00 start / 19:00 s
 
 ## [C] e2e 검증 — `/devops ping`
 
-> 결과물: Slack → EC2 → pong 왕복 1회(코드의 마지막 미검증 경로) + 스크린샷.
+> 결과물: Slack → EC2 → pong 왕복 1회 + 스크린샷. 최초 검증은 2026-06-20 완료했다.
 > 접속은 SSH 대신 **SSM Session Manager**(인바운드 0 유지): `aws ssm start-session --target "$INSTANCE_ID"`.
 
 - [x] **서비스 3개 active**(2026-06-20, SSM send-command 확인): slack/worker/chat-agent 모두 `active`,

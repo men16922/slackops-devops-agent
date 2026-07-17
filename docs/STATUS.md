@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-17b
+Last updated: 2026-07-17
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -11,13 +11,13 @@ Last updated: 2026-07-17b
 - **D15 secure runtime production deployed (2026-07-15):** GitHub OAuth, immutable plan/approval hash, workspace/tool/postcondition validation, approver allowlist/audit chain, EC2 hardening; Vercel and real GitHub login passed.
 
 ## Verification Baseline
-- 3-layer gate: `make check` → **557 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
+- 3-layer gate: `make check` → **563 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
 - **pr execute path FIXED + real PR opened LIVE (2026-07-17)**: the MVP write path now closes end-to-end.
   Three stacked root causes fixed — diff-source정본화(`ba813bf`), execute git 배관 런타임 결정화(`9081bed`,
   `app.pr_execution.open_pr`, LLM 제거), postcondition gh 인증 grant 환경 이동(`be0422d`). Live: Slack NL →
-  agent propose → prepare(runtime diff) → dashboard approve(men16922) → deterministic execute → **GitHub PR #3
-  OPEN** → grant-authed postcondition → job `f879c3fe`=DONE. (earlier fixes still in place: approver decrypt
-  `63ec156`, `claude-sonnet-5` `bad79aa`, prepare-prompt `90da9cc`.) 2 open test PRs(#2/#3) to close.
+  agent propose → prepare(runtime diff) → human approve → deterministic execute → **GitHub PR #3–#5 opened
+  live** → grant-authed postcondition → DONE. Slack buttons and Review change Modal both passed the approver allowlist.
+  Test PRs #2–#5 and remote test branches are now closed/removed.
   `cd web && npm run build` green on the current tree (re-verified after the D21 `AuditEvent` mirror change, not
   only for D15); `git diff --check` passes.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge→Lambda(`alarm_lambda`, detect→propose)→DynamoDB queue→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok). Serverless producer fires EC2-off; EC2 then terminated → ≈ $0.
@@ -34,14 +34,14 @@ Last updated: 2026-07-17b
   denied before access, Worker emitted `policy_denied` with reason/scope, 24h window verified; artifact/instance removed.
 - **P3 managed AWS MCP pilot scaffold (local/CI only, 2026-07-15):** separate-account contract, context-key-constrained Logs
   read policy, CloudTrail violation query. No AWS role, trust policy, endpoint, MCP session, or EC2 rehearsal exists.
-- **D19–D23 secure agent runtime (local/CI, 2026-07-16, `3affc65`/`84535bc`/`86b08be`):** all five rest on one
+- **D19–D23 secure agent runtime (local/CI + live write path, 2026-07-16–17):** all five rest on one
   measurement — `--allowedTools 'Bash(echo:*)'` ran `echo hi; whoami` (2.1.210), so tool patterns bind a command
   line's head, not execution. Now: PreToolUse `command_guard` (argv normalize + per-command schema) is the boundary;
   PR write is a per-approval GitHub App token (minted after hash re-verification, revoked, audited); capability is
   declared (5-class) and chain-summed vs `RISK_CEILING=10`; the audit trail is a step tree with back-compatible
   hashing; observed capability is recomputed from what ran and **gates** completion (`capability_drift`).
   Verified e2e vs a real `claude -p`: `;`/`$()` denied, `claimed → tool_call ×2 → done caps=read`, drift=FAILED.
-  Rationale/limits: DECISIONS D19–D23. **Unverified**: GitHub App token path (no App) and no EC2 rehearsal.
+  GitHub App mint→scoped push→PR→revoke path passed live in PR #3–#5; D17/P1/P2 EC2 boundaries passed separately.
 - **All user-facing text English** (H0): agent Slack/chat + dashboard UI are English; seed rationales translated (2026-07-15).
 - web/: `next build` green (TS strict) + `docker compose up` e2e — 22 seeds, 8930 responds, jobs/detail/metrics render
   + approval transition / duplicate-approval ConditionalCheckFailed rejection confirmed (2026-06-16).
@@ -103,10 +103,9 @@ Last updated: 2026-07-17b
 - **v2 = AWSKRUG 발표 데모** (작업은 전부 `main`). Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 한국 미달).
   목표 = "Slack 자연어 →
   실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
-- **D1–D3 + 실 Slack sandbox e2e 완료(2026-07-02)** — DM 폴백(register_dm_messages) 경로로 스트리밍→pr 제안→diff+버튼→
-  approved 전이(audit via slack)→**Canvas 자동 생성**→footer/payload 확정. ASSISTANT_POLL_TIMEOUT_S(240s).
-  **D4 실 AWS 검증(2026-07-06)**: EC2→CloudWatch 진단+write-denied. Modal diff·Shortcut 은 코드 완료(07-15), Slack App
-  등록은 수동 잔여. pr execute(실 push)는 발표 시 EC2 라이브 = D19 write credential 리허설과 같은 회차. ★ NEXT = 슬라이드.
+- **Presentation bundle ready(2026-07-17):** 15-slide V2 PPTX, OWASP mapping, current architecture,
+  Korean speaker script, and Builder V2 article draft with real Slack/dashboard evidence. Public V1 article updated.
+  ★ NEXT = remaining security-denial capture + live-demo rehearsal + optional separate V2 publication.
 - H0 인프라(DynamoDB/Vercel/Lambda/SSM) 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier. SSM: bot/app/oauth
   + SLACK_NOTIFY_CHANNEL + SLACK_APPROVER_IDS + DASHBOARD_URL + PR write 4종. Canvas scope `canvases:write` 부여완료.
 

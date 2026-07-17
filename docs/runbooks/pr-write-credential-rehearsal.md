@@ -1,8 +1,11 @@
 # Runbook — PR write credential 경로 실검증 (GitHub App)
 
-> 대상: operator(사람). 목적: 코드에서 **유일하게 미검증**인 write credential 경로를
-> 실 EC2에서 한 번 리허설한다. 코드는 완성됨(`src/app/write_credentials.py` +
-> `src/app/worker.py`). 이 문서는 그 경로를 실제로 켜서 Done 4조건을 확인하는 절차다.
+> **완료 상태(2026-07-17):** 이 절차를 적용한 GitHub App mint→push→PR→revoke 경로가 실 PR #3–#5에서 통과했다.
+> 아래 내용은 재검증과 운영 복구를 위한 절차로 유지한다.
+>
+> 대상: operator(사람). 목적: write credential 경로를 다시 실검증한다. 구현은
+> `src/app/write_credentials.py` + `src/app/worker.py`에 있다. 이 문서는 경로를 실제로 켜서
+> Done 4조건을 확인하는 절차다.
 > 권위: docs/NEXT_PLAN.md("write credential 경로 실검증") · rationale: docs/DECISIONS.md D19–D23.
 
 ## 0. 배경 (왜 이 리허설이 필요한가)
@@ -13,8 +16,9 @@ worker가 **승인된 plan hash가 실행 직전 workspace에 그대로 바인�
 그 한 자식 프로세스의 환경에서만 발급되는 저장소·권한 고정 installation token(기본 10분)이다.
 단계가 끝나면 즉시 회수하고, 만료가 백스톱이다.
 
-코드 경로(`GitHubAppGrantIssuer`)는 로컬/CI에서만 검증됐다 — **실제 GitHub App이 없어서**
-`_app_jwt()` → installation token 발급 → push/PR 왕복이 실물로 돈 적이 없다. 이 리허설이 그 공백을 닫는다.
+코드 경로(`GitHubAppGrantIssuer`)는 처음에는 로컬/CI에서만 검증됐다. 2026-07-17 실제 GitHub App으로
+`_app_jwt()` → installation token 발급 → push/PR → revoke 왕복까지 확인했다. 이 절차는 같은 경계를
+새 환경이나 정책 변경 뒤 다시 확인할 때 사용한다.
 
 ## 1. 사전 요건
 

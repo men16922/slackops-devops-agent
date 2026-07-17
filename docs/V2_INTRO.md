@@ -71,7 +71,7 @@ v2는 **"AI는 관찰·제안하고 실행은 사람만"**을 증명하는 *실�
 | 구간 | 상태 |
 | --- | --- |
 | D15~D17 / P1 / P2 | **실 EC2 리허설 통과**(2026-07-15) — role/credential/egress/audit/scope 경계 실증 |
-| D19~D23 | **local/CI e2e 통과**(실 `claude -p` 대상). 단 **GitHub App write 경로는 미검증**(App 미등록), EC2 리허설 없음 |
+| D19~D23 | command guard·capability drift는 **실 `claude -p` 통과**. GitHub App mint→push→PR→revoke는 **실 PR #3–#5 통과**. 두 경계의 단일 EC2 세션 통합 시연은 남음 |
 | P3 (managed MCP) | **CI-locked scaffold만** — 실 AWS role/endpoint/session 없음 |
 
 > 발표에서 피할 표현(strategy.md §7.3): "prompt injection을 해결했다" → "모델이 속아도 sink를 줄이는 경계를 구현했다".

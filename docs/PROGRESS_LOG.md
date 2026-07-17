@@ -5,6 +5,19 @@ Last updated: 2026-07-17
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
 
+## 2026-07-17 — AWSKRUG V2 deck and Builder article ready
+- Status: DONE. Presentation/article bundle is now a durable in-repo deliverable.
+- Changed: 15-slide `SlackOps DevOps Agent V2.pptx`; current `Architecture.png`/`simple.png`; Korean
+  speaker script and Claude Design prompt; OWASP/Lethal Trifecta/CaMeL reference notes.
+- Article: new English V2 draft plus real Slack approval and dashboard PR evidence; public V1 Builder article
+  updated to fixed adapters, immutable plans, JIT GitHub token, deterministic PR, stream-json, and 563 tests.
+- Proof: Slide 14 maps OWASP risk → implementation → runtime evidence; GitHub PR #3–#5 and EC2 boundary
+  claims stay explicitly separated from the managed-MCP scaffold.
+- Verified: PPTX contains 15 slides; image references resolve; `make check` 563 passed, Ruff, mypy strict,
+  doc budgets, and `git diff --check` green.
+- Blockers: none. One security-denial image remains a documented article placeholder.
+- Next: capture that proof, rehearse the 20-minute live flow, and decide whether to publish V2 separately.
+
 ## 2026-07-17 — Slack approval verified LIVE (buttons + Modal), approver id resolved
 - Status: DONE + verified LIVE. Slack-native approval closes the loop: Approve/Reject buttons AND the
   "Review change" Modal both approve `via slack` → deterministic execute → real PR. EC2 stopped ($0).

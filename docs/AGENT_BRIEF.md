@@ -9,7 +9,10 @@ Last updated: 2026-07-17
 >   **Slack-native approval also verified LIVE**: Approve/Reject buttons AND the "Review change" Modal
 >   both approve `via slack` (Paulos=U0BG6ELKMH8 approver) → execute → real PR. `review_slackops_job`
 >   Message Shortcut registered + working. `make check` **563 passed**. EC2 stopped ($0).
->   ★ NEXT (all manual, presentation): AWSKRUG slides (⏰ Canvas ~8/09). Test PRs all closed.
+>   ★ PRESENTATION READY (2026-07-17): 15-slide `docs/presentation/SlackOps DevOps Agent V2.pptx`,
+>   OWASP risk→implementation→proof slide, current architecture, speaker script/prompt, and Builder V2 article draft
+>   with real Slack/dashboard evidence are in-repo. Public V1 article was updated to current security claims.
+>   NEXT: capture the remaining security-denial proof image, rehearse the live demo, and decide whether to publish V2 separately.
 >   Guides: `docs/guide/kr/SLACK_NEW_GUIDE.md`, `docs/V2_INTRO.md`/`V2_TEST.md`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
@@ -32,7 +35,7 @@ harness/CONTEXT_BRIDGE.md → docs/AGENT_BRIEF.md → docs/STATUS.md → docs/NE
   the existing output gate. JobSource.AGENT + Job.rationale. Runbook docs/runbooks/agent-mcp-demo.md.
   + **conversational producer (D10)** — natural-language chat over a DynamoDB conversation bus + chat_agent poller +
   web Chat. Agent inbound = 0 (poll-only) → works on Vercel. Real Claude e2e verified.
-- **Verification:** 3-layer gate — `make check` (540 passed) + ruff + mypy (strict) + documentation budget.
+- **Verification:** 3-layer gate — `make check` (563 passed) + ruff + mypy (strict) + documentation budget.
   web/ is `next build` + `docker compose up` e2e green. **`make demo`** runs the full local stack (web+DB+chat_agent+worker) in one shot.
 - **Current focus:** cloud deploy A–C verified (DynamoDB us-east-1 live, EC2 ping pong, then terminated). Logs/diagnose/detect use fixed read adapters → sanitizer isolation (generic AWS MCP retired). D17/P1/P2 fresh EC2 rehearsal verified role/credential/egress/audit boundaries plus deterministic scope deny before fetch and Worker audit; instance stopped. P3 is local/CI-only separate-account managed-MCP scaffolding, not an enabled AWS integration.
 

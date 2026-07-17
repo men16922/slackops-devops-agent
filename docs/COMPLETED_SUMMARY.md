@@ -1,9 +1,12 @@
 # COMPLETED_SUMMARY — slackops-devops-agent
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 > Compressed completed milestones + links. Detailed history in PROGRESS_LOG / docs/archive/. Updated via /checkpoint.
 
 ## Milestones
+- **2026-07-17 — AWSKRUG V2 presentation/article bundle ready**: 15-slide PPTX, current architecture and
+  safe-autonomy graphics, Korean speaker script, OWASP/Lethal Trifecta/CaMeL notes, and an English Builder V2 draft
+  with real Slack/dashboard evidence. Public V1 article updated to current security claims. `make check` 563 passed.
 - **2026-07-16 — D19–D23 secure agent runtime (Notion reference P0+P1 closed)**: all five rest on one measurement —
   on Claude Code 2.1.210, `--allowedTools 'Bash(echo:*)'` still executed `echo hi; whoami`, so tool patterns bind a
   command line's head, not execution. D19 made a PreToolUse argv-schema guard the boundary and replaced standing PR
@@ -11,9 +14,9 @@ Last updated: 2026-07-16
   the substring capability classifier (which scored `git add`/`pytest`/`terraform plan` as *no* capability) with a
   declared 5-class taxonomy plus chain-summed risk vs `RISK_CEILING=10`; D21 made the audit trail a step tree with
   back-compatible hashing; D22 switched to stream-json for observation and recomputed capability from what actually
-  ran; D23 promoted that from record to gate (`capability_drift` fails the job). `make check` 540 passed; guard deny,
-  trajectory, and drift gate verified end-to-end against a real `claude -p`. **Unverified**: the GitHub App token path
-  (no App registered) and no EC2 rehearsal. Commits `3affc65`/`84535bc`/`86b08be`; rationale: `docs/DECISIONS.md`
+  ran; D23 promoted that from record to gate (`capability_drift` fails the job). Guard deny, trajectory, and drift
+  passed against a real `claude -p`; GitHub App mint→push→PR→revoke passed live in PR #3–#5. D17/P1/P2 EC2
+  boundaries passed separately. Commits `3affc65`/`84535bc`/`86b08be`; rationale: `docs/DECISIONS.md`
   D19–D23; detail: `docs/archive/progress-2026-07.md`.
 - **2026-07-15 — v2 AWSKRUG demo path (D1–D4 + Modal/Shortcut)**: Assistant handler, approval gate (button ↔ output
   gate) + poll-in-thread, postmortem Canvas, local mock fallback console, and Slack Modal diff approval +

@@ -213,8 +213,9 @@ Last updated: 2026-07-15
   token is the only GitHub credential that is simultaneously short-lived, single-repository, and permission-narrowed.
 - Impact: adding a command requires both a tool allowlist entry and a guard schema — an import-time cross-check fails otherwise.
   Commands whose AWS data comes from fixed read adapters (logs/diagnose/detect) have no shell surface at all. The guard's
-  deny path is verified end-to-end against the real runtime; the GitHub App token path is unverified until the App is
-  registered and rehearsed on EC2, and until then `pr` execute fails closed with no write credential.
+  deny path is verified end-to-end against the real runtime. At the time of this decision, the GitHub App token path
+  remained unverified and `pr` execution failed closed with no write credential. It was subsequently registered and
+  verified live through PR #3–#5 on 2026-07-17; the original fail-closed behavior remains the fallback.
 
 ## D20 — capability is declared, and aggregate risk is scored against the ceiling in force at approval
 - Decision: every tool the allowlist can grant carries a *declared* capability from a five-class taxonomy

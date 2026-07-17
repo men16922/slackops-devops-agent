@@ -1,5 +1,5 @@
 # NEXT_PLAN — slackops-devops-agent
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 > **Open work only** (≤120 lines). Remove when done (history → PROGRESS_LOG/COMPLETED_SUMMARY). Authority: this file > docs/plans/.
 > Tags: `[auto]` = doable in an unattended overnight round (local code+tests). `[manual]` = operator manual (AWS/Slack/UI).
@@ -8,24 +8,11 @@ Last updated: 2026-07-16
 > Completed history: docs/COMPLETED_SUMMARY.md (milestones) · docs/DECISIONS.md D19–D23 (secure-runtime rationale).
 
 ## ★ Active — v2 AWSKRUG 발표 데모
-> D1–D4 + Modal/Shortcut 코드 완료, 실 Slack sandbox e2e 통과 (COMPLETED_SUMMARY 참조).
-> 남은 것은 대부분 **사람이 클릭/등록/발표**해야 하는 항목이다.
-> Slack은 새 워크스페이스("Platform Agent")로 이전 완료 — SSM Slack 4종 v2 갱신, 로컬 `/devops ping` pong 확인.
-- [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
-      ⏰ Canvas 무료 트라이얼 **~8/09 종료**(새 워크스페이스로 교체돼 트라이얼 갱신, 2026-07-17 기준 23일) — 그 전에 캡처/데모.
-- [x] **Slack Modal 승인 검증 완료(2026-07-17)** — Shortcut 등록(앱 config Interactivity On, callback_id
-      `review_slackops_job`, Messages) + 메시지 "More actions" 노출 확인. "Review diff" 버튼 → **"Review change"
-      Modal 열림**(diff + Decision 라디오) → "Approve and run" → "Apply decision" → 승인자 allowlist 통과 →
-      job `3e2934ee` **approved `via slack`(actor U0BG6ELKMH8=Paulos)** → execute → **PR #5 오픈** → DONE.
-      직접 Approve/Reject 버튼도 동작(job `8261489c` approved via slack → PR #4). 진단 로깅+ephemeral fallback
-      추가(`ead7137`). 참고: 앞선 "modal 안 열림"은 오관찰 — modal fade-in 애니메이션을 스크린샷이 너무 빨리 잡았을 뿐.
-- [x] **승인자 검증 완료(2026-07-17)** — `SLACK_APPROVER_IDS` SecureString 미복호화 버그 수정(`63ec156`);
-      men16922 가 대시보드에서 승인 성공, 감사 `approved` 기록. (Slack Message Shortcut 등록은 위 항목 참조 — 대시보드 경로는 검증됨.)
-- [x] **pr execute-blocking 버그 FIXED + 실 PR 라이브 검증 완료(2026-07-17)** — 3중 근본원인 스택 해결:
-      ① diff-source 정본화(`ba813bf`, `current_workspace_diff`) ② execute git 배관을 런타임 결정적으로
-      (`9081bed`, `app.pr_execution.open_pr` — LLM 제거) ③ postcondition gh 인증을 grant 환경으로 이동
-      (`be0422d`). job `f879c3fe`=DONE, **GitHub PR #3 OPEN**. `make check` 563 passed. 상세: PROGRESS_LOG 2026-07-17.
-      잔여: 테스트 PR #2/#3(unmerged) 닫기.
+> 기능, Slack 승인, GitHub App PR #3–#5, 15장 V2 덱과 대본까지 완료했다. 남은 항목은 발표 준비뿐이다.
+- [ ] `[manual]` Slide 12용 실제 보안 거부 증거를 캡처해 아티클의 마지막 placeholder와 PPT에 반영한다.
+- [ ] `[manual]` 20분 발표 리허설: Slack diagnose → Review change → Approve → PR, 실패 시 캡처 전환까지 측정한다.
+- [ ] `[manual]` 영문 V2 원고를 별도 Builder 글로 발행할지 결정한다. 기존 V1 글은 2026-07-17 현재 구현으로 갱신됨.
+- [ ] `[manual]` Canvas 트라이얼 종료(~8/09) 전에 포스트모템 시연 화면을 최종 보관한다.
 
 ## Secure Agent Runtime — Notion 레퍼런스 잔여 (rationale: DECISIONS D19–D23)
 > 레퍼런스 §8 Implementation Priority 의 **P0 전부 + P1 전부 닫힘**. **번호 체계가 repo 의
@@ -48,6 +35,3 @@ Last updated: 2026-07-16
 
 ## Day 8–9 — Observability
 - [ ] `[manual]` Configure ADOT Collector on EC2 + capture diagnose numbers once (N sec/$0.0X/M tool calls).
-
-## Later — presentation/article (manual)
-- [ ] `[manual]` Record demo + slides / AWSKRUG talk / PACE paragraph / article draft.
