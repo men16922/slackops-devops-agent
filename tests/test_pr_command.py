@@ -15,13 +15,14 @@ from app.commands.pr import (
     DIFF_END_MARKER,
     MAX_DESCRIPTION_CHARS,
     PR_GATED_TOOLS,
-    PR_EXECUTE_EXCLUDED_TOOLS,
-    PR_EXECUTE_PROMPT_TEMPLATE,
     PR_PREPARE_PROMPT_TEMPLATE,
     extract_diff,
     handle_pr,
 )
+from app.execution_plan import ExecutionPlan
+from app.pr_execution import PrExecutionError
 from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
+from app.write_credentials import WriteGrant
 from tests._helpers import RecordingRunner, result_json
 
 DIFF = "--- a/x.py\n+++ b/x.py\n-old\n+new"
@@ -126,53 +127,61 @@ def test_prepare_exec_failure_returns_warning() -> None:
     assert "exit 3" in result.summary
 
 
-# ── execute 단계(승인 후) ─────────────────────────────────────
+# ── execute 단계(승인 후, 결정적 git 배관 — LLM 없음) ─────────────
+
+_PLAN = ExecutionPlan(
+    command="pr",
+    args_sha256="a",
+    diff_sha256="d",
+    paths=("x.py",),
+    policy_version="secure-runtime-v1",
+    workspace_root="/w",
+)
+_GRANT = WriteGrant(
+    token="t",
+    repository="o/n",
+    permissions={"contents": "write"},
+    expires_at=0.0,
+    job_id="j1",
+    approval_hash="h1",
+    policy_version="secure-runtime-v1",
+)
 
 
-def test_execute_uses_narrowed_non_editing_allowlist_with_pr_tools() -> None:
-    runner = RecordingRunner(stdout=result_json("PR created: #42"))
+def test_execute_opens_pr_deterministically_without_llm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """execute 는 LLM 을 호출하지 않고 open_pr(고정 argv git 배관)로 PR 을 연다."""
+    called: dict[str, object] = {}
 
-    result = handle_pr("fix typo", approved_diff=DIFF, runner=runner)
+    def fake_open_pr(desc, plan, grant, **_kw):  # type: ignore[no-untyped-def]
+        called["desc"], called["plan"], called["grant"] = desc, plan, grant
+        return ":white_check_mark: Pull request opened: https://github.com/o/n/pull/7"
+
+    monkeypatch.setattr("app.commands.pr.open_pr", fake_open_pr)
+    runner = RecordingRunner(stdout=result_json("unused"))
+
+    result = handle_pr("fix typo", approved_diff=DIFF, runner=runner, write_grant=_GRANT, plan=_PLAN)
 
     assert result.diff is None  # 게이트 재진입 없음
-    assert result.summary == "PR created: #42"
-    tools = _allowed_tools_of(runner)
-    assert "Bash(gh pr create:*)" in tools
-    assert "Bash(git push:*)" in tools
-    assert tools == [t for t in allowed_tools("pr") if t not in PR_EXECUTE_EXCLUDED_TOOLS]
-    assert "Edit" not in tools
-    assert "Write" not in tools
-    assert "Bash(git add:*)" not in tools
+    assert "pull/7" in result.summary
+    assert called["grant"] is _GRANT and called["plan"] is _PLAN
+    assert runner.calls == []  # execute 는 어떤 Claude 호출도 하지 않는다
 
 
-def test_execute_prompt_compels_single_command_push_and_pr() -> None:
-    """execute 프롬프트는 모델이 조사만 하다 끝내지 않고 commit→push→gh pr create 를
-    **단일 명령**(compound/`$()` 금지)으로 수행하고 PR URL 로 끝내도록 강제해야 한다 —
-    실 EC2 에서 execute 가 읽기 전용 명령만 돌리다 PR URL 없이 끝나던 회귀 방지."""
-    t = PR_EXECUTE_PROMPT_TEMPLATE
-    assert "git commit -m" in t
-    assert "git push -u origin HEAD" in t
-    assert "gh pr create --title" in t
-    assert "--fill" not in t  # 스키마 미허용 플래그를 지시하지 않는다
-    assert "ONE command per" in t  # compound 금지 지시
-    assert "$(" in t  # substitution 금지를 명시적으로 언급
-    assert "final line of your reply MUST be that full URL" in t
-    assert "{untrusted_data}" in t  # 격리 삽입 자리 유지
+def test_execute_without_write_grant_fails_closed() -> None:
+    """grant 없이는 PR 을 열지 않는다(자격 없는 쓰기 차단)."""
+    result = handle_pr("fix typo", approved_diff=DIFF, plan=_PLAN, write_grant=None)
+    assert result.diff is None
+    assert "No approved write credential" in result.summary
 
 
-def test_execute_isolates_approved_diff_in_untrusted_block() -> None:
-    runner = RecordingRunner(stdout=result_json("ok"))
-    handle_pr("fix typo", approved_diff=DIFF, runner=runner)
-    prompt = _prompt_of(runner)
-    assert prompt.index(UNTRUSTED_OPEN) < prompt.index(DIFF) < prompt.index(
-        UNTRUSTED_CLOSE
-    )
-    assert "fix typo" in prompt.split(UNTRUSTED_OPEN, 1)[1]
+def test_execute_open_pr_error_returns_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_a, **_k):  # type: ignore[no-untyped-def]
+        raise PrExecutionError("`git push` failed: denied")
 
-
-def test_execute_exec_failure_returns_warning() -> None:
-    runner = RecordingRunner(stdout="", stderr="gh auth", exit_code=1)
-    result = handle_pr("fix typo", approved_diff=DIFF, runner=runner)
+    monkeypatch.setattr("app.commands.pr.open_pr", boom)
+    result = handle_pr("fix typo", approved_diff=DIFF, write_grant=_GRANT, plan=_PLAN)
     assert result.summary.startswith(":warning:")
     assert result.diff is None
 

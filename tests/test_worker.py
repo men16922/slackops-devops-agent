@@ -346,8 +346,9 @@ def test_pr_default_executor_gates_then_creates_pr_after_approval(
 ) -> None:
     """default_executors 의 pr 경로 e2e — prepare 게이트 → 승인 → execute 완료.
 
-    1차(prepare) argv 에는 push/PR 도구가 없고(게이트 없이 PR 생성 불가),
-    승인 후 2차(execute) argv 에만 push/PR 도구가 들어간다.
+    1차(prepare)만 Claude 를 호출하고 argv 에 push/PR 도구가 없다(게이트 없이 PR
+    생성 불가). 승인 후 execute 는 **LLM 을 호출하지 않고**(결정적 git 배관), 이
+    테스트처럼 write grant 가 구성되지 않은 로컬 경로에서는 자격 없이 fail-closed 한다.
     """
     from app.commands.pr import DIFF_BEGIN_MARKER, DIFF_END_MARKER
 
@@ -375,9 +376,9 @@ def test_pr_default_executor_gates_then_creates_pr_after_approval(
 
     assert done is not None
     assert done.status is JobStatus.DONE
-    second_cmd, _ = runner.calls[1]
-    assert "Bash(gh pr create:*)" in second_cmd
-    assert "Bash(git push:*)" in second_cmd
+    # execute 는 LLM 을 호출하지 않는다 — prepare 1회 외에 추가 Claude 호출이 없다.
+    assert len(runner.calls) == 1
+    assert "No approved write credential" in (done.result or "")
 
 
 def test_tf_review_executor_e2e_done(stores) -> None:

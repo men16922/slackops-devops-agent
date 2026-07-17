@@ -305,6 +305,7 @@ def default_executors(
                 runner=runner,
                 on_metrics=captured.append,
                 write_grant=grant,
+                plan=plan,
             )
         return _merge_metrics(
             CommandOutcome(result=pr_result.summary, diff=pr_result.diff), captured

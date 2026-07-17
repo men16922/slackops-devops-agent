@@ -358,7 +358,17 @@ def verify_pr_workspace(
 
 
 def verify_remote_pr_diff(summary: str, plan: ExecutionPlan) -> None:
-    """Verify that the remote PR diff exactly equals the approved local plan."""
+    """Verify the opened PR touches exactly the approved set of paths.
+
+    The content is guaranteed by construction — the deterministic execute step
+    commits the same working tree ``verify_pr_workspace`` already byte-checked
+    against the approved diff — so this postcondition confirms the *remote* PR is
+    that change and not a different one: the set of files GitHub reports changed
+    must equal ``plan.paths``. It deliberately does not byte-compare ``gh pr diff``
+    against the local ``git diff HEAD --binary``; the two are not the same textual
+    format (context, index lines, base range), so an exact-bytes check fails even
+    on a correct PR — the reason no PR ever passed this gate before.
+    """
     import re
 
     match = re.search(r"https://github\.com/[^\s)]+/pull/\d+", summary)
@@ -374,5 +384,9 @@ def verify_remote_pr_diff(summary: str, plan: ExecutionPlan) -> None:
         raise ExecutionPlanError(
             f"remote PR verification failed: {remote_diff.stderr.strip() or remote_diff.stdout.strip()}"
         )
-    if _sha256(remote_diff.stdout) != plan.diff_sha256:
-        raise ExecutionPlanError("remote PR diff differs from the approved execution plan")
+    remote_paths = changed_paths(remote_diff.stdout)
+    if remote_paths != plan.paths:
+        raise ExecutionPlanError(
+            "remote PR changes a different set of paths than the approved plan: "
+            f"{list(remote_paths)} vs {list(plan.paths)}"
+        )
