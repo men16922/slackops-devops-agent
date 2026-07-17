@@ -7,6 +7,8 @@ mock runner 주입 — 실 git/gh/Claude 호출 없음.
 
 from __future__ import annotations
 
+import pytest
+
 from app.allowlist import allowed_tools
 from app.commands.pr import (
     DIFF_BEGIN_MARKER,
@@ -22,6 +24,16 @@ from app.sanitizer import UNTRUSTED_CLOSE, UNTRUSTED_OPEN
 from tests._helpers import RecordingRunner, result_json
 
 DIFF = "--- a/x.py\n+++ b/x.py\n-old\n+new"
+
+
+@pytest.fixture(autouse=True)
+def _runtime_diff(monkeypatch: pytest.MonkeyPatch) -> None:
+    """prepare 의 정본 diff 는 런타임 `git diff HEAD` 다(모델 텍스트가 아님).
+
+    실 git worktree 없이 prepare 단계를 단위 검증하기 위해 그 리더를 기본값 DIFF 로
+    주입한다. 빈 diff(변경 없음) 케이스는 개별 테스트에서 재주입한다.
+    """
+    monkeypatch.setattr("app.commands.pr.current_workspace_diff", lambda: DIFF)
 
 
 def prepare_output(reply: str = "변경 준비 완료", diff: str = DIFF) -> str:
@@ -93,7 +105,12 @@ def test_prepare_prompt_compels_an_edit() -> None:
     assert "{untrusted_data}" in t  # 격리 삽입 자리 유지
 
 
-def test_prepare_without_diff_markers_does_not_gate() -> None:
+def test_prepare_without_runtime_change_does_not_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 게이트 여부는 모델이 마커를 찍었는지가 아니라 런타임 워크트리에 실제 변경이
+    # 있는지로 결정된다 — `git diff HEAD` 가 비면 열 PR 이 없다.
+    monkeypatch.setattr("app.commands.pr.current_workspace_diff", lambda: "")
     runner = RecordingRunner(stdout=result_json("변경할 것이 없습니다"))
     result = handle_pr("fix typo", runner=runner)
     assert result.diff is None

@@ -341,7 +341,9 @@ def test_approved_pr_job_completes_without_regating(stores) -> None:
     ]
 
 
-def test_pr_default_executor_gates_then_creates_pr_after_approval(stores) -> None:
+def test_pr_default_executor_gates_then_creates_pr_after_approval(
+    stores, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """default_executors 의 pr 경로 e2e — prepare 게이트 → 승인 → execute 완료.
 
     1차(prepare) argv 에는 push/PR 도구가 없고(게이트 없이 PR 생성 불가),
@@ -350,6 +352,8 @@ def test_pr_default_executor_gates_then_creates_pr_after_approval(stores) -> Non
     from app.commands.pr import DIFF_BEGIN_MARKER, DIFF_END_MARKER
 
     diff = "--- a/x.py\n+++ b/x.py\n-old\n+new"
+    # prepare 의 정본 diff 는 런타임 `git diff HEAD` — 실 worktree 없이 그 리더를 주입.
+    monkeypatch.setattr("app.commands.pr.current_workspace_diff", lambda: diff)
     runner = RecordingRunner(
         stdout=result_json(f"준비 완료\n{DIFF_BEGIN_MARKER}\n{diff}\n{DIFF_END_MARKER}")
     )

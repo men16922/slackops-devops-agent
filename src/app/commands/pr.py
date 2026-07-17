@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from app.allowlist import run_for_command
 from app.claude_runner import DEFAULT_TIMEOUT_S, SubprocessRunner
 from app.commands._replies import exec_failed_reply
+from app.execution_plan import ExecutionPlanError, current_workspace_diff
 from app.sanitizer import build_prompt
 from app.policy_boundary import CommandScope, PolicyDenied, authorize_command
 from app.telemetry import RunMetricsHook
@@ -221,8 +222,20 @@ def _prepare(
                 _TARGET_LABEL, "PR preparation", result.exit_code, result.output
             )
         )
-    diff = extract_diff(result.output)
-    if diff is None:
+    # 정본 diff 는 모델이 마커 사이에 찍은 텍스트(근사치)가 아니라 런타임의
+    # `git diff HEAD` 다. 승인·해시·execute 재검증이 모두 이 한 소스를 쓰므로
+    # prepare 와 execute 가 갈라져 항상 plan_binding_rejected 로 끝나던 버그를 없앤다.
+    # 모델의 마커는 요약 경계(마커 앞 텍스트)로만 쓰이고, 게이트 여부는 실제 변경
+    # 유무로만 판단한다.
+    # RAW(비-strip) 로 저장·해시한다 — verify_pr_workspace 가 재계산하는
+    # current_workspace_diff 와 바이트 동일해야 해시가 맞는다(trailing newline 포함).
+    try:
+        diff = current_workspace_diff()
+    except ExecutionPlanError as exc:
+        return PrResult(
+            summary=exec_failed_reply(_TARGET_LABEL, "PR preparation", 1, str(exc))
+        )
+    if not diff.strip():
         return PrResult(
             summary=(
                 ":mag: No change diff was produced, so the PR is not proceeding.\n"

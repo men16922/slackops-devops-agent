@@ -11,6 +11,7 @@ from app.execution_plan import (
     ExecutionPlanError,
     build_pr_plan,
     changed_paths,
+    current_workspace_diff,
     verify_pr_workspace,
 )
 
@@ -151,6 +152,46 @@ def test_reapproval_on_read_to_write_escalation(
             swapped.digest(),
             expected_execution_tools=("Write",),
         )
+
+
+def test_prepare_runtime_diff_round_trips_through_unmocked_verify(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The regression that blocked every real PR: `_prepare` hashed the model's
+    *printed* diff text while execute byte-compared the runtime's own
+    `git diff HEAD`, so verify always fail-closed (`plan_binding_rejected`). Now
+    prepare captures the runtime diff via the same helper verify recomputes, so
+    the exact bytes prepare approved re-verify against a real repo — unmocked.
+    """
+    from app.commands.pr import DIFF_BEGIN_MARKER, DIFF_END_MARKER, handle_pr
+    from tests._helpers import RecordingRunner, result_json
+
+    root = _repository(tmp_path)
+    # During prepare the model edits + stages; the RecordingRunner cannot touch
+    # the tree, so apply the change the model would have made.
+    (root / "service.txt").write_text("after\n", encoding="utf-8")
+    _git(root, "add", "service.txt")
+    monkeypatch.setenv("SLACKOPS_WORKSPACE_ROOT", str(root))
+
+    # The model prints an APPROXIMATE diff (fake index/@@ lines) between the
+    # markers — exactly the text that never byte-matched. Prepare must ignore it.
+    fake = "--- a/service.txt\n+++ b/service.txt\nindex 0000000..0000000\n@@ fake @@\n-before\n+after"
+    runner = RecordingRunner(
+        stdout=result_json(f"prepared\n{DIFF_BEGIN_MARKER}\n{fake}\n{DIFF_END_MARKER}")
+    )
+
+    prepared = handle_pr("update service", runner=runner)
+
+    assert prepared.diff is not None
+    assert prepared.diff != fake  # authoritative diff is the tree's, not the model's
+    assert prepared.diff == current_workspace_diff(root)  # byte-identical to verify's source
+
+    plan = build_pr_plan("update service", prepared.diff)
+    # Unmocked verify against the real repo — the exact path that used to reject.
+    verified = verify_pr_workspace(
+        "update service", prepared.diff, plan.canonical_json(), plan.digest()
+    )
+    assert verified == plan
 
 
 def test_reapproval_on_account_or_region_change(

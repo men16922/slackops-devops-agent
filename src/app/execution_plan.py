@@ -275,6 +275,20 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout
 
 
+def current_workspace_diff(root: Path | None = None) -> str:
+    """The runtime's authoritative working-tree diff versus HEAD.
+
+    This is the single source of truth for the approved diff. prepare displays
+    and hashes exactly this, and verify_pr_workspace re-computes exactly this
+    before execution, so the two can never disagree over the model's textual
+    approximation of its own change (the printed diff between markers carried a
+    fake ``index``/``@@`` line that never byte-matched the real tree, which made
+    execute always fail closed with ``plan_binding_rejected``).
+    """
+    r = root if root is not None else configured_workspace_root()
+    return _git(r, "diff", "HEAD", "--no-ext-diff", "--binary")
+
+
 def verify_pr_workspace(
     args: str,
     diff: str,
@@ -337,7 +351,7 @@ def verify_pr_workspace(
     status = _git(root, "status", "--porcelain")
     if any(line.startswith("?? ") for line in status.splitlines()):
         raise ExecutionPlanError("untracked files are not allowed after approval")
-    current_diff = _git(root, "diff", "HEAD", "--no-ext-diff", "--binary")
+    current_diff = current_workspace_diff(root)
     if _sha256(current_diff) != plan.diff_sha256:
         raise ExecutionPlanError("working tree diff changed after approval")
     return plan
