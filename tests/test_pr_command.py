@@ -16,6 +16,7 @@ from app.commands.pr import (
     MAX_DESCRIPTION_CHARS,
     PR_GATED_TOOLS,
     PR_EXECUTE_EXCLUDED_TOOLS,
+    PR_EXECUTE_PROMPT_TEMPLATE,
     PR_PREPARE_PROMPT_TEMPLATE,
     extract_diff,
     handle_pr,
@@ -142,6 +143,21 @@ def test_execute_uses_narrowed_non_editing_allowlist_with_pr_tools() -> None:
     assert "Edit" not in tools
     assert "Write" not in tools
     assert "Bash(git add:*)" not in tools
+
+
+def test_execute_prompt_compels_single_command_push_and_pr() -> None:
+    """execute 프롬프트는 모델이 조사만 하다 끝내지 않고 commit→push→gh pr create 를
+    **단일 명령**(compound/`$()` 금지)으로 수행하고 PR URL 로 끝내도록 강제해야 한다 —
+    실 EC2 에서 execute 가 읽기 전용 명령만 돌리다 PR URL 없이 끝나던 회귀 방지."""
+    t = PR_EXECUTE_PROMPT_TEMPLATE
+    assert "git commit -m" in t
+    assert "git push -u origin HEAD" in t
+    assert "gh pr create --title" in t
+    assert "--fill" not in t  # 스키마 미허용 플래그를 지시하지 않는다
+    assert "ONE command per" in t  # compound 금지 지시
+    assert "$(" in t  # substitution 금지를 명시적으로 언급
+    assert "final line of your reply MUST be that full URL" in t
+    assert "{untrusted_data}" in t  # 격리 삽입 자리 유지
 
 
 def test_execute_isolates_approved_diff_in_untrusted_block() -> None:
