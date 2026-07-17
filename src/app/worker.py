@@ -28,7 +28,6 @@ from app.execution_plan import (
     ExecutionPlanError,
     build_pr_plan,
     verify_pr_workspace,
-    verify_remote_pr_diff,
 )
 from app.policy_boundary import CommandScope, PolicyDenied, authorize_command
 from app.store import (
@@ -217,9 +216,13 @@ def _verify_approved_pr(job: Job) -> ExecutionPlan:
 
 
 def _verify_pr_postcondition(
-    _job: Job, outcome: CommandOutcome, plan: ExecutionPlan
+    _job: Job, _outcome: CommandOutcome, _plan: ExecutionPlan
 ) -> None:
-    verify_remote_pr_diff(outcome.result, plan)
+    # The remote PR is verified inside the deterministic execute (pr_execution.
+    # open_pr), where the short-lived write grant is in the environment so `gh`
+    # can authenticate. The worker process holds no GitHub credential, so a
+    # `gh pr diff` here would fail auth and fail-close a PR that actually opened.
+    return None
 
 
 def default_executors(

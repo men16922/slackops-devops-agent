@@ -137,4 +137,42 @@ def open_pr(
             "gh pr create returned no pull-request URL: "
             f"{(created.stdout or created.stderr).strip()}"
         )
+
+    _verify_remote_paths(url, plan, root, env, run)
     return f":white_check_mark: Pull request opened: {url}"
+
+
+def _verify_remote_paths(
+    url: str,
+    plan: ExecutionPlan,
+    root: Path,
+    env: Mapping[str, str],
+    run: CommandRunner,
+) -> None:
+    """Confirm the opened PR changes exactly the approved set of paths.
+
+    This runs here — inside the deterministic execute, with the grant in ``env``
+    — rather than as a later worker step, because the worker process has no
+    GitHub credential and ``gh`` would fail to authenticate. Content is already
+    guaranteed by construction (the committed tree was byte-verified against the
+    approved diff); this catches a wrong-branch or path-set surprise on the
+    remote. It deliberately does not byte-compare ``gh pr diff`` against the local
+    ``git diff HEAD --binary`` — the two are different textual formats, so an
+    exact-bytes check fails even on a correct PR.
+    """
+    from app.execution_plan import ExecutionPlanError, changed_paths
+
+    result = run(["gh", "pr", "diff", url, "--color=never"], root, env)
+    if result.returncode != 0:
+        raise PrExecutionError(
+            f"remote PR verification failed: {(result.stderr or result.stdout).strip()}"
+        )
+    try:
+        remote_paths = changed_paths(result.stdout)
+    except ExecutionPlanError as exc:
+        raise PrExecutionError(f"could not read the remote PR diff: {exc}") from exc
+    if remote_paths != tuple(plan.paths):
+        raise PrExecutionError(
+            "remote PR changes a different set of paths than approved: "
+            f"{list(remote_paths)} vs {list(plan.paths)}"
+        )

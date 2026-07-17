@@ -55,12 +55,21 @@ def _grant() -> WriteGrant:
     )
 
 
-def _runner_with_gh(pr_url: str = "https://github.com/o/n/pull/1"):
-    """Real subprocess for git; a canned success for `gh pr create`."""
+def _gh_diff_for(paths: tuple[str, ...]) -> str:
+    return "".join(f"--- a/{p}\n+++ b/{p}\n@@ -1 +1 @@\n-x\n+y\n" for p in paths)
+
+
+def _runner_with_gh(
+    pr_url: str = "https://github.com/o/n/pull/1",
+    diff_paths: tuple[str, ...] = ("service.txt",),
+):
+    """Real subprocess for git; canned success for `gh pr create` / `gh pr diff`."""
 
     def run(argv, cwd, extra_env):  # type: ignore[no-untyped-def]
-        if argv[0] == "gh":
+        if list(argv[:3]) == ["gh", "pr", "create"]:
             return subprocess.CompletedProcess(list(argv), 0, stdout=pr_url + "\n", stderr="")
+        if list(argv[:3]) == ["gh", "pr", "diff"]:
+            return subprocess.CompletedProcess(list(argv), 0, stdout=_gh_diff_for(diff_paths), stderr="")
         env = {**os.environ, **(extra_env or {})}
         return subprocess.run(
             list(argv), cwd=str(cwd), env=env, capture_output=True, text=True
@@ -108,6 +117,27 @@ def test_open_pr_stages_only_plan_paths(
 
     committed = _git(root, "show", "--name-only", "--pretty=format:", "HEAD").split()
     assert committed == ["service.txt"]
+
+
+def test_open_pr_raises_when_remote_pr_changes_other_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The opened PR must touch exactly the approved paths — a remote diff over a
+    different file set fails closed (grant-authenticated check inside execute)."""
+    root = _repo_with_remote(tmp_path)
+    (root / "service.txt").write_text("after\n", encoding="utf-8")
+    monkeypatch.setenv("SLACKOPS_WORKSPACE_ROOT", str(root))
+    diff = current_workspace_diff(root)
+    plan = build_pr_plan("update service", diff)  # plan.paths == ("service.txt",)
+
+    with pytest.raises(PrExecutionError, match="different set of paths"):
+        open_pr(
+            "update service",
+            plan,
+            _grant(),
+            workspace_root=root,
+            run=_runner_with_gh(diff_paths=("unexpected.txt",)),
+        )
 
 
 def test_open_pr_raises_when_push_fails(
