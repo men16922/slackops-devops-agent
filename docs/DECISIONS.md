@@ -287,3 +287,24 @@ Last updated: 2026-07-15
   the audit trail and the failure reason. Measured both ways: an authorized `git status`-only run completes with
   `caps=read`, while an observed `curl http://169.254.169.254/` fails the job and both tool steps remain in the tree.
   Limitation: the bound is per-job, so a capability legitimately approved for one job is not re-examined across jobs.
+
+## D24 — the PR execute step is deterministic runtime plumbing, not an LLM turn
+- Decision: once the operator-approved plan is re-verified against the live worktree and the short-lived write grant is
+  minted, the runtime — not a headless model — performs the git plumbing. `app.pr_execution.open_pr` runs a fixed argv
+  sequence (branch → `git add` the approved `plan.paths` → commit → `git push` → `gh pr create`), authenticated by the
+  grant's child env, and verifies the opened PR touches exactly `plan.paths` inline (where `gh` has the token) rather
+  than as a later worker step. The prepare model still proposes the change (edits files, emits the diff); it never
+  touches the write path. The authoritative approved diff is the runtime's own `git diff HEAD` from prepare onward
+  (`current_workspace_diff`), stored raw so its hash byte-matches what execute re-verifies.
+- Reason: three live EC2 runs proved the LLM execute step could not reliably open a PR — it non-deterministically
+  inspected instead of pushing, tried `a && b` compounds the guard rejects, or left the change unstaged on `main` so
+  `git commit` had nothing to commit. The write path is the one place non-determinism is least acceptable and least
+  necessary: the change is already decided and byte-verified, so opening the PR is mechanical. Removing the model here
+  makes an approved PR reliably open *and* shrinks the trusted surface — no LLM output influences the push. The drift
+  gate (D23) stays satisfied because an execute with no model tool calls has empty observed capability (⊆ authorized).
+- Impact: an approved PR now opens end-to-end and the job reaches DONE (verified live: GitHub PR #3, job DONE). The old
+  LLM execute prompt/tools and `execution_plan.verify_remote_pr_diff` are retired; the worker PR postcondition is a
+  no-op because the remote check moved into `open_pr` where the credential lives. The remote check compares the changed
+  *path set*, not `gh pr diff` bytes against `git diff HEAD --binary` — different textual formats that never matched,
+  which is why no PR had ever passed the postcondition. Limitation: content equivalence rests on construction (the
+  committed tree was byte-verified), not on re-diffing the remote.

@@ -1,9 +1,33 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 > Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
 > Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
 > Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
+
+## 2026-07-17 — pr execute FIXED end-to-end: a real PR opens live (the MVP write path closes)
+- Status: DONE + verified LIVE. Job `f879c3fe` reached **DONE** with `Pull request opened:
+  .../pull/3`; GitHub PR #3 OPEN. The 3-year-open "no real PR" gap is closed. EC2 stopped ($0).
+- Three stacked root causes, each fixed and each surfaced only by fixing the one before it:
+  1. **diff-source mismatch** (`ba813bf`): `_prepare` hashed the model's PRINTED diff text; execute
+     byte-compared the runtime `git diff HEAD`. New `execution_plan.current_workspace_diff()` is the
+     single source (prepare stores RAW/unstripped so the hash byte-matches verify). Live: verify passed,
+     `write_credentials_issued` fired — first time ever past `plan_binding_rejected`.
+  2. **LLM-driven git plumbing** (`9081bed`, supersedes prompt-hardening `70c29ab`): the execute model
+     non-deterministically inspected instead of pushing, or left the change UNSTAGED on `main`. New
+     `app.pr_execution.open_pr` does branch→add(plan.paths)→commit→push→`gh pr create` with fixed argv
+     (no shell, no model), authed by the grant's child env. More reliable AND removes the LLM from the
+     write path. Drift gate OK (empty observed ⊆ authorized). Live: PR #2 opened.
+  3. **postcondition gh auth** (`be0422d`): `verify_remote_pr_diff` ran `gh pr diff` in the worker env
+     (no grant token) → "gh auth login" → fail-closed a PR that had opened. Moved the remote check into
+     `open_pr` (grant in env), path-set compare not byte-compare. Live: job #3 = DONE.
+- Verified: `make check` **563 passed** + ruff + mypy strict + doc-budget. New TCs: unmocked verify
+  round-trip; `open_pr` real branch/commit/push to a bare origin (gh injected) + path-mismatch fail-close.
+- Live chain: Slack NL → agent propose → prepare(runtime diff) → dashboard approve (men16922) →
+  deterministic execute → PR opened → grant-authed postcondition → DONE. Drove Slack/dashboard via browser.
+- Notes: 2 open test PRs (#2 720-run before the postcondition fix, #3 750-run success) — unmerged, to
+  close. Infra: on a stop→start EC2, `runtime-credentials-refresh` flock contention delays service
+  start-pre ~2min (self-resolves); a fresh `cloud-up` avoids it.
 
 ## 2026-07-17 — fresh-EC2 pr run: prepare hardening worked; found the real execute-blocking bug
 - Status: Root cause found (no code change this session). Instance i-0269c8e791e26cc84 launched with all

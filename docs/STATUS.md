@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-17
+Last updated: 2026-07-17b
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -12,11 +12,12 @@ Last updated: 2026-07-17
 
 ## Verification Baseline
 - 3-layer gate: `make check` → **557 passed** · `ruff` · `mypy src`(strict) · documentation-budget gate all green;
-- **Live pr test (2026-07-17)**: approver bug fixed (`SLACK_APPROVER_IDS` SecureString now `--with-decryption`,
-  `63ec156`, decrypts from boot); model pinned `claude-sonnet-5` (`bad79aa`); prepare prompt hardened (`90da9cc`)
-  → model now edits (298-char diff); men16922 approved via dashboard. **Real PR still blocked by a found bug:**
-  `_prepare` hashes the model's printed diff **text** but execute byte-compares the runtime's own `git diff HEAD`
-  (`execution_plan.py:340`) → never matches → `plan_binding_rejected`. Mocked TC hid it. Fix = NEXT_PLAN top.
+- **pr execute path FIXED + real PR opened LIVE (2026-07-17)**: the MVP write path now closes end-to-end.
+  Three stacked root causes fixed — diff-source정본화(`ba813bf`), execute git 배관 런타임 결정화(`9081bed`,
+  `app.pr_execution.open_pr`, LLM 제거), postcondition gh 인증 grant 환경 이동(`be0422d`). Live: Slack NL →
+  agent propose → prepare(runtime diff) → dashboard approve(men16922) → deterministic execute → **GitHub PR #3
+  OPEN** → grant-authed postcondition → job `f879c3fe`=DONE. (earlier fixes still in place: approver decrypt
+  `63ec156`, `claude-sonnet-5` `bad79aa`, prepare-prompt `90da9cc`.) 2 open test PRs(#2/#3) to close.
   `cd web && npm run build` green on the current tree (re-verified after the D21 `AuditEvent` mirror change, not
   only for D15); `git diff --check` passes.
 - **Event-driven loop live (2026-06-20, real AWS):** CloudWatch ALARM→EventBridge→Lambda(`alarm_lambda`, detect→propose)→DynamoDB queue→worker(Claude)→DONE→Slack ($0.15/2.7K–6K tok). Serverless producer fires EC2-off; EC2 then terminated → ≈ $0.

@@ -1,18 +1,15 @@
 # AGENT_BRIEF — slackops-devops-agent
 Last updated: 2026-07-17
 
-> ▶ NEXT SESSION (**v2 AWSKRUG demo**): Slack migrated to a new workspace
->   ("Platform Agent"): App re-created via manifest, SSM Slack 4종 refreshed (v2), local `/devops ping` pong verified
->   (guide: `docs/guide/kr/SLACK_NEW_GUIDE.md` + `slack-app-manifest.yaml`). **GitHub App write path**
->   ★ NEXT: **fix the pr execute-blocking bug** (NEXT_PLAN top). `_prepare` hashes/approves the model's printed
->   diff **text**, but execute (`verify_pr_workspace`, `execution_plan.py:340`) byte-compares the runtime's own
->   `git diff HEAD --binary` → model approximation never matches → **always `plan_binding_rejected`**. Masked by
->   mocked TC. Fix: prepare uses the RUNTIME git diff as authoritative (display+hash+execute) + unmocked verify TC.
->   Working on 2026-07-17 (fresh EC2, stopped): approver decrypt-from-boot (`63ec156`), `claude-sonnet-5` pin
->   (`bad79aa`), prepare-prompt hardening (`90da9cc`, model now edits → 298-char diff), men16922 dashboard approve;
->   #2/#3 verified live earlier. `make check` **557 passed**.
->   Docs: `docs/V2_INTRO.md`/`V2_TEST.md`.
->   Manual remains: register `review_slackops_job` Message Shortcut in the new workspace; slides (⏰ Canvas ~8/09, 23d left).
+> ▶ NEXT SESSION (**v2 AWSKRUG demo**): **The pr execute write path is FIXED and a real PR opened LIVE
+>   (2026-07-17)** — Slack NL → agent propose → prepare(runtime diff) → dashboard approve(men16922) →
+>   deterministic execute (`app.pr_execution.open_pr`, no LLM in the write path) → **GitHub PR #3 OPEN** →
+>   job DONE. Three stacked root causes fixed: `ba813bf` (runtime diff as authoritative source),
+>   `9081bed` (runtime-deterministic git plumbing), `be0422d` (grant-authed remote postcondition).
+>   `make check` **563 passed**. EC2 stopped ($0). Slack on the new "Platform Agent" workspace.
+>   ★ NEXT (all manual, presentation): register `review_slackops_job` Message Shortcut in the new
+>   workspace; AWSKRUG slides (⏰ Canvas ~8/09); close the 2 open test PRs (#2/#3, unmerged).
+>   Guides: `docs/guide/kr/SLACK_NEW_GUIDE.md`, `docs/V2_INTRO.md`/`V2_TEST.md`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 
 ## Read Path (session start/resume)
