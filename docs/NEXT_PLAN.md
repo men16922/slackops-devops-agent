@@ -13,8 +13,13 @@ Last updated: 2026-07-16
 > Slack은 새 워크스페이스("Platform Agent")로 이전 완료 — SSM Slack 4종 v2 갱신, 로컬 `/devops ping` pong 확인.
 - [ ] `[manual]` AWSKRUG 슬라이드 디자인 마무리 (라이브 시연으로 대체, 사전 녹화 폐기).
       ⏰ Canvas 무료 트라이얼 **~8/09 종료**(새 워크스페이스로 교체돼 트라이얼 갱신, 2026-07-17 기준 23일) — 그 전에 캡처/데모.
-- [ ] `[manual]` **새 워크스페이스**에 `review_slackops_job` Message Shortcut 등록 후 Modal diff 승인/거부 확인.
-      Done: 비허용 사용자는 modal을 열거나 상태를 바꾸지 못하고, 허용 사용자의 결정은 원본 메시지와 감사 기록에 남음.
+- [~] `review_slackops_job` Message Shortcut — **등록 확인 완료(2026-07-17)**: 앱 config(Interactivity On,
+      callback_id `review_slackops_job`, Messages) + Slack 메시지 "More actions"에 "Review SlackOps job" 노출 확인.
+      **미완**: shortcut 호출 시 Modal이 안 열림. 메시지는 `decision_blocks`로 `approval:{job_id}` 블록을 정상 렌더하나
+      `_on_shortcut`이 로그가 없어 발화/실패를 확인 불가. 유력 가설 = **Assistant DM 스레드** 메시지의 shortcut 페이로드가
+      custom blocks 미포함 → `job_id_from_message_blocks`=None. 후속: ① `_on_shortcut`에 log 추가(진단 가능성 확보 —
+      app structlog가 journald 에 안 남는 문제도 같이) ② **채널 알림 메시지**(proposal_notifier)에서 재검증.
+      Done 기준: 비허용자는 상태를 못 바꾸고(제출 시 NOT_AUTHORIZED), 허용자의 결정은 원본 메시지+감사에 남음.
 - [x] **승인자 검증 완료(2026-07-17)** — `SLACK_APPROVER_IDS` SecureString 미복호화 버그 수정(`63ec156`);
       men16922 가 대시보드에서 승인 성공, 감사 `approved` 기록. (Slack Message Shortcut 등록은 위 항목 참조 — 대시보드 경로는 검증됨.)
 - [x] **pr execute-blocking 버그 FIXED + 실 PR 라이브 검증 완료(2026-07-17)** — 3중 근본원인 스택 해결:
