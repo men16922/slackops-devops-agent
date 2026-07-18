@@ -7,7 +7,8 @@
 ## 0. 한 줄 요약
 우리 설계는 **표준 프레임워크(OWASP·AWS·OpenAI)** 뿐 아니라 **2025년 프롬프트 인젝션 방어 담론의 최신 개념
 (Lethal Trifecta · control/data 분리 · Plan-Then-Execute · Zero Standing Privilege)** 과도 실질적으로 일치한다.
-구현은 이미 다 되어 있고, 발표에는 "이름"만 붙이면 최신성이 살아난다.
+핵심 경계는 구현·검증돼 있다. 발표에서는 현재 런타임에 없는 P3 Managed MCP를 제외하고,
+검증된 통제만 최신 프레임워크의 언어로 연결한다.
 
 ---
 
@@ -16,7 +17,7 @@
 | 프레임워크 | 핵심 | 우리 연계 | 덱 위치 |
 | --- | --- | --- | --- |
 | **OWASP Top 10 for LLM Applications 2025** | LLM01~LLM10. 중심축 **LLM06 Excessive Agency** | 10개 중 7개 직접 커버 매핑표 | S6(이론 근거) |
-| **OWASP Top 10 for Agentic Applications 2026** (2025-12-09, ASI01~10) | agent 특화: Tool Misuse·Identity/Privilege Abuse·Agentic Supply Chain 등 | ASI02→command_guard, ASI03→role split, ASI04→MCP registry | S6 보조 배너 |
+| **OWASP Top 10 for Agentic Applications 2026** (2025-12-09, ASI01~10) | agent 특화: Goal Hijack·Tool Misuse·Identity/Privilege Abuse·Unexpected Execution 등 | ASI01→격리/tools=0, ASI02→fixed adapter/command_guard, ASI03→role split/JIT token, ASI05→deterministic executor | S17 위험→구현→증명 |
 | **OpenAI: Designing agents to resist prompt injection** (2026) | 인젝션은 사회공학적 맥락 조작 — 입력 분류로 못 막음, source·sink 함께 축소 | source(격리)+sink(도구 0·hard deny) | S7(source/sink) |
 | **AWS AI Security Framework / agentic 원칙** | 모델 '밖' 최소권한 인가 + high-consequence 사람 승인 | IAM role split + 승인 게이트 | S5·S6 |
 
@@ -79,7 +80,7 @@
 | Non-Human Identity | role split, IMDS 차단 | ✅ 구현 (5-B) |
 | HITL (high-consequence) | 승인 게이트 | ✅ 구현 |
 
-→ **실구현은 최신 흐름과 거의 다 일치. 발표에 "이름"과 각주만 추가하면 됨.**
+→ **실구현과 검증 범위 안에서 최신 흐름을 설명한다. Top 10 전체 대응이나 P3 실사용은 주장하지 않는다.**
 
 ---
 
@@ -92,10 +93,10 @@
 ---
 
 ## 5. 발표 반영 제안 (실행 옵션)
-1. **[강력권장] "Lethal Trifecta 를 우리가 끊는다" 슬라이드 1장** 추가 — S5(런타임 보안) 또는 S7(source/sink) 인접.
+1. **[반영] "Lethal Trifecta 를 우리가 끊는다" 슬라이드 1장** — S13에 fixed adapter·격리·egress deny를 연결.
    3다리(민감데이터/비신뢰콘텐츠/외부통신) → 각 다리를 끊는 우리 통제 대응. 최신성·기억성 최고.
-2. **[선택] 각주 태깅** — 5-B(→NHI·JIT), S7(→Lethal Trifecta·source/sink), 교훈 슬라이드(→CaMeL·Plan-Then-Execute).
-3. **선행 작업:** 위 인용(저자·연도·arXiv)을 웹으로 1회 검증한 뒤 슬라이드에 표기.
+2. **[반영] Agentic Top 10 매핑** — S17을 ASI01/02/03/05/09와 실제 증거 중심으로 갱신.
+3. **[반영] 최신 공식 자료 검증** — OpenAI 2026-03-11, AWS 2026-05-15, OWASP Agentic 2026 원문을 대본 정본에 추가.
 
 ## 6. 참고 자료 (웹 원문 검증 완료 2026-07-17)
 - **Lethal Trifecta:** Simon Willison, "The lethal trifecta for AI agents: private data, untrusted content,

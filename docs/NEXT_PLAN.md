@@ -1,5 +1,5 @@
 # NEXT_PLAN — slackops-devops-agent
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 > **Open work only** (≤120 lines). Remove when done (history → PROGRESS_LOG/COMPLETED_SUMMARY). Authority: this file > docs/plans/.
 > Tags: `[auto]` = doable in an unattended overnight round (local code+tests). `[manual]` = operator manual (AWS/Slack/UI).
@@ -8,9 +8,10 @@ Last updated: 2026-07-17
 > Completed history: docs/COMPLETED_SUMMARY.md (milestones) · docs/DECISIONS.md D19–D23 (secure-runtime rationale).
 
 ## ★ Active — v2 AWSKRUG 발표 데모
-> 기능, Slack 승인, GitHub App PR #3–#5, 15장 V2 덱과 대본까지 완료했다. 남은 항목은 발표 준비뿐이다.
-- [ ] `[manual]` Slide 12용 실제 보안 거부 증거를 캡처해 아티클의 마지막 placeholder와 PPT에 반영한다.
-- [ ] `[manual]` 20분 발표 리허설: Slack diagnose → Review change → Approve → PR, 실패 시 캡처 전환까지 측정한다.
+> 기능, Slack 승인, GitHub App PR #3–#5, 최종 18장 PDF/PPTX, 대본, LIVE 런북까지 완료했다.
+- [ ] `[manual]` Slide 4/6 페이지 번호 렌더링을 고치고 Slide 18 QR의 최종 목적지를 휴대폰으로 확인한다.
+- [ ] `[manual]` `docs/presentation/LIVE.md` D-1 절차로 fresh EC2 실경로를 리허설하고 즉시 stop한다.
+- [ ] `[manual]` 20분 발표 리허설: Slack diagnose → Review change → Approve → PR, A/B/C 전환까지 측정한다.
 - [ ] `[manual]` 영문 V2 원고를 별도 Builder 글로 발행할지 결정한다. 기존 V1 글은 2026-07-17 현재 구현으로 갱신됨.
 - [ ] `[manual]` Canvas 트라이얼 종료(~8/09) 전에 포스트모템 시연 화면을 최종 보관한다.
 

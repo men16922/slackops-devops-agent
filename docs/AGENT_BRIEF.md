@@ -1,18 +1,12 @@
 # AGENT_BRIEF — slackops-devops-agent
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
-> ▶ NEXT SESSION (**v2 AWSKRUG demo**): **The pr execute write path is FIXED and a real PR opened LIVE
->   (2026-07-17)** — Slack NL → agent propose → prepare(runtime diff) → dashboard approve(men16922) →
->   deterministic execute (`app.pr_execution.open_pr`, no LLM in the write path) → **GitHub PR #3 OPEN** →
->   job DONE. Three stacked root causes fixed: `ba813bf` (runtime diff as authoritative source),
->   `9081bed` (runtime-deterministic git plumbing), `be0422d` (grant-authed remote postcondition).
->   **Slack-native approval also verified LIVE**: Approve/Reject buttons AND the "Review change" Modal
->   both approve `via slack` (Paulos=U0BG6ELKMH8 approver) → execute → real PR. `review_slackops_job`
->   Message Shortcut registered + working. `make check` **563 passed**. EC2 stopped ($0).
->   ★ PRESENTATION READY (2026-07-17): 15-slide `docs/presentation/SlackOps DevOps Agent V2.pptx`,
->   OWASP risk→implementation→proof slide, current architecture, speaker script/prompt, and Builder V2 article draft
->   with real Slack/dashboard evidence are in-repo. Public V1 article was updated to current security claims.
->   NEXT: capture the remaining security-denial proof image, rehearse the live demo, and decide whether to publish V2 separately.
+> ▶ NEXT SESSION (**v2 AWSKRUG demo**): authority = `docs/NEXT_PLAN.md`.
+>   Final bundle: 18-page `docs/presentation/SlackOps.pdf`, final PPTX, synchronized Korean speaker script,
+>   and `docs/presentation/LIVE.md` for Slack diagnose → approval → real PR with A/B/C fallbacks.
+>   First action: fix Slide 4/6 footer rendering and phone-check Slide 18's QR redirect.
+>   Then run the D-1 fresh-EC2 rehearsal and time the full 20-minute flow; publication stays optional.
+>   Verification: `make check` **563 passed**; PDF 18 pages rendered; no current `deploy/.instance-id`.
 >   Guides: `docs/guide/kr/SLACK_NEW_GUIDE.md`, `docs/V2_INTRO.md`/`V2_TEST.md`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 

@@ -1,12 +1,12 @@
 # COMPLETED_SUMMARY — slackops-devops-agent
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 > Compressed completed milestones + links. Detailed history in PROGRESS_LOG / docs/archive/. Updated via /checkpoint.
 
 ## Milestones
-- **2026-07-17 — AWSKRUG V2 presentation/article bundle ready**: 15-slide PPTX, current architecture and
-  safe-autonomy graphics, Korean speaker script, OWASP/Lethal Trifecta/CaMeL notes, and an English Builder V2 draft
-  with real Slack/dashboard evidence. Public V1 article updated to current security claims. `make check` 563 passed.
+- **2026-07-19 — Final AWSKRUG presentation bundle ready**: 18-page final PDF/PPTX, current architecture and
+  security proof, synchronized Korean script, and LIVE runbook for fresh-EC2 preflight, Slack diagnose → approval →
+  real PR, failure fallbacks, and cleanup. All pages rendered; official sources checked; `make check` 563 passed.
 - **2026-07-16 — D19–D23 secure agent runtime (Notion reference P0+P1 closed)**: all five rest on one measurement —
   on Claude Code 2.1.210, `--allowedTools 'Bash(echo:*)'` still executed `echo hi; whoami`, so tool patterns bind a
   command line's head, not execution. D19 made a PreToolUse argv-schema guard the boundary and replaced standing PR

@@ -1,9 +1,23 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
-> Latest 3–5 increments (≤120 lines, newest on top). When it overflows, split into docs/archive/progress-YYYY-MM.md. Append via /checkpoint.
-> Earlier entries (~2026-06-20): docs/archive/progress-2026-06.md
-> Archived 2026-06-26–2026-07-16 entries: docs/archive/progress-2026-07.md
+> Latest 3–5 increments (≤120 lines, newest first); archives: `docs/archive/progress-2026-06.md`, `progress-2026-07.md`.
+
+## 2026-07-19 — Final 18-slide presentation and LIVE runbook ready
+
+- Status: DONE. `SlackOps.pdf` is the final 18-page review source; script and live scenario are synchronized.
+- Changed: final PPTX/PDF naming, 18-slide `PRESENTATION.md`, and `LIVE.md` cloud preflight/fallback/cleanup runbook.
+- Verified: all 18 pages rendered; sources cross-checked; `make check` = 563 passed, Ruff, mypy strict, docs, diff check.
+- Blockers: Slide 4/6 footer rendering and Slide 18 QR redirect still need manual device checks; no code blocker.
+- Next: fix those visuals, run the D-1 fresh-EC2 rehearsal, then time the 20-minute stage flow.
+
+## 2026-07-17 — V2 repository cleanup committed and synced
+- Status: DONE. `314faf6` is the shared tip of local `main` and `origin/main`.
+- Changed: committed the 20-file presentation/article bundle and docs chain; render intermediates stayed out of-repo.
+- Verified: `make check` → 563 passed, Ruff, mypy strict, and doc budgets; PPTX zip integrity and 15-slide count;
+  `git diff --check`; clean worktree and `main...origin/main` synchronized.
+- Blockers: none. The remaining security-denial capture is an explicit presentation task, not a repository blocker.
+- Next: capture the Slide 12 proof, rehearse the live flow, then decide on separate V2 publication.
 
 ## 2026-07-17 — AWSKRUG V2 deck and Builder article ready
 - Status: DONE. Presentation/article bundle is now a durable in-repo deliverable.

@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -103,9 +103,9 @@ Last updated: 2026-07-17
 - **v2 = AWSKRUG 발표 데모** (작업은 전부 `main`). Slack 해커톤 제출 **폐기**(Devpost §3 Eligibility 한국 미달).
   목표 = "Slack 자연어 →
   실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
-- **Presentation bundle ready(2026-07-17):** 15-slide V2 PPTX, OWASP mapping, current architecture,
-  Korean speaker script, and Builder V2 article draft with real Slack/dashboard evidence. Public V1 article updated.
-  ★ NEXT = remaining security-denial capture + live-demo rehearsal + optional separate V2 publication.
+- **Final presentation bundle ready(2026-07-19):** 18-page PDF/final PPTX, OWASP mapping, current architecture,
+  synchronized Korean script, and LIVE runbook with cloud preflight/fallback/cleanup. Public V1 article is current.
+  ★ NEXT = Slide 4/6 footer + QR phone check, fresh-EC2 rehearsal, then the timed live flow.
 - H0 인프라(DynamoDB/Vercel/Lambda/SSM) 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier. SSM: bot/app/oauth
   + SLACK_NOTIFY_CHANNEL + SLACK_APPROVER_IDS + DASHBOARD_URL + PR write 4종. Canvas scope `canvases:write` 부여완료.
 
