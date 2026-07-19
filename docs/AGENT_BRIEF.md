@@ -4,9 +4,10 @@ Last updated: 2026-07-19
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): authority = `docs/NEXT_PLAN.md`.
 >   Final bundle: 18-page `docs/presentation/SlackOps.pdf`, final PPTX, synchronized Korean speaker script,
 >   and `docs/presentation/LIVE.md` for Slack diagnose → approval → real PR with A/B/C fallbacks.
->   First action: fix Slide 4/6 footer rendering and phone-check Slide 18's QR redirect.
->   Then run the D-1 fresh-EC2 rehearsal and time the full 20-minute flow; publication stays optional.
->   Verification: `make check` **563 passed**; PDF 18 pages rendered; no current `deploy/.instance-id`.
+>   First action: fix LIVE diagnose scope rejection, then Slack terminal-state synchronization.
+>   After that, fix Slide 4/6 footer, phone-check Slide 18 QR, and rerun the timed fresh-EC2 flow.
+>   Verification: `make check` **563 passed**; real PR #6 is OPEN/REVIEW_REQUIRED/BLOCKED; test EC2 stopped
+>   and tracked by `deploy/.instance-id-live-test`.
 >   Guides: `docs/guide/kr/SLACK_NEW_GUIDE.md`, `docs/V2_INTRO.md`/`V2_TEST.md`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 

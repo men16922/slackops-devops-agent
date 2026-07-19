@@ -105,14 +105,16 @@ Last updated: 2026-07-19
   실 AWS 안전 진단 → 승인게이트 → 포스트모템 Canvas" 라이브 데모(보안+관측성 차별점).
 - **Final presentation bundle ready(2026-07-19):** 18-page PDF/final PPTX, OWASP mapping, current architecture,
   synchronized Korean script, and LIVE runbook with cloud preflight/fallback/cleanup. Public V1 article is current.
-  ★ NEXT = Slide 4/6 footer + QR phone check, fresh-EC2 rehearsal, then the timed live flow.
+  Fresh-EC2 rehearsal: Slack ping 9.6s; Slack approval(`U0BG6ELKMH8`) bound to the immutable plan; real PR #6 is
+  OPEN, one-file/one-line, REVIEW_REQUIRED/BLOCKED, unmerged; `main-rule` applies to default branch with 1 review
+  and no bypass. EC2 `i-0d1ccb998417b9685` is stopped.
+  ★ NEXT = fix diagnose scope denial + Slack terminal-state sync, then visuals/QR and timed fresh-EC2 rerun.
 - H0 인프라(DynamoDB/Vercel/Lambda/SSM) 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier. SSM: bot/app/oauth
   + SLACK_NOTIFY_CHANNEL + SLACK_APPROVER_IDS + DASHBOARD_URL + PR write 4종. Canvas scope `canvases:write` 부여완료.
 
 ## Open Risks
-- Slack/log/CloudWatch/kubectl/git/adapter-error input now enters through one `<untrusted_data>` boundary. The remaining
-  risk is semantic prompt injection within that data, mitigated by tool-less L0 analysis and the permission/output gates.
+- LIVE blockers: exact diagnose text is denied `resource_not_allowed`; Slack can remain `analyzing`/`running now`
+  after FAILED/DONE; PR prepare took 88s (> Plan A 40s), and Plan C mock does not match the scripted diff.
 - Never use credentials other than IAM Instance Profile (.env commits example only).
 - EC2 always-on cost — verify EventBridge schedule stop/start.
-- Non-goals (out of scope): public HTTPS endpoint, EC2 always-on, Level 2 (Execute), Production/deploy/IAM/DB changes,
-  calling SQLite a prod datastore.
+- Non-goals: public HTTPS endpoint, EC2 always-on, Level 2 Execute, Production/deploy/IAM/DB changes, SQLite-as-prod.
