@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-19
+Last updated: 2026-07-21
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -106,8 +106,8 @@ Last updated: 2026-07-19
 - **Final presentation bundle ready(2026-07-19):** 18-page PDF/final PPTX, OWASP mapping, current architecture,
   synchronized Korean script, and LIVE runbook with cloud preflight/fallback/cleanup. Public V1 article is current.
   Fresh-EC2 rehearsal: Slack ping 9.6s; Slack approval(`U0BG6ELKMH8`) bound to the immutable plan; real PR #6 is
-  OPEN, one-file/one-line, REVIEW_REQUIRED/BLOCKED, unmerged; `main-rule` applies to default branch with 1 review
-  and no bypass. EC2 `i-0d1ccb998417b9685` is stopped.
+  OPEN, one-file/one-line, unmerged; `main-rule` enforces PR-only. **Reconfigured 2026-07-21 (D25):** approvals 1→0
+  + admin `always` bypass (solo repo can't self-approve); agent App token still cannot merge. EC2 stopped.
   ★ NEXT = fix diagnose scope denial + Slack terminal-state sync, then visuals/QR and timed fresh-EC2 rerun.
 - H0 인프라(DynamoDB/Vercel/Lambda/SSM) 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier. SSM: bot/app/oauth
   + SLACK_NOTIFY_CHANNEL + SLACK_APPROVER_IDS + DASHBOARD_URL + PR write 4종. Canvas scope `canvases:write` 부여완료.

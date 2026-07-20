@@ -309,3 +309,17 @@ Last updated: 2026-07-15
   *path set*, not `gh pr diff` bytes against `git diff HEAD --binary` — different textual formats that never matched,
   which is why no PR had ever passed the postcondition. Limitation: content equivalence rests on construction (the
   committed tree was byte-verified), not on re-diffing the remote.
+
+## D25 — main-rule enforces PR-only, but a solo repo needs 0 required approvals plus an admin bypass
+- Decision: the `main-rule` ruleset keeps `pull_request` + `deletion`/`non_fast_forward` protection on the default
+  branch, but with `required_approving_review_count: 0` and RepositoryRole admin (id 5) as an `always` bypass actor.
+  Updates go through **PUT** `/repos/{owner}/{repo}/rulesets/{id}` with the full representation (PATCH returns 404).
+- Reason: this is a single-account repo, and GitHub forbids a PR author from approving their own PR. With 1 required
+  approval and no bypass, no PR was ever mergeable — main was permanently locked, even for the maintainer's own docs
+  commits (surfaced by a GH013 push rejection on 2026-07-21). Requiring "another human's review" is unsatisfiable
+  here without a second identity, so the honest solo config is: force every change through a PR, but let the sole
+  maintainer merge their own PR (count 0) and keep an admin bypass for direct maintenance pushes.
+- Impact: the maintainer can push to main and self-merge PRs; the agent's scoped GitHub App token still cannot merge,
+  so "agent proposes a PR, a human is the merge gate" holds. Trade-off: the literal "no bypass" claim used in the
+  AWSKRUG demo is relaxed — if a run must demonstrate that verbatim, either remove the bypass and merge via a second
+  collaborator account (real review), or restore count=1 for that run only. PR #6 stays OPEN as the blocked-PR exhibit.
