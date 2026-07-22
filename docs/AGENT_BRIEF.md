@@ -1,13 +1,14 @@
 # AGENT_BRIEF — slackops-devops-agent
-Last updated: 2026-07-19
+Last updated: 2026-07-23
 
 > ▶ NEXT SESSION (**v2 AWSKRUG demo**): authority = `docs/NEXT_PLAN.md`.
->   Final bundle: 18-page `docs/presentation/SlackOps.pdf`, final PPTX, synchronized Korean speaker script,
->   and `docs/presentation/LIVE.md` for Slack diagnose → approval → real PR with A/B/C fallbacks.
->   First action: fix LIVE diagnose scope rejection, then Slack terminal-state synchronization.
->   After that, fix Slide 4/6 footer, phone-check Slide 18 QR, and rerun the timed fresh-EC2 flow.
->   Verification: `make check` **563 passed**; real PR #6 is OPEN/REVIEW_REQUIRED/BLOCKED; test EC2 stopped
->   and tracked by `deploy/.instance-id-live-test`.
+>   `PRESENTATION.md`이 PPTX **19장**(신규 Slide 3) speaker note와 동기화됨. 인터컷 슬라이드용 데모 mp4 4종 제작 완료:
+>   `docs/presentation/assets/videos/slide{7,11,12,16}-*.mp4`(각 8.6s·1920p, **입력→결과**; 결과=실 라이브 캡처, 입력 프레임=PIL 합성).
+>   First action: **EC2 stop**(현재 running) + PR job `37d65bc9`(awaiting_approval) 정리 + **미커밋 번들 커밋**(`deploy/demo/*`, Makefile,
+>   정책 TC, `LIVE/PRESENTATION.md`, `assets/`). PPT 영상 임베드는 사용자 직접.
+>   Live infra 상태: monitor 정지(SSM), 데모 로그 재시딩됨, EC2 750 dirty(리셋해도 committed=750), **Chrome 확장 연결해제**(재캡처 시 재연결 필요).
+>   Verification: `make check` **565 passed**(이전); 4개 mp4 <10s·1920p 확인.
+>   남은 blocker: Slack terminal-state 잔류, PR prepare ~2분, monitor `diagnose 'api'` denied 스팸(정지시킴), 라이브 타이핑 실녹화는 macOS Space 이슈.
 >   Guides: `docs/guide/kr/SLACK_NEW_GUIDE.md`, `docs/V2_INTRO.md`/`V2_TEST.md`.
 > 1-minute compact entry point (≤60 lines). Standards in harness/CORE_MANDATES.md; work authority is NEXT_PLAN.md > docs/plans/.
 

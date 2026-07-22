@@ -1,7 +1,40 @@
 # PROGRESS_LOG — slackops-devops-agent
-Last updated: 2026-07-19
+Last updated: 2026-07-23
 
 > Latest 3–5 increments (≤120 lines, newest first); archives: `docs/archive/progress-2026-06.md`, `progress-2026-07.md`.
+
+## 2026-07-23 — PRESENTATION.md 19장 노트 동기화 + 슬라이드 데모 클립 4종 제작
+
+- Status: DONE(미커밋). 발표 대본을 실제 PPTX 19장 speaker note에 맞춰 재작성; 인터컷 슬라이드 4종 데모 mp4 생성.
+- Changed: (1) `docs/presentation/PRESENTATION.md` — PPTX가 18→**19장**(신규 Slide 3 "글로벌 보안 동향/OWASP·Willison·AWS" 삽입)으로
+  바뀌어, 전 슬라이드 발표 대본을 PPTX 임베드 노트와 동일하게 정정 + 번호/시간배분/최종확인 목록 재정렬. (2) 신규
+  `docs/presentation/assets/videos/` — `slide7-diagnose`·`slide11-readonly-evidence`·`slide12-approval-gate`·`slide16-denied`.mp4
+  (각 8.6s·1920p·crf18, **입력(컴포저 명령)→페이드→결과** 구성). 사용자가 PPT 임베드는 직접.
+- Method: `screencapture -v` 네이티브 녹화(결과=실 라이브 EC2·Slack·대시보드 캡처) + ffmpeg 크롭/xfade. **입력 프레임은 PIL 합성**
+  (실 Slack 컴포저에 명령 텍스트 오버레이) — 라이브 타이핑 녹화가 macOS Space 전환(→VS Code/바탕화면 캡처) + 세션 중
+  Chrome 확장 연결해제로 불가했기 때문. 명령·결과 자체는 전부 실제.
+- Live infra(이 세션): EC2 재가동(이미 running이었음), monitor 정지(SSM stop; mask는 $HOME/dubious-ownership로 실패하나 무해),
+  `make cloud-demo-logs` 재시딩, 자연어 PR 요청으로 **PR job `37d65bc9` awaiting_approval** 생성(자동실행 안 됨).
+- Verified: 4개 mp4 각 <10s·1920p 확인(ffprobe), 결과 프레임 육안 검증(진단/근거/승인게이트 diff 750→900/거부 메시지).
+  발표 대본은 19개 notesSlide XML 추출과 대조.
+- Blockers: Chrome 확장 연결해제(재캡처 불가). EC2 running 유지 중. PR job 37d65bc9 미처리(reject 또는 방치).
+- Next: (선택) 확장 재연결 후 라이브 타이핑 실녹화로 입력 프레임 교체. **EC2 stop**. PR job 정리. 미커밋 번들 커밋.
+
+## 2026-07-22 — v2 데모 diagnose scope 해결 + 라이브 ①~⑦ 검증 + 발표 대본 정비
+
+- Status: 코드/문서 DONE, 실 검증 완료(실 EC2·Slack·대시보드·브라우저). 미커밋.
+- Changed: (1) `deploy/demo/{seed,clean}-demo-logs.sh` + `make cloud-demo-logs[-clean]` — `/aws/slackops-demo/checkout-service`
+  로그그룹에 5xx 샘플 시딩(정책 prefix `/aws/` 통과). (2) `tests/test_policy_boundary.py` +2 TC(prod `/aws/`에서 데모그룹 PASS,
+  bare `checkout-service` DENY=`resource_not_allowed`). (3) `LIVE.md` → 행동/대본 실행 시트로 재작성. (4) `PRESENTATION.md`
+  점진적 데모(Slide 6·10·11·15·16 `라이브 인터컷`+pre-arm), Slide 15 좌측 대본을 scope-denial로 정정 + 우측 이미지 교체 노트
+  (`assets/slide15-plan-binding-rejected.jpg`). (5) PPTX 갱신(사용자).
+- Verified: `make check` 565 passed(563→565)·ruff·mypy strict. 라이브: ① 슬래시 diagnose→실 증거 진단(2회),
+  ② restart→"지원 작업 아님" 거부, ③④⑤→실 PR #7(close+branch 삭제), ⑥ Canvas 탭 생성, ⑦ 대시보드 Job/Audit/Metrics 렌더.
+  runtime STS role이 `/aws/slackops-demo/*` 읽고 boot role은 거부(identity split 실증). plan_binding_rejected 실 감사(job `2ade0913`) 캡처.
+- Blockers: #2 Slack DM이 DONE 후 `running now` 잔류. #3 PR prepare 실측 ~2분(40s/88s보다 김). executor가 워크스페이스를
+  dirty하게 남김 → 데모 전 600 리셋 필요(현재 EC2 750 dirty; 자동 리셋은 auto-mode classifier 차단). ⑦ 자율 monitor가 `diagnose 'api'`
+  반복 자동제안 → 전부 denied(SUCCESS RATE 3%). 전부 문서에 반영, 코드 미수정.
+- Next: 커밋(데모 시딩·정책 TC·LIVE/PRESENTATION·assets). EC2 stop. 선택: Slide 15 좌측 라벨 `SCOPE DENIED`, blocker #2/#3/monitor 코드 수정.
 
 ## 2026-07-21 — main-rule reconfigured so a solo repo can merge without self-approval
 

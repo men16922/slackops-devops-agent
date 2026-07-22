@@ -1,5 +1,5 @@
 # STATUS — slackops-devops-agent
-Last updated: 2026-07-21
+Last updated: 2026-07-23
 
 > Current state/verification/risks (≤120 lines). Source of truth. Update via /checkpoint.
 
@@ -109,12 +109,12 @@ Last updated: 2026-07-21
   OPEN, one-file/one-line, unmerged; `main-rule` enforces PR-only. **Reconfigured 2026-07-21 (D25):** approvals 1→0
   + admin `always` bypass (solo repo can't self-approve); agent App token still cannot merge. EC2 stopped.
   ★ NEXT = fix diagnose scope denial + Slack terminal-state sync, then visuals/QR and timed fresh-EC2 rerun.
-- H0 인프라(DynamoDB/Vercel/Lambda/SSM) 유지, **비용 ≈ $0**. AWS credit rejected → $63.91 + free tier. SSM: bot/app/oauth
-  + SLACK_NOTIFY_CHANNEL + SLACK_APPROVER_IDS + DASHBOARD_URL + PR write 4종. Canvas scope `canvases:write` 부여완료.
+- **PRESENTATION.md=PPTX 19장 노트 동기화(2026-07-23)**(신규 Slide 3) + 인터컷 데모 mp4 4종 `assets/videos/slide{7,11,12,16}-*.mp4`(8.6s·1920p, **입력→결과**; 결과=실 라이브, 입력=PIL 합성).
+- H0 인프라(DynamoDB/Vercel/Lambda/SSM) 유지, **비용 ≈ $0**($63.91+free tier). SSM: bot/app/oauth + NOTIFY_CHANNEL + APPROVER_IDS + DASHBOARD_URL + PR write 4종; Canvas `canvases:write` 부여완료.
 
 ## Open Risks
-- LIVE blockers: exact diagnose text is denied `resource_not_allowed`; Slack can remain `analyzing`/`running now`
-  after FAILED/DONE; PR prepare took 88s (> Plan A 40s), and Plan C mock does not match the scripted diff.
-- Never use credentials other than IAM Instance Profile (.env commits example only).
-- EC2 always-on cost — verify EventBridge schedule stop/start.
+- **v2 데모 라이브 검증됨 (2026-07-22)**: ①~⑦ 실 EC2·Slack·대시보드 통과. diagnose scope 해결(데모 로그그룹 `/aws/slackops-demo/*` 시딩 + ① 슬래시 명령 + 회귀 TC).
+  남은 LIVE blockers: (a) Slack DM `running now` 잔류; (b) PR prepare ~2분; (c) executor가 워크스페이스 dirty; (d) 자율 monitor `diagnose 'api'` denied 스팸.
+- **현재 라이브 상태(2026-07-23, 정리 필요)**: EC2 **running**(→`make cloud-stop`); monitor **정지**(SSM); PR job `37d65bc9` **awaiting_approval**(자동실행 안 됨, reject/방치); 데모 로그 재시딩됨; Chrome 확장 연결해제.
+- Never use credentials other than IAM Instance Profile (.env commits example only). EC2 always-on cost — verify schedule stop/start.
 - Non-goals: public HTTPS endpoint, EC2 always-on, Level 2 Execute, Production/deploy/IAM/DB changes, SQLite-as-prod.

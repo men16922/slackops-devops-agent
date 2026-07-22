@@ -52,6 +52,10 @@ cloud-alarm:   ## (클라우드) 실 CloudWatch alarm 강제 ALARM → **EventBr
 	@bash scripts/cloud-alarm.sh
 cloud-alarm-clean: ## (클라우드) 데모 alarm 삭제(비용 정리). 이벤트 경로는 cloud-lambda-clean.
 	aws cloudwatch delete-alarms --alarm-names "$${ALARM_NAME:-slackops-demo-checkout-5xx}"
+cloud-demo-logs: ## (클라우드) LIVE ① diagnose용 데모 로그그룹(/aws/slackops-demo/checkout-service) 생성 + 5xx 샘플 로그 주입. 정책 prefix(/aws/) 통과 → 실 증거 진단.
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/demo/seed-demo-logs.sh
+cloud-demo-logs-clean: ## (클라우드) 데모 로그그룹 삭제(시연 후 정리).
+	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/demo/clean-demo-logs.sh
 cloud-vercel-key: ## (클라우드) Vercel 대시보드용 최소권한 IAM 키 발급(테이블 스코프, read+approve). READONLY=1 가능. ★직접 실행(Secret 보호).
 	@AWS_REGION=$${AWS_REGION:-us-east-1} bash deploy/vercel/create-key.sh
 cloud-vercel-key-clean: ## (클라우드) Vercel IAM 사용자/키 정리(노출 의심·제출 후).

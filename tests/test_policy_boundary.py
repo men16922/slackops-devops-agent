@@ -83,3 +83,29 @@ def test_logs_handler_denies_before_fetch_when_scope_is_outside_policy(
     assert reply.startswith(":no_entry:")
     assert fetcher.calls == []
     assert runner.calls == []
+
+
+# Production EC2 config (deploy/ec2/user-data.sh): the reviewed prefix is exactly "/aws/".
+# The LIVE ① demo depends on this: the seeded /aws/slackops-demo/... group is inside scope,
+# while a bare service name is denied *before* any fetch (resource_not_allowed).
+_PROD_ENV = {
+    "SLACKOPS_POLICY_ENFORCEMENT": "true",
+    "AWS_ACCOUNT_ID": "908601828278",
+    "AWS_REGION": "us-east-1",
+    "SLACKOPS_ALLOWED_AWS_ACCOUNT_IDS": "908601828278",
+    "SLACKOPS_ALLOWED_AWS_REGIONS": "us-east-1",
+    "SLACKOPS_ALLOWED_LOG_GROUP_PREFIXES": "/aws/",
+}
+
+
+def test_live_demo_log_group_is_inside_the_prod_aws_prefix() -> None:
+    scope = authorize_command(
+        "diagnose", "/aws/slackops-demo/checkout-service", _PROD_ENV
+    )
+    assert scope.resource == "log_group:/aws/slackops-demo/checkout-service"
+
+
+def test_bare_service_name_is_denied_under_the_prod_aws_prefix() -> None:
+    # Reproduces the LIVE blocker: "checkout-service" does not start with "/aws/".
+    with pytest.raises(PolicyDenied, match="resource_not_allowed"):
+        authorize_command("diagnose", "checkout-service", _PROD_ENV)
