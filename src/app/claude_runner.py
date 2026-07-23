@@ -27,7 +27,7 @@ CLAUDE_BIN = "claude"
 DEFAULT_MODEL = "claude-sonnet-5"
 _MODEL_ENV = "SLACKOPS_CLAUDE_MODEL"
 
-DEFAULT_TIMEOUT_S = 600
+DEFAULT_TIMEOUT_S = 900
 
 
 def _model_args() -> list[str]:
