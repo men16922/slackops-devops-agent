@@ -82,7 +82,7 @@ aws ssm put-parameter --name /slackops/SLACK_BOT_TOKEN          --type SecureStr
 aws ssm put-parameter --name /slackops/SLACK_APP_TOKEN          --type SecureString --value 'xapp-...'
 aws ssm put-parameter --name /slackops/CLAUDE_CODE_OAUTH_TOKEN  --type SecureString --value 'sk-ant-oat...'
 ```
-- [x] 검증 완료(2026-06-20, region `us-east-1`, account `908601828278`): 3개 모두 복호화 prefix 확인 — `xoxb-`/`xapp-1-`/`sk-ant-oat01`.
+- [x] 검증 완료(2026-06-20, region `us-east-1`, account `<AWS_ACCOUNT_ID>`): 3개 모두 복호화 prefix 확인 — `xoxb-`/`xapp-1-`/`sk-ant-oat01`.
       ```sh
       aws ssm get-parameter --name /slackops/SLACK_BOT_TOKEN --with-decryption \
         --query Parameter.Value --output text | head -c 8     # "xoxb-..." 앞부분

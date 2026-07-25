@@ -54,3 +54,35 @@ docs/submission/
 /_workspace/
 /tmp/
 /*.heic
+
+# ===== 로컬 전용(공개 repo 미포함) — 파일은 로컬에 유지, 추적만 해제 =====
+# 에이전트/작업 하네스 스캐폴딩
+.claude/
+.codex/
+.kiro/
+harness/
+scripts/overnight/
+CLAUDE.md
+.mcp.json
+# 내부 진행/작업 문서 (overnight 하네스 북키핑)
+docs/AGENT_BRIEF.md
+docs/STATUS.md
+docs/NEXT_PLAN.md
+docs/PROGRESS_LOG.md
+docs/DECISIONS.md
+docs/DOCS_POLICY.md
+docs/COMPLETED_SUMMARY.md
+docs/README.md
+docs/strategy.md
+docs/suggestion.md
+docs/V2_INTRO.md
+docs/V2_TEST.md
+docs/archive/
+docs/reports/
+docs/plans/
+docs/test/
+# 엔지니어링 방법론 에세이 (내부 레퍼런스)
+docs/engineering/
+docs/images/loop_engineering.png
+# 발표 자료 (AWSKRUG talk — 대용량 바이너리 + 스피커 노트)
+docs/presentation/

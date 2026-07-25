@@ -90,9 +90,9 @@ def test_logs_handler_denies_before_fetch_when_scope_is_outside_policy(
 # while a bare service name is denied *before* any fetch (resource_not_allowed).
 _PROD_ENV = {
     "SLACKOPS_POLICY_ENFORCEMENT": "true",
-    "AWS_ACCOUNT_ID": "908601828278",
+    "AWS_ACCOUNT_ID": "123456789012",
     "AWS_REGION": "us-east-1",
-    "SLACKOPS_ALLOWED_AWS_ACCOUNT_IDS": "908601828278",
+    "SLACKOPS_ALLOWED_AWS_ACCOUNT_IDS": "123456789012",
     "SLACKOPS_ALLOWED_AWS_REGIONS": "us-east-1",
     "SLACKOPS_ALLOWED_LOG_GROUP_PREFIXES": "/aws/",
 }

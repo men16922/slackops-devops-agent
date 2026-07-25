@@ -8,7 +8,8 @@
 check: test lint typecheck check-doc-budget   ## 커밋 게이트 (pytest + ruff + mypy + doc-budget)
 
 check-doc-budget: ## entry-doc line caps (context budget — mirrors harness-config budgets)
-	@bash harness/check-doc-budget.sh
+	@if [ -f harness/check-doc-budget.sh ]; then bash harness/check-doc-budget.sh; \
+	else echo "doc-budget: harness/ not present (local-only tooling) — skipped"; fi
 
 test:        ## pytest 전체
 	python3 -m pytest tests/ -q
